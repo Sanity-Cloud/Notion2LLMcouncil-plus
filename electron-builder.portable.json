@@ -1,6 +1,7 @@
 {
   "appId": "cloud.sanity.notion2council",
   "productName": "Notion2Council",
+  "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
   "directories": {
     "output": "release"
   },
@@ -23,6 +24,14 @@
     "main": "electron/main.js"
   },
   "portable": {
-    "artifactName": "Notion2Council-0.1.0-portable.exe"
+    "artifactName": "Notion2Council-${version}-portable.${ext}"
+  },
+  "nsis": {
+    "artifactName": "Notion2Council-${version}-setup.${ext}",
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Notion2Council"
   }
 }
