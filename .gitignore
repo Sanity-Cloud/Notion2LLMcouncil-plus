@@ -12,7 +12,6 @@ config/local.json
 node_modules/
 release/
 dist-release/
-package-lock.json
 
 # IDEs
 .vscode/

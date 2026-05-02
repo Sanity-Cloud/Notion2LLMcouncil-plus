@@ -45,10 +45,18 @@ function Write-IcoFromPngBytes {
 
 $IconPngPath = Join-Path $ElectronDir "icon.png"
 $IconIcoPath = Join-Path $ElectronDir "icon.ico"
-$pngBytes = [Convert]::FromBase64String($IconPngBase64.Trim())
 
-[IO.File]::WriteAllBytes($IconPngPath, $pngBytes)
-Write-Host "Wrote tray icon: $IconPngPath"
+if (-not (Test-Path $IconPngPath)) {
+    $pngBytes = [Convert]::FromBase64String($IconPngBase64.Trim())
+    [IO.File]::WriteAllBytes($IconPngPath, $pngBytes)
+    Write-Host "Wrote tray icon: $IconPngPath"
+} else {
+    Write-Host "Using existing icon: $IconPngPath"
+}
 
-Write-IcoFromPngBytes -PngBytes $pngBytes -Path $IconIcoPath -Width 32 -Height 32
-Write-Host "Wrote valid Windows icon: $IconIcoPath"
+if (-not (Test-Path $IconIcoPath)) {
+    Write-IcoFromPngBytes -PngBytes ([IO.File]::ReadAllBytes($IconPngPath)) -Path $IconIcoPath -Width 32 -Height 32
+    Write-Host "Wrote valid Windows icon: $IconIcoPath"
+} else {
+    Write-Host "Using existing ICO: $IconIcoPath"
+}
