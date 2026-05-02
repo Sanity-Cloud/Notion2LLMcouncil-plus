@@ -13,6 +13,7 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  RELEASE_TAG: v0.1.0
 
 jobs:
   build-windows:
@@ -64,9 +65,18 @@ jobs:
             dist-release/**
 
       - name: Publish GitHub release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          target_commitish: ${{ github.sha }}
+          name: Notion2Council v0.1.0
+          body: |
+            Notion2Council desktop release v0.1.0.
+
+            Includes Windows portable EXE, ZIP package, MSI setup installer, and source/runtime bundle when all build targets complete.
+          draft: false
+          prerelease: false
+          make_latest: true
           files: |
             release/**
             dist-release/**
