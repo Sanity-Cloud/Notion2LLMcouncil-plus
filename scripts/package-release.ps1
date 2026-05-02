@@ -1,7 +1,8 @@
 param(
     [string]$Version = "",
     [switch]$SkipNpmInstall,
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    [switch]$NoPause
 )
 
 $ErrorActionPreference = "Stop"
@@ -85,4 +86,7 @@ Write-Host "Source/runtime bundle:"
 Write-Host "  $ZipPath"
 Write-Host ""
 Write-Host "For a GitHub Release, upload the portable EXE, MSI, ZIP from release\ and the source bundle from dist-release\."
-Pause
+
+if (-not $NoPause -and -not $env:GITHUB_ACTIONS) {
+    Pause
+}
