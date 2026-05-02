@@ -74,10 +74,7 @@
     },
     "msi": {
       "artifactName": "Notion2Council-${version}-setup.msi",
-      "upgradeCode": "AD379612-CB12-4220-A03D-76A8A3C98E51",
-      "additionalWixArgs": [
-        "-sval"
-      ]
+      "upgradeCode": "AD379612-CB12-4220-A03D-76A8A3C98E51"
     },
     "nsis": {
       "oneClick": false,

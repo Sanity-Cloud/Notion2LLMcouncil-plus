@@ -36,8 +36,6 @@ jobs:
 
       - name: Build Electron package
         run: npm run electron:build
-        env:
-          DEBUG: "electron-builder*"
 
       - name: Create source/runtime bundle
         shell: powershell
