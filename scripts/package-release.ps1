@@ -37,7 +37,7 @@ if (Test-Path $iconScript) {
 }
 
 if (-not $SkipBuild) {
-    Write-Host "==> Building installer and portable ZIP through electron-builder"
+    Write-Host "==> Building portable EXE, MSI setup, and ZIP through electron-builder"
     npm run electron:build
 }
 
@@ -50,10 +50,13 @@ $include = @(
     "electron",
     "scripts",
     "launch.bat",
+    "launch-ui.bat",
     "stop.bat",
     "setup.bat",
     "setup-desktop.bat",
     "package-release.bat",
+    "build-ui-exe.bat",
+    "build-setup-msi.bat",
     "package.json",
     "package-lock.json",
     "README.md"
@@ -72,10 +75,14 @@ Compress-Archive -Path (Join-Path $BundleRoot "*") -DestinationPath $ZipPath -Fo
 
 Write-Host ""
 Write-Host "Release packaging complete."
-Write-Host "Electron-builder output:"
+Write-Host "Portable app EXE:"
+Get-ChildItem $ReleaseRoot -Filter "*portable*.exe" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.FullName)" }
+Write-Host "MSI setup installer:"
+Get-ChildItem $ReleaseRoot -Filter "*.msi" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.FullName)" }
+Write-Host "All Electron-builder output:"
 Write-Host "  $ReleaseRoot"
 Write-Host "Source/runtime bundle:"
 Write-Host "  $ZipPath"
 Write-Host ""
-Write-Host "For a GitHub Release, upload the installer/zip from release\ and the source bundle from dist-release\."
+Write-Host "For a GitHub Release, upload the portable EXE, MSI, ZIP from release\ and the source bundle from dist-release\."
 Pause
