@@ -9,8 +9,9 @@
     "setup": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/setup-desktop.ps1",
     "electron:dev": "cross-env NODE_ENV=development electron .",
     "start": "npm run electron:dev",
-    "electron:build": "electron-builder --win portable msi zip --publish never",
+    "electron:build": "npm run electron:build:exe && npm run electron:build:zip && npm run electron:build:msi",
     "electron:build:exe": "electron-builder --win portable --publish never",
+    "electron:build:zip": "electron-builder --win zip --publish never",
     "electron:build:msi": "electron-builder --win msi --publish never",
     "electron:pack": "electron-builder --dir",
     "release:local": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/package-release.ps1",
@@ -24,64 +25,12 @@
   "build": {
     "appId": "cloud.sanity.notion2council",
     "productName": "Notion2Council",
-    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "electron/**/*",
-      "scripts/**/*",
-      "config/default.json",
-      "config/prompt-presets.json",
-      "launch.bat",
-      "stop.bat",
-      "setup.bat",
-      "setup-desktop.bat",
-      "package-release.bat",
-      "launch-ui.bat",
-      "build-ui-exe.bat",
-      "build-setup-msi.bat",
-      "README.md"
-    ],
-    "extraMetadata": {
-      "main": "electron/main.js"
-    },
-    "win": {
-      "icon": "electron/icon.ico",
-      "target": [
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "msi",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "x64"
-          ]
-        }
-      ]
-    },
-    "portable": {
-      "artifactName": "Notion2Council-${version}-portable.exe"
-    },
-    "msi": {
-      "artifactName": "Notion2Council-${version}-setup.msi",
-      "upgradeCode": "AD379612-CB12-4220-A03D-76A8A3C98E51"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Notion2Council"
-    }
+    "directories": { "output": "release" },
+    "files": ["electron/**/*", "scripts/**/*", "config/default.json", "config/prompt-presets.json", "launch.bat", "stop.bat", "setup.bat", "setup-desktop.bat", "package-release.bat", "launch-ui.bat", "build-ui-exe.bat", "build-setup-msi.bat", "README.md"],
+    "extraMetadata": { "main": "electron/main.js" },
+    "win": { "icon": "electron/icon.ico" },
+    "portable": { "artifactName": "Notion2Council-0.1.0-portable.exe" },
+    "zip": { "artifactName": "Notion2Council-0.1.0-win-x64.zip" },
+    "msi": { "artifactName": "Notion2Council-0.1.0-setup.msi", "upgradeCode": "AD379612-CB12-4220-A03D-76A8A3C98E51" }
   }
 }
