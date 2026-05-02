@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Electron shell and launcher menu for Notion2LLMcouncil Plus.",
+  "author": "Sanity Cloud",
   "main": "electron/main.js",
   "scripts": {
     "setup": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/setup-desktop.ps1",
@@ -46,6 +47,7 @@
       "main": "electron/main.js"
     },
     "win": {
+      "icon": "electron/icon.png",
       "target": [
         {
           "target": "portable",

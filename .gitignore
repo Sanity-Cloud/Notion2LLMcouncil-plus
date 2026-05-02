@@ -7,3 +7,18 @@ config/local.json
 .env
 .env.*
 !.env.example
+
+# Build and dependencies
+node_modules/
+release/
+dist-release/
+package-lock.json
+
+# IDEs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

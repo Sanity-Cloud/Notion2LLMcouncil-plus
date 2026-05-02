@@ -10,8 +10,12 @@ iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAACJklEQVR4nOVXO27CQBQcotTbUKR0lVP4
 '@
 
 $IconPngPath = Join-Path $ElectronDir "icon.png"
-[IO.File]::WriteAllBytes($IconPngPath, [Convert]::FromBase64String($IconPngBase64.Trim()))
-Write-Host "Wrote tray icon: $IconPngPath"
+if (-not (Test-Path $IconPngPath)) {
+    [IO.File]::WriteAllBytes($IconPngPath, [Convert]::FromBase64String($IconPngBase64.Trim()))
+    Write-Host "Wrote tray icon: $IconPngPath"
+} else {
+    Write-Host "Using existing icon: $IconPngPath"
+}
 
 # Best-effort ICO for the Electron window. This is optional; the tray uses icon.png.
 $IconIcoPath = Join-Path $ElectronDir "icon.ico"
