@@ -41,17 +41,15 @@ function Convert-BitmapToIconDibBytes {
     $width = $Bitmap.Width
     $height = $Bitmap.Height
     $xorSize = $width * $height * 4
-    $andStride = [int]([Math]::Floor(($width + 31) / 32) * 4)
-    $andSize = $andStride * $height
 
     $ms = New-Object System.IO.MemoryStream
     $bw = New-Object System.IO.BinaryWriter($ms)
     try {
-        # BITMAPINFOHEADER. biHeight must be doubled for ICO DIB payloads because
-        # it includes XOR bitmap height plus AND mask height.
-        $bw.Write([UInt32]40)           # biSize
+        # BMP/DIB-backed ICO payload. For 32-bit alpha icons, omit a separate AND mask.
+        # This matches the DIB shape produced by common icon writers and is accepted by NSIS.
+        $bw.Write([UInt32]40)           # BITMAPINFOHEADER.biSize
         $bw.Write([Int32]$width)        # biWidth
-        $bw.Write([Int32]($height * 2)) # biHeight
+        $bw.Write([Int32]($height * 2)) # biHeight = XOR height + AND-mask height
         $bw.Write([UInt16]1)            # biPlanes
         $bw.Write([UInt16]32)           # biBitCount
         $bw.Write([UInt32]0)            # biCompression = BI_RGB
@@ -72,8 +70,6 @@ function Convert-BitmapToIconDibBytes {
             }
         }
 
-        # AND mask. For 32-bit alpha icons this should be all zero.
-        $bw.Write((New-Object byte[] $andSize))
         $bw.Flush()
         return $ms.ToArray()
     } finally {
@@ -89,7 +85,8 @@ function Write-WindowsIco {
     )
 
     $source = [System.Drawing.Image]::FromFile($SourcePng)
-    $sizes = @(16, 32, 48, 64, 128, 256)
+    # Keep the icon conservative for older NSIS/makensis parsers.
+    $sizes = @(16, 24, 32, 48)
     $entries = @()
 
     try {
@@ -116,13 +113,12 @@ function Write-WindowsIco {
         $bw.Write([UInt16]$entries.Count)
 
         foreach ($entry in $entries) {
-            $sizeByte = if ($entry.Size -eq 256) { 0 } else { $entry.Size }
-            $bw.Write([byte]$sizeByte)
-            $bw.Write([byte]$sizeByte)
-            $bw.Write([byte]0) # color count
-            $bw.Write([byte]0) # reserved
-            $bw.Write([UInt16]1) # color planes
-            $bw.Write([UInt16]32) # bits per pixel
+            $bw.Write([byte]$entry.Size)
+            $bw.Write([byte]$entry.Size)
+            $bw.Write([byte]0)     # color count
+            $bw.Write([byte]0)     # reserved
+            $bw.Write([UInt16]1)   # color planes
+            $bw.Write([UInt16]32)  # bits per pixel
             $bw.Write([UInt32]$entry.Bytes.Length)
             $bw.Write([UInt32]$offset)
             $offset += $entry.Bytes.Length
@@ -144,4 +140,4 @@ function Write-WindowsIco {
 Write-Host "Wrote tray PNG: $IconPngPath"
 
 Write-WindowsIco -SourcePng $IconPngPath -DestinationIco $IconIcoPath
-Write-Host "Wrote BMP-backed Windows ICO: $IconIcoPath"
+Write-Host "Wrote NSIS-readable BMP ICO: $IconIcoPath"
