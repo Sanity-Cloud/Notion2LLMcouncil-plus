@@ -1,0 +1,9 @@
+logs/
+vendor/
+*.log
+*.tmp
+*.local.json
+config/local.json
+.env
+.env.*
+!.env.example

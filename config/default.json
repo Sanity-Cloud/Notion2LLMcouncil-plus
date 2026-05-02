@@ -1,0 +1,27 @@
+{
+  "notion": {
+    "localRoot": "X:\\Code\\notion2api-pub",
+    "repoUrl": "https://github.com/Sanity-Cloud/notion2api.git",
+    "branch": "feat/login-cdp",
+    "port": 8000
+  },
+  "council": {
+    "localRoot": "X:\\Code\\llm-council-plus",
+    "repoUrl": "https://github.com/jacob-bd/llm-council-plus.git",
+    "branch": "main",
+    "backendPort": 8001,
+    "frontendPort": 5173
+  },
+  "provider": {
+    "name": "Notion2API",
+    "enabledKey": "custom",
+    "urlPath": "/v1",
+    "councilModels": [
+      "custom:gpt-5.5",
+      "custom:claude-opus4.7",
+      "custom:gemini-3.1pro",
+      "custom:kimi-2.6"
+    ],
+    "chairmanModel": "custom:claude-opus4.7"
+  }
+}
