@@ -8,7 +8,9 @@
     "setup": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/setup-desktop.ps1",
     "electron:dev": "cross-env NODE_ENV=development electron .",
     "start": "npm run electron:dev",
-    "electron:build": "electron-builder --publish never",
+    "electron:build": "electron-builder --win portable msi zip --publish never",
+    "electron:build:exe": "electron-builder --win portable --publish never",
+    "electron:build:msi": "electron-builder --win msi --publish never",
     "electron:pack": "electron-builder --dir",
     "release:local": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/package-release.ps1",
     "release:dir": "npm run electron:pack"
@@ -21,6 +23,7 @@
   "build": {
     "appId": "cloud.sanity.notion2council",
     "productName": "Notion2Council",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "directories": {
       "output": "release"
     },
@@ -34,6 +37,9 @@
       "setup.bat",
       "setup-desktop.bat",
       "package-release.bat",
+      "launch-ui.bat",
+      "build-ui-exe.bat",
+      "build-setup-msi.bat",
       "README.md"
     ],
     "extraMetadata": {
@@ -41,9 +47,31 @@
     },
     "win": {
       "target": [
-        "nsis",
-        "zip"
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "msi",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
+    },
+    "portable": {
+      "artifactName": "Notion2Council-${version}-portable.exe"
+    },
+    "msi": {
+      "artifactName": "Notion2Council-${version}-setup.msi"
     },
     "nsis": {
       "oneClick": false,
