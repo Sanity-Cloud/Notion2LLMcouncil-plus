@@ -1,0 +1,28 @@
+{
+  "appId": "cloud.sanity.notion2council",
+  "productName": "Notion2Council",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "electron/**/*",
+    "scripts/**/*",
+    "config/default.json",
+    "config/prompt-presets.json",
+    "launch.bat",
+    "stop.bat",
+    "setup.bat",
+    "setup-desktop.bat",
+    "package-release.bat",
+    "launch-ui.bat",
+    "build-ui-exe.bat",
+    "build-setup-msi.bat",
+    "README.md"
+  ],
+  "extraMetadata": {
+    "main": "electron/main.js"
+  },
+  "portable": {
+    "artifactName": "Notion2Council-0.1.0-portable.exe"
+  }
+}
