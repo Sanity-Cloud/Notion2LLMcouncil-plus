@@ -2,61 +2,90 @@ $ErrorActionPreference = "Stop"
 
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $ElectronDir = Join-Path $RepoRoot "electron"
-New-Item -ItemType Directory -Force -Path $ElectronDir | Out-Null
+if (-not (Test-Path $ElectronDir)) {
+    New-Item -ItemType Directory -Force -Path $ElectronDir | Out-Null
+}
 
-# 32x32 PNG tray icon. Electron uses this for the Windows notification area near the clock.
-$IconPngBase64 = @'
-iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAACJklEQVR4nOVXO27CQBQcotTbUKR0lVP4CIgejMQJKHwBVz5AXHACJJz0KEfwKagoU6TZCzgFfsvb9duPA1KKjISEvd6d8fsb+O+Y/WbTqu1739pHMZt0ZvLDIdJ7xCQJ6N/W/fqlNdefuwy6ygEAqu6sZxf7yyQRwcVV2/fvX4W55mQ+AbSm6s4S4xPyFCIHAP7mKSBhusrxuctG5yUJ4A/zQ+jwFJBlYiK8FuCbJdOjbIGyhf6+WL/QORJGfiG/+3xryANQc5vQjQkeD5YFuIl0lcsm5+RNATXProTNLVi5JaSY4DyiC1TdGQtYQgbyESGtD4JIBM8UyaIA8CzeZUKMiOGtiEDVHZaHC5YHYAPgeGZua+TUlWB8QWbxBQwXsDzIwYZBSIyYx0IwCyTyFMTemmPkglCu6yrH5jWcAdf1NKGigEcgVrDWIQFi/pf3SvJjsgWO5yLohtM2A4bC48Nif/sfDUJd5be0KttogPHCkwIjgMojb6G+Q47nwqQb4bTNTC0Qi9gAtxxbvYBqgXcGoBLbFBbJCFSuhYLkChBjQNWdaSDW/Xl2FVG20KVdF1TdWT2Ar3FL8AwAPN0QCFTEKo92Q24hvo+GG2835IvubGfIEamIg9ld10jkogAOSQS9mdWGWVuWskQ6JyiAq6TNU8Yxgq7y6GDqtYArItTTXdBzfKD1TcVJ3wXuMCkNqm6axYgnCZBEpOBhX0ZTxEz9Nvxz/ADa/jp/mIi68QAAAABJRU5ErkJggg==
-'@
+$IconPngPath = Join-Path $ElectronDir "icon.png"
+$IconIcoPath = Join-Path $ElectronDir "icon.ico"
 
-function Write-IcoFromPngBytes {
+# Ensure we have System.Drawing for robust conversion
+Add-Type -AssemblyName System.Drawing
+
+function Convert-To-ValidPng {
+    param([string]$SourcePath, [string]$DestPath)
+    $img = [System.Drawing.Image]::FromFile($SourcePath)
+    try {
+        # Create a new bitmap to ensure we lose any weird metadata/formats
+        $bmp = New-Object System.Drawing.Bitmap($img.Width, $img.Height)
+        $g = [System.Drawing.Graphics]::FromImage($bmp)
+        $g.DrawImage($img, 0, 0, $img.Width, $img.Height)
+        $g.Dispose()
+        $bmp.Save($DestPath, [System.Drawing.Imaging.ImageFormat]::Png)
+        $bmp.Dispose()
+    } finally {
+        $img.Dispose()
+    }
+}
+
+function Write-IcoFromPng {
     param(
-        [byte[]]$PngBytes,
-        [string]$Path,
-        [int]$Width = 32,
-        [int]$Height = 32
+        [string]$PngPath,
+        [string]$IcoPath
     )
 
-    # ICO container with PNG image payload:
-    # ICONDIR: reserved=0, type=1, count=1
-    # ICONDIRENTRY: width, height, colors, reserved, planes, bitcount, bytes, offset
+    $PngBytes = [IO.File]::ReadAllBytes($PngPath)
+    $img = [System.Drawing.Image]::FromFile($PngPath)
+    $w = $img.Width
+    $h = $img.Height
+    $img.Dispose()
+
+    # ICO limits: if > 256, use 0 in header
+    $headerW = if ($w -ge 256) { 0 } else { $w }
+    $headerH = if ($h -ge 256) { 0 } else { $h }
+
     $ms = New-Object System.IO.MemoryStream
     $bw = New-Object System.IO.BinaryWriter($ms)
     try {
-        $bw.Write([UInt16]0)
-        $bw.Write([UInt16]1)
-        $bw.Write([UInt16]1)
-        $bw.Write([byte]$Width)
-        $bw.Write([byte]$Height)
-        $bw.Write([byte]0)
-        $bw.Write([byte]0)
-        $bw.Write([UInt16]1)
-        $bw.Write([UInt16]32)
+        $bw.Write([UInt16]0) # Reserved
+        $bw.Write([UInt16]1) # Type (1 = Icon)
+        $bw.Write([UInt16]1) # Count
+        
+        $bw.Write([byte]$headerW)
+        $bw.Write([byte]$headerH)
+        $bw.Write([byte]0) # Colors
+        $bw.Write([byte]0) # Reserved
+        $bw.Write([UInt16]1) # Planes
+        $bw.Write([UInt16]32) # BitCount
         $bw.Write([UInt32]$PngBytes.Length)
-        $bw.Write([UInt32]22)
+        $bw.Write([UInt32]22) # Offset (6 header + 16 entry)
+        
         $bw.Write($PngBytes)
         $bw.Flush()
-        [IO.File]::WriteAllBytes($Path, $ms.ToArray())
+        [IO.File]::WriteAllBytes($IcoPath, $ms.ToArray())
     } finally {
         $bw.Dispose()
         $ms.Dispose()
     }
 }
 
-$IconPngPath = Join-Path $ElectronDir "icon.png"
-$IconIcoPath = Join-Path $ElectronDir "icon.ico"
-
-if (-not (Test-Path $IconPngPath)) {
-    $pngBytes = [Convert]::FromBase64String($IconPngBase64.Trim())
-    [IO.File]::WriteAllBytes($IconPngPath, $pngBytes)
-    Write-Host "Wrote tray icon: $IconPngPath"
+# 1. Fix the PNG if it's actually a JPEG or malformed
+if (Test-Path $IconPngPath) {
+    $bytes = [IO.File]::ReadAllBytes($IconPngPath)
+    if ($bytes[0] -ne 0x89 -or $bytes[1] -ne 0x50) {
+        Write-Host "Detected non-PNG signature. Converting to valid PNG..."
+        $tempPath = "$IconPngPath.tmp"
+        Move-Item $IconPngPath $tempPath
+        Convert-To-ValidPng -SourcePath $tempPath -DestPath $IconPngPath
+        Remove-Item $tempPath
+    }
 } else {
-    Write-Host "Using existing icon: $IconPngPath"
+    # Fallback to embedded base64 if missing (unlikely in this repo state)
+    Write-Error "Missing icon.png in electron directory."
 }
 
-if (-not (Test-Path $IconIcoPath)) {
-    Write-IcoFromPngBytes -PngBytes ([IO.File]::ReadAllBytes($IconPngPath)) -Path $IconIcoPath -Width 32 -Height 32
-    Write-Host "Wrote valid Windows icon: $IconIcoPath"
-} else {
-    Write-Host "Using existing ICO: $IconIcoPath"
-}
+# 2. Generate the ICO from the valid PNG
+Write-Host "Generating valid Windows ICO from $IconPngPath..."
+Write-IcoFromPng -PngPath $IconPngPath -IcoPath $IconIcoPath
+Write-Host "Done. icon.ico is now a valid Windows Icon container."
+
