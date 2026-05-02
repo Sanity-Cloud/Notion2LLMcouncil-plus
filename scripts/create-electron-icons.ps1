@@ -7,7 +7,8 @@ New-Item -ItemType Directory -Force -Path $ElectronDir | Out-Null
 $IconPngPath = Join-Path $ElectronDir "icon.png"
 $IconIcoPath = Join-Path $ElectronDir "icon.ico"
 
-# 32x32 PNG tray icon. Electron uses this for the Windows notification area near the clock.
+# Embedded source icon. This is currently 32x32, so the script writes a resized
+# 256x256 PNG for electron-builder's Windows/MSI requirement.
 $IconPngBase64 = @'
 iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAACJklEQVR4nOVXO27CQBQcotTbUKR0lVP4CIgejMQJKHwBVz5AXHACJJz0KEfwKagoU6TZCzgFfsvb9duPA1KKjISEvd6d8fsb+O+Y/WbTqu1739pHMZt0ZvLDIdJ7xCQJ6N/W/fqlNdefuwy6ygEAqu6sZxf7yyQRwcVV2/fvX4W55mQ+AbSm6s4S4xPyFCIHAP7mKSBhusrxuctG5yUJ4A/zQ+jwFJBlYiK8FuCbJdOjbIGyhf6+WL/QORJGfiG/+3xryANQc5vQjQkeD5YFuIl0lcsm5+RNATXProTNLVi5JaSY4DyiC1TdGQtYQgbyESGtD4JIBM8UyaIA8CzeZUKMiOGtiEDVHZaHC5YHYAPgeGZua+TUlWB8QWbxBQwXsDzIwYZBSIyYx0IwCyTyFMTemmPkglCu6yrH5jWcAdf1NKGigEcgVrDWIQFi/pf3SvJjsgWO5yLohtM2A4bC48Nif/sfDUJd5be0KttogPHCkwIjgMojb6G+Q47nwqQb4bTNTC0Qi9gAtxxbvYBqgXcGoBLbFBbJCFSuhYLkChBjQNWdaSDW/Xl2FVG20KVdF1TdWT2Ar3FL8AwAPN0QCFTEKo92Q24hvo+GG2835IvubGfIEamIg9ld10jkogAOSQS9mdWGWVuWskQ6JyiAq6TNU8Yxgq7y6GDqtYArItTTXdBzfKD1TcVJ3wXuMCkNqm6axYgnCZBEpOBhX0ZTxEz9Nvxz/ADa/jp/mIi68QAAAABJRU5ErkJggg==
 '@
@@ -45,21 +46,18 @@ function Convert-BitmapToIconDibBytes {
     $ms = New-Object System.IO.MemoryStream
     $bw = New-Object System.IO.BinaryWriter($ms)
     try {
-        # BMP/DIB-backed ICO payload. For 32-bit alpha icons, omit a separate AND mask.
-        # This matches the DIB shape produced by common icon writers and is accepted by NSIS.
-        $bw.Write([UInt32]40)           # BITMAPINFOHEADER.biSize
-        $bw.Write([Int32]$width)        # biWidth
-        $bw.Write([Int32]($height * 2)) # biHeight = XOR height + AND-mask height
-        $bw.Write([UInt16]1)            # biPlanes
-        $bw.Write([UInt16]32)           # biBitCount
-        $bw.Write([UInt32]0)            # biCompression = BI_RGB
-        $bw.Write([UInt32]$xorSize)     # biSizeImage
-        $bw.Write([Int32]0)             # biXPelsPerMeter
-        $bw.Write([Int32]0)             # biYPelsPerMeter
-        $bw.Write([UInt32]0)            # biClrUsed
-        $bw.Write([UInt32]0)            # biClrImportant
+        $bw.Write([UInt32]40)
+        $bw.Write([Int32]$width)
+        $bw.Write([Int32]($height * 2))
+        $bw.Write([UInt16]1)
+        $bw.Write([UInt16]32)
+        $bw.Write([UInt32]0)
+        $bw.Write([UInt32]$xorSize)
+        $bw.Write([Int32]0)
+        $bw.Write([Int32]0)
+        $bw.Write([UInt32]0)
+        $bw.Write([UInt32]0)
 
-        # ICO DIB pixel data is bottom-up BGRA.
         for ($y = $height - 1; $y -ge 0; $y--) {
             for ($x = 0; $x -lt $width; $x++) {
                 $c = $Bitmap.GetPixel($x, $y)
@@ -85,8 +83,7 @@ function Write-WindowsIco {
     )
 
     $source = [System.Drawing.Image]::FromFile($SourcePng)
-    # Keep the icon conservative for older NSIS/makensis parsers.
-    $sizes = @(16, 24, 32, 48)
+    $sizes = @(16, 24, 32, 48, 256)
     $entries = @()
 
     try {
@@ -108,17 +105,18 @@ function Write-WindowsIco {
     $ms = New-Object System.IO.MemoryStream
     $bw = New-Object System.IO.BinaryWriter($ms)
     try {
-        $bw.Write([UInt16]0) # reserved
-        $bw.Write([UInt16]1) # image type: icon
+        $bw.Write([UInt16]0)
+        $bw.Write([UInt16]1)
         $bw.Write([UInt16]$entries.Count)
 
         foreach ($entry in $entries) {
-            $bw.Write([byte]$entry.Size)
-            $bw.Write([byte]$entry.Size)
-            $bw.Write([byte]0)     # color count
-            $bw.Write([byte]0)     # reserved
-            $bw.Write([UInt16]1)   # color planes
-            $bw.Write([UInt16]32)  # bits per pixel
+            $sizeByte = if ($entry.Size -eq 256) { 0 } else { $entry.Size }
+            $bw.Write([byte]$sizeByte)
+            $bw.Write([byte]$sizeByte)
+            $bw.Write([byte]0)
+            $bw.Write([byte]0)
+            $bw.Write([UInt16]1)
+            $bw.Write([UInt16]32)
             $bw.Write([UInt32]$entry.Bytes.Length)
             $bw.Write([UInt32]$offset)
             $offset += $entry.Bytes.Length
@@ -136,8 +134,22 @@ function Write-WindowsIco {
     }
 }
 
-[IO.File]::WriteAllBytes($IconPngPath, [Convert]::FromBase64String($IconPngBase64.Trim()))
-Write-Host "Wrote tray PNG: $IconPngPath"
+$sourceBytes = [Convert]::FromBase64String($IconPngBase64.Trim())
+$sourceStream = New-Object System.IO.MemoryStream(,$sourceBytes)
+$sourceImage = [System.Drawing.Image]::FromStream($sourceStream)
+try {
+    $png256 = New-ResizedBitmap -Source $sourceImage -Size 256
+    try {
+        $png256.Save($IconPngPath, [System.Drawing.Imaging.ImageFormat]::Png)
+    } finally {
+        $png256.Dispose()
+    }
+} finally {
+    $sourceImage.Dispose()
+    $sourceStream.Dispose()
+}
+
+Write-Host "Wrote 256x256 Windows PNG: $IconPngPath"
 
 Write-WindowsIco -SourcePng $IconPngPath -DestinationIco $IconIcoPath
-Write-Host "Wrote NSIS-readable BMP ICO: $IconIcoPath"
+Write-Host "Wrote Windows ICO with 256px layer: $IconIcoPath"
