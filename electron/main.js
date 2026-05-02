@@ -128,7 +128,7 @@ function toggleMainWindow() {
 }
 
 function createMainWindow() {
-  const iconIco = path.join(__dirname, 'icon.ico');
+  const iconPng = path.join(__dirname, 'icon.png');
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 860,
@@ -137,7 +137,7 @@ function createMainWindow() {
     show: false,
     backgroundColor: '#060a12',
     title: 'Notion2Council',
-    icon: fs.existsSync(iconIco) ? iconIco : undefined,
+    icon: fs.existsSync(iconPng) ? iconPng : undefined,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
