@@ -47,7 +47,7 @@
       "main": "electron/main.js"
     },
     "win": {
-      "icon": "electron/icon.png",
+      "icon": "electron/icon.ico",
       "target": [
         {
           "target": "portable",
@@ -73,7 +73,11 @@
       "artifactName": "Notion2Council-${version}-portable.exe"
     },
     "msi": {
-      "artifactName": "Notion2Council-${version}-setup.msi"
+      "artifactName": "Notion2Council-${version}-setup.msi",
+      "upgradeCode": "AD379612-CB12-4220-A03D-76A8A3C98E51",
+      "additionalWixArgs": [
+        "-sval"
+      ]
     },
     "nsis": {
       "oneClick": false,
