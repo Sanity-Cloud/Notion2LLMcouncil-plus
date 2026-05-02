@@ -3,6 +3,8 @@ name: Build Windows Release
 on:
   workflow_dispatch:
   push:
+    branches:
+      - master
     tags:
       - "v*"
 
@@ -35,7 +37,7 @@ jobs:
 
       - name: Create source/runtime bundle
         shell: powershell
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\package-release.ps1 -SkipNpmInstall -SkipBuild
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\package-release.ps1 -SkipNpmInstall -SkipBuild -NoPause
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
