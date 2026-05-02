@@ -34,14 +34,28 @@ jobs:
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\create-electron-icons.ps1
 
-      - name: Build Electron package
-        run: npm run electron:build
+      - name: Show build scripts
+        shell: powershell
+        run: |
+          $pkg = Get-Content package.json -Raw | ConvertFrom-Json
+          $pkg.scripts | ConvertTo-Json -Depth 5
+          $pkg.build | ConvertTo-Json -Depth 10
+
+      - name: Build portable EXE
+        run: npm run electron:build:exe
+
+      - name: Build ZIP package
+        run: npm run electron:build:zip
+
+      - name: Build MSI setup
+        run: npm run electron:build:msi
 
       - name: Create source/runtime bundle
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\package-release.ps1 -SkipNpmInstall -SkipBuild -NoPause
 
       - name: Upload build artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Notion2Council-Windows
