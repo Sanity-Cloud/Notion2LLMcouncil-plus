@@ -1,0 +1,43 @@
+{
+  "name": "notion2council-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Electron shell and launcher menu for Notion2LLMcouncil Plus.",
+  "main": "electron/main.js",
+  "scripts": {
+    "electron:dev": "cross-env NODE_ENV=development electron .",
+    "start": "npm run electron:dev",
+    "electron:build": "electron-builder"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "cloud.sanity.notion2council",
+    "productName": "Notion2Council",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "scripts/**/*",
+      "config/default.json",
+      "launch.bat",
+      "stop.bat",
+      "setup.bat",
+      "README.md"
+    ],
+    "extraMetadata": {
+      "main": "electron/main.js"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
