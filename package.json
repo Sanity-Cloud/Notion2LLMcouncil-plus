@@ -11,7 +11,7 @@
     "start": "npm run electron:dev",
     "electron:build": "npm run electron:build:exe && npm run electron:build:zip && npm run electron:build:msi",
     "electron:build:exe": "electron-builder --win portable --publish never",
-    "electron:build:zip": "electron-builder --win zip --publish never",
+    "electron:build:zip": "electron-builder --win zip --config.artifactName=Notion2Council-0.1.0-win-x64.zip --publish never",
     "electron:build:msi": "electron-builder --win msi --publish never",
     "electron:pack": "electron-builder --dir",
     "release:local": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/package-release.ps1",
@@ -30,7 +30,6 @@
     "extraMetadata": { "main": "electron/main.js" },
     "win": { "icon": "electron/icon.ico" },
     "portable": { "artifactName": "Notion2Council-0.1.0-portable.exe" },
-    "zip": { "artifactName": "Notion2Council-0.1.0-win-x64.zip" },
     "msi": { "artifactName": "Notion2Council-0.1.0-setup.msi", "upgradeCode": "AD379612-CB12-4220-A03D-76A8A3C98E51" }
   }
 }
