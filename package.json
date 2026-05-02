@@ -28,7 +28,7 @@
     "directories": { "output": "release" },
     "files": ["electron/**/*", "scripts/**/*", "config/default.json", "config/prompt-presets.json", "launch.bat", "stop.bat", "setup.bat", "setup-desktop.bat", "package-release.bat", "launch-ui.bat", "build-ui-exe.bat", "build-setup-msi.bat", "README.md"],
     "extraMetadata": { "main": "electron/main.js" },
-    "win": { "icon": "electron/icon.ico" },
+    "win": { "icon": "electron/icon.png" },
     "portable": { "artifactName": "Notion2Council-0.1.0-portable.exe" },
     "msi": { "artifactName": "Notion2Council-0.1.0-setup.msi", "upgradeCode": "AD379612-CB12-4220-A03D-76A8A3C98E51" }
   }
