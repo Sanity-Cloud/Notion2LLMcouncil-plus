@@ -11,7 +11,8 @@ The launcher starts both projects and automatically configures LLM Council Plus 
 
 - Reuses existing local checkouts or clones both upstream repos into `vendor/`
 - Validates the Notion login with `python login.py --check`
-- Refreshes the Notion browser login flow when needed
+- Refreshes the Notion browser login flow when needed, or when `-RefreshLogin` is passed
+- Generates or preserves a local Notion2API `API_KEY`
 - Forces Notion2API to `APP_MODE=standard`
 - Starts Notion2API on `http://127.0.0.1:8000`
 - Starts LLM Council backend on `http://127.0.0.1:8001`
@@ -19,9 +20,12 @@ The launcher starts both projects and automatically configures LLM Council Plus 
 - Configures LLM Council custom provider:
   - name: `Notion2API`
   - URL: `http://127.0.0.1:8000/v1`
+  - API key: the generated/preserved Notion2API `API_KEY`
   - provider enabled: `custom`
   - council models: `custom:gpt-5.5`, `custom:claude-opus4.7`, `custom:gemini-3.1pro`, `custom:kimi-2.6`
   - chairman: `custom:claude-opus4.7`
+  - member filters: `Remote` for all four council members
+- Leaves Notion2API streaming available for OpenAI-compatible clients that send `stream: true`
 
 The default local paths, clone URLs, ports, and provider model list live in `config/default.json`.
 Create `config/local.json` with the same shape to override them without committing local machine paths or private settings.
@@ -41,6 +45,12 @@ The upstream projects provide their own dependency files. This launcher does not
 From this repo:
 
 ```powershell
+.\setup.bat
+```
+
+Then:
+
+```powershell
 .\launch.bat
 ```
 
@@ -51,6 +61,8 @@ http://127.0.0.1:5173/
 ```
 
 The first run may open a Chrome/Edge window for Notion login. Complete the Notion login there. The generated credentials stay in the local Notion2API checkout and are ignored by git.
+
+`setup.bat` is the one-time initializer. It checks or refreshes the Notion browser login flow and writes a local Notion2API API key if one is missing. `launch.bat` starts the services and configures LLM Council to use that same key.
 
 ## Common Commands
 
@@ -65,6 +77,8 @@ Force a fresh Notion login:
 ```powershell
 .\launch.bat -RefreshLogin
 ```
+
+The launcher handles the Notion login flow by checking `python login.py --check` before startup. If the session is invalid, it runs the browser-assisted login flow with the configured timeout, then starts Notion2API only after the token check passes.
 
 Stop launcher-managed services:
 
@@ -122,6 +136,18 @@ Until the Notion2API auto-login PR is merged upstream, vendor mode clones the PR
 This repo does not store Notion cookies, `token_v2`, `.env`, or `accounts.json`.
 
 Notion2API's `login.py` uses browser cookies transiently during local login to derive the active Notion account and workspace. The resulting `accounts.json` and `.env` stay in the Notion2API checkout and should not be committed.
+
+## Streaming
+
+Notion2API supports OpenAI-compatible streaming when the caller sends:
+
+```json
+{
+  "stream": true
+}
+```
+
+The integration exposes this as `provider.supportsStreaming` in `config/default.json` so the capability is visible and configurable. It does not force streaming globally because non-streaming clients should keep receiving normal JSON responses.
 
 ## Logs
 

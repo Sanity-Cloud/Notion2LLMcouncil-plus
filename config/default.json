@@ -3,7 +3,10 @@
     "localRoot": "X:\\Code\\notion2api-pub",
     "repoUrl": "https://github.com/Sanity-Cloud/notion2api.git",
     "branch": "feat/login-cdp",
-    "port": 8000
+    "port": 8000,
+    "appMode": "standard",
+    "autoLogin": true,
+    "loginTimeoutSeconds": 300
   },
   "council": {
     "localRoot": "X:\\Code\\llm-council-plus",
@@ -16,12 +19,22 @@
     "name": "Notion2API",
     "enabledKey": "custom",
     "urlPath": "/v1",
+    "supportsStreaming": true,
+    "applyDefaultCouncil": true,
     "councilModels": [
       "custom:gpt-5.5",
       "custom:claude-opus4.7",
       "custom:gemini-3.1pro",
       "custom:kimi-2.6"
     ],
-    "chairmanModel": "custom:claude-opus4.7"
+    "chairmanModel": "custom:claude-opus4.7",
+    "councilMemberFilters": {
+      "0": "remote",
+      "1": "remote",
+      "2": "remote",
+      "3": "remote"
+    },
+    "chairmanFilter": "remote",
+    "searchQueryFilter": "remote"
   }
 }
