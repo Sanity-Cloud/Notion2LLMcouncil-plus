@@ -501,6 +501,25 @@ function Apply-CouncilProviderSettings {
     Invoke-RestMethod -Method Put -Uri $settingsUrl -ContentType "application/json" -Body $body -TimeoutSec 20 | Out-Null
 }
 
+function Test-CouncilProviderConnection {
+    param([string]$NotionApiKey)
+
+    $providerUrl = "http://127.0.0.1:$NotionPort$ProviderUrlPath"
+    $testUrl = "http://127.0.0.1:$CouncilBackendPort/api/settings/test-custom-endpoint"
+    $body = @{
+        name = $ProviderName
+        url = $providerUrl
+        api_key = $NotionApiKey
+    } | ConvertTo-Json -Depth 10
+
+    Write-Step "Testing LLM Council connection to Notion2API provider"
+    $result = Invoke-RestMethod -Method Post -Uri $testUrl -ContentType "application/json" -Body $body -TimeoutSec 20
+    if (-not $result.success) {
+        throw "LLM Council could not connect to Notion2API provider: $($result.message)"
+    }
+    Write-Step "Notion2API provider connection is ready"
+}
+
 function Start-CouncilFrontend {
     param($State)
     $allowedPorts = @($CouncilFrontendPort, 5173, 5174, 3000) | Select-Object -Unique
@@ -647,6 +666,7 @@ $state = Get-State
 $state = Start-NotionApi -State $state
 $state = Start-CouncilBackend -State $state
 Apply-CouncilProviderSettings -NotionApiKey $notionApiKey
+Test-CouncilProviderConnection -NotionApiKey $notionApiKey
 $state = Start-CouncilFrontend -State $state
 Save-State -State $state
 
