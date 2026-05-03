@@ -13,7 +13,6 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  RELEASE_TAG: v0.1.1
 
 jobs:
   build-windows:
@@ -27,6 +26,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "24"
+
+      - name: Read package version
+        id: version
+        shell: powershell
+        run: |
+          $pkg = Get-Content package.json -Raw | ConvertFrom-Json
+          "version=$($pkg.version)" >> $env:GITHUB_OUTPUT
+          "tag=v$($pkg.version)" >> $env:GITHUB_OUTPUT
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
@@ -55,28 +62,49 @@ jobs:
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\package-release.ps1 -SkipNpmInstall -SkipBuild -NoPause
 
+      - name: Stage single GitHub release package
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = "${{ steps.version.outputs.version }}"
+          $stage = "github-release"
+          $bundle = "Notion2Council-$version-windows-release.zip"
+
+          Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+
+          $assetRoot = Join-Path $stage "Notion2Council-$version"
+          New-Item -ItemType Directory -Force -Path $assetRoot | Out-Null
+
+          Get-ChildItem release -File -Include "*.exe","*.msi","*.zip","*.blockmap","*.yml" -Recurse -ErrorAction SilentlyContinue |
+            Copy-Item -Destination $assetRoot -Force
+
+          Get-ChildItem dist-release -File -Filter "*.zip" -Recurse -ErrorAction SilentlyContinue |
+            Copy-Item -Destination $assetRoot -Force
+
+          Compress-Archive -Path (Join-Path $assetRoot "*") -DestinationPath (Join-Path $stage $bundle) -Force
+
+          Write-Host "Staged release asset: $stage\$bundle"
+          Get-ChildItem $stage -File | Format-Table Name, Length
+
       - name: Upload build artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Notion2Council-Windows
-          path: |
-            release/**
-            dist-release/**
+          path: github-release/*.zip
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.RELEASE_TAG }}
+          tag_name: ${{ steps.version.outputs.tag }}
           target_commitish: ${{ github.sha }}
-          name: Notion2Council v0.1.1
+          name: Notion2Council ${{ steps.version.outputs.tag }}
           body: |
-            Notion2Council desktop release v0.1.1.
+            Notion2Council desktop release ${{ steps.version.outputs.tag }}.
 
-            Includes Windows portable EXE, ZIP package, MSI setup installer, and source/runtime bundle when all build targets complete.
+            This release publishes a single Windows package containing the portable EXE, ZIP package, MSI setup installer, and source/runtime bundle.
           draft: false
           prerelease: false
           make_latest: true
-          files: |
-            release/**
-            dist-release/**
+          files: github-release/*.zip
