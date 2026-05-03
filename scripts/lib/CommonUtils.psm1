@@ -1,9 +1,11 @@
-function Write-Step {
+function Write-Step
+{
     param([string]$Message)
     Write-Host "==> $Message" -ForegroundColor Cyan
 }
 
-function Read-JsonFile {
+function Read-JsonFile
+{
     param([string]$Path)
     if (-not (Test-Path $Path)) {
         return $null
@@ -11,7 +13,8 @@ function Read-JsonFile {
     return Get-Content -Raw -Path $Path | ConvertFrom-Json
 }
 
-function ConvertTo-StringArray {
+function ConvertTo-StringArray
+{
     param($Value)
     if ($null -eq $Value) {
         return @()

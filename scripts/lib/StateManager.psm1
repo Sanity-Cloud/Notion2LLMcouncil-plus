@@ -1,4 +1,5 @@
-function Get-State {
+function Get-State
+{
     param([string]$StateFile)
     $state = Read-JsonFile -Path $StateFile
     if ($state) {
@@ -11,9 +12,14 @@ function Get-State {
     }
 }
 
-function Save-State {
+function Save-State
+{
     param($State, [string]$StateFile)
-    $State | ConvertTo-Json -Depth 20 | Set-Content -Path $StateFile -Encoding UTF8
+    $json = $State | ConvertTo-Json -Depth 20
+    
+    # Write UTF8 WITHOUT BOM
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($StateFile, $json, $utf8NoBom)
 }
 
 Export-ModuleMember -Function Get-State, Save-State

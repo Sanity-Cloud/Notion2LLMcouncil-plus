@@ -1,4 +1,5 @@
-function Use-ConfigValue {
+function Use-ConfigValue
+{
     param($Value, $Fallback)
     if ($null -eq $Value -or "$Value" -eq "") {
         return $Fallback
@@ -6,7 +7,8 @@ function Use-ConfigValue {
     return $Value
 }
 
-function Read-IntegrationConfig {
+function Read-IntegrationConfig
+{
     param([string]$RepoRoot, [string]$ConfigPath)
     $defaultPath = Join-Path $RepoRoot "config\default.json"
     $localPath = if ($ConfigPath) { $ConfigPath } else { Join-Path $RepoRoot "config\local.json" }
@@ -21,7 +23,8 @@ function Read-IntegrationConfig {
     }
 }
 
-function Get-ConfigProperty {
+function Get-ConfigProperty
+{
     param(
         [hashtable]$Config,
         [string[]]$Path,

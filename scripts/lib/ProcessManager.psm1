@@ -1,10 +1,12 @@
-function Test-PortInUse {
+function Test-PortInUse
+{
     param([int]$Port)
     $listeners = [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners()
     return [bool]($listeners | Where-Object { $_.Port -eq $Port })
 }
 
-function Get-ListeningProcessId {
+function Get-ListeningProcessId
+{
     param([int]$Port)
     try {
         $connection = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction Stop |
@@ -18,7 +20,8 @@ function Get-ListeningProcessId {
     return 0
 }
 
-function Find-FreePort {
+function Find-FreePort
+{
     param(
         [int]$PreferredPort,
         [int[]]$Alternates = @()
@@ -39,7 +42,8 @@ function Find-FreePort {
     throw "No free local port found near $PreferredPort."
 }
 
-function Stop-ProcessId {
+function Stop-ProcessId
+{
     param(
         [int]$ProcessId,
         [switch]$Tree
