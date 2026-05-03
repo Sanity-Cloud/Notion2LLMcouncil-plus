@@ -3,8 +3,6 @@ name: Build Windows Release
 on:
   workflow_dispatch:
   push:
-    branches:
-      - master
     tags:
       - "v*"
 
@@ -41,6 +39,9 @@ jobs:
       - name: Generate Electron icons
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\create-electron-icons.ps1
+
+      - name: Validate release inputs
+        run: npm run validate:ci
 
       - name: Show build scripts
         shell: powershell
