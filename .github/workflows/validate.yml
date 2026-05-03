@@ -25,5 +25,27 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Generate Electron icons
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\create-electron-icons.ps1
+
       - name: Validate repository
         run: npm run validate:ci
+
+      - name: Check Electron modules
+        shell: powershell
+        run: |
+          $files = @(
+            "electron/main.js",
+            "electron/lib/launcher.js",
+            "electron/lib/config.js",
+            "electron/lib/logger.js",
+            "electron/lib/utils.js",
+            "electron/windows/main.js",
+            "electron/windows/hotkeys.js"
+          )
+          foreach ($file in $files) {
+            if (Test-Path $file) {
+              node --check $file
+            }
+          }
