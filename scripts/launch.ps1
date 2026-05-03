@@ -100,8 +100,6 @@ function Ensure-NotionApiKey {
     $generated = "n2c_" + (New-ApiKey)
     Set-EnvLine -Path $envPath -Name "API_KEY" -Value $generated
     $script:NotionApiKeyChanged = $true
-    Set-EnvLine -Path $envPath -Name "API_KEY" -Value $generated
-    $script:NotionApiKeyChanged = $true
     Set-Content -Path $RestartNotionFlag -Value "api-key-generated" -Encoding UTF8
     Write-Step "Generated Notion2API API key"
     return $generated
@@ -210,17 +208,23 @@ function Apply-CouncilSettings {
     if ($current.enabled_providers) { foreach ($property in $current.enabled_providers.PSObject.Properties) { $enabled[$property.Name] = [bool]$property.Value } }
     $enabled[$ProviderEnabledKey] = $true
 
-    $body = @{
-        custom_endpoint_name = $ProviderName
-        custom_endpoint_url = "http://127.0.0.1:$NotionPort$ProviderUrlPath"
+    $body = [ordered]@{
+        custom_endpoint_name    = $ProviderName
+        custom_endpoint_url     = "http://127.0.0.1:$NotionPort$ProviderUrlPath"
         custom_endpoint_api_key = $NotionApiKey
-        enabled_providers = $enabled
-        council_models = if ($ProviderApplyDefaultCouncil) { $ConfiguredCouncilModels } else { $current.council_models }
-        chairman_model = if ($ProviderApplyDefaultCouncil) { $ConfiguredChairmanModel } else { $current.chairman_model }
-    } | ConvertTo-Json -Depth 20
+        enabled_providers       = $enabled
+        council_models          = if ($ProviderApplyDefaultCouncil) { $ConfiguredCouncilModels } else { $current.council_models }
+        chairman_model          = if ($ProviderApplyDefaultCouncil) { $ConfiguredChairmanModel } else { $current.chairman_model }
+    }
+    if ($ProviderApplyDefaultCouncil) {
+        if ($ConfiguredCouncilMemberFilters) { $body['council_member_filters'] = $ConfiguredCouncilMemberFilters }
+        $body['chairman_filter']     = $ConfiguredChairmanFilter
+        $body['search_query_filter'] = $ConfiguredSearchQueryFilter
+    }
+    $bodyJson = $body | ConvertTo-Json -Depth 20
 
     Write-Step "Configuring LLM Council custom provider"
-    Invoke-RestMethod -Method Put -Uri $settingsUrl -ContentType "application/json" -Body $body -TimeoutSec 20 | Out-Null
+    Invoke-RestMethod -Method Put -Uri $settingsUrl -ContentType "application/json" -Body $bodyJson -TimeoutSec 20 | Out-Null
 }
 
 function Start-CouncilFrontend {
@@ -236,7 +240,13 @@ function Start-CouncilFrontend {
     }
 
     $frontendRoot = Join-Path $CouncilRoot "frontend"
-    Set-Content -Path (Join-Path $frontendRoot ".env.local") -Value "VITE_API_URL=http://127.0.0.1:$CouncilBackendPort`nVITE_ENABLE_LOCAL_SHUTDOWN=true" -Encoding UTF8
+    $envLocalPath = Join-Path $frontendRoot ".env.local"
+    $envLocalLines = @(
+        "VITE_API_URL=http://127.0.0.1:$CouncilBackendPort",
+        "VITE_ENABLE_LOCAL_SHUTDOWN=true"
+    )
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllLines($envLocalPath, $envLocalLines, $utf8NoBom)
 
     Write-Step "Starting LLM Council frontend on http://127.0.0.1:$CouncilFrontendPort"
     $process = Start-Process -FilePath "npm.cmd" -ArgumentList @("run", "dev", "--", "--host", "127.0.0.1", "--port", "$CouncilFrontendPort") `
@@ -264,6 +274,9 @@ $NotionLoginTimeoutSeconds = [int](Use-ConfigValue -Value (Get-ConfigProperty $C
 $ProviderApplyDefaultCouncil = [bool](Use-ConfigValue -Value (Get-ConfigProperty $Config @("provider", "applyDefaultCouncil")) -Fallback $true)
 $ConfiguredCouncilModels = ConvertTo-StringArray (Get-ConfigProperty $Config @("provider", "councilModels"))
 $ConfiguredChairmanModel = Use-ConfigValue -Value (Get-ConfigProperty $Config @("provider", "chairmanModel")) -Fallback "custom:claude-opus4.7"
+$ConfiguredCouncilMemberFilters = Get-ConfigProperty $Config @("provider", "councilMemberFilters")
+$ConfiguredChairmanFilter       = Use-ConfigValue -Value (Get-ConfigProperty $Config @("provider", "chairmanFilter"))       -Fallback "remote"
+$ConfiguredSearchQueryFilter    = Use-ConfigValue -Value (Get-ConfigProperty $Config @("provider", "searchQueryFilter"))    -Fallback "remote"
 
 if ($UseVendor) { $NotionRoot = Join-Path $VendorRoot "notion2api"; $CouncilRoot = Join-Path $VendorRoot "llm-council-plus" }
 Ensure-Repo -Path $NotionRoot -Url $NotionRepoUrl -Branch $NotionBranch

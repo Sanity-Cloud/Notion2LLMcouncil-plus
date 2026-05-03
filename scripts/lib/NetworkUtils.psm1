@@ -9,10 +9,13 @@ function Test-HttpOk {
         if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 500) {
             return $false
         }
-        if ($ExpectedTitle -and -not ($response.Content -match "<title>.*$ExpectedTitle.*</title>")) {
-            return $false
+        if ($ExpectedTitle) {
+            $titleMatch = [regex]::Match($response.Content, '<title>(.*?)</title>', 'Singleline,IgnoreCase')
+            if (-not ($titleMatch.Success -and $titleMatch.Groups[1].Value.Contains($ExpectedTitle))) {
+                return $false
+            }
         }
-        if ($ExpectedContent -and -not ($response.Content -match $ExpectedContent)) {
+        if ($ExpectedContent -and -not ($response.Content.Contains($ExpectedContent))) {
             return $false
         }
         return $true

@@ -89,8 +89,8 @@ function startStack({ noBrowser = true } = {}) {
 }
 
 function stopStack() {
-  appendLog('Stopping services stack...');
-  runPowerShell(getScriptPath('launch.ps1'), ['-Stop']);
+  appendLog('[launcher] stopStack: dispatching launch.ps1 -Stop');
+  return runPowerShell(getScriptPath('launch.ps1'), ['-Stop']);
 }
 
 module.exports = {

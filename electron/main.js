@@ -170,10 +170,32 @@ app.whenReady().then(async () => {
   mainWindow.show();
 });
 
-app.on('before-quit', () => {
-  appendLog('App quitting - stopping background services');
+app.on('before-quit', (e) => {
+  if (isQuitting) return;            // re-entry guard
   isQuitting = true;
-  stopStack();
+  app.isQuitting = true;             // keep window close-handlers happy
+
+  e.preventDefault();                // hold the quit until stopStack settles
+
+  appendLog('App quitting - stopping background services');
+  const child = stopStack();
+
+  const finish = () => {
+    try { app.removeAllListeners('before-quit'); } catch {}
+    app.quit();
+  };
+
+  if (!child || typeof child.once !== 'function') {
+    finish();
+    return;
+  }
+
+  let done = false;
+  const finalize = () => { if (done) return; done = true; finish(); };
+
+  child.once('exit', finalize);
+  child.once('error', finalize);
+  setTimeout(finalize, 8000);        // hard cap so a stuck PS process can't trap us
 });
 
 app.on('activate', () => {
