@@ -13,7 +13,7 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  RELEASE_TAG: v0.1.0
+  RELEASE_TAG: v0.1.1
 
 jobs:
   build-windows:
@@ -69,9 +69,9 @@ jobs:
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           target_commitish: ${{ github.sha }}
-          name: Notion2Council v0.1.0
+          name: Notion2Council v0.1.1
           body: |
-            Notion2Council desktop release v0.1.0.
+            Notion2Council desktop release v0.1.1.
 
             Includes Windows portable EXE, ZIP package, MSI setup installer, and source/runtime bundle when all build targets complete.
           draft: false
