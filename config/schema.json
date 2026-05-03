@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Notion2Council Configuration",
+  "type": "object",
+  "properties": {
+    "notion": {
+      "type": "object",
+      "properties": {
+        "localRoot": { "type": "string" },
+        "repoUrl": { "type": "string" },
+        "branch": { "type": "string" },
+        "port": { "type": "integer" },
+        "appMode": { "type": "string", "enum": ["standard", "debug"] },
+        "autoLogin": { "type": "boolean" },
+        "loginTimeoutSeconds": { "type": "integer" }
+      }
+    },
+    "council": {
+      "type": "object",
+      "properties": {
+        "localRoot": { "type": "string" },
+        "repoUrl": { "type": "string" },
+        "branch": { "type": "string" },
+        "backendPort": { "type": "integer" },
+        "frontendPort": { "type": "integer" }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "enabledKey": { "type": "string" },
+        "urlPath": { "type": "string" },
+        "supportsStreaming": { "type": "boolean" },
+        "applyDefaultCouncil": { "type": "boolean" },
+        "councilModels": { "type": "array", "items": { "type": "string" } },
+        "chairmanModel": { "type": "string" },
+        "councilMemberFilters": { "type": "object" },
+        "chairmanFilter": { "type": "string" },
+        "searchQueryFilter": { "type": "string" }
+      }
+    }
+  }
+}

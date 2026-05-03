@@ -1,243 +1,30 @@
-const { app, BrowserWindow, Menu, Tray, nativeImage, globalShortcut, clipboard, ipcMain, shell, dialog } = require('electron');
-const { spawn } = require('child_process');
-const fs = require('fs');
-const http = require('http');
+const { app, Menu, Tray, nativeImage, globalShortcut, clipboard, ipcMain, shell } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
-let mainWindow = null;
-let hotkeyWindow = null;
+// Internal Modules
+const { appendLog } = require('./lib/logger');
+const { readHotkeys, writeHotkeys, defaultHotkeys, getHotkeyConfigPath } = require('./lib/config');
+const { waitForUrl } = require('./lib/utils');
+const { startStack, stopStack } = require('./lib/launcher');
+const { createMainWindow, getMainWindow, showMainWindow, toggleMainWindow } = require('./windows/main');
+const { openHotkeySettings } = require('./windows/hotkeys');
+
 let tray = null;
-let launcherProcess = null;
-
+let isQuitting = false;
 const councilUiUrl = process.env.NOTION2COUNCIL_UI_URL || 'http://127.0.0.1:5173/';
 const notionApiUrl = process.env.NOTION2API_URL || 'http://127.0.0.1:8000/';
 const notionDocsUrl = process.env.NOTION2API_DOCS_URL || 'http://127.0.0.1:8000/docs';
 
-const defaultHotkeys = {
-  toggleWindow: 'Alt+Space',
-  openChat: 'CommandOrControl+Shift+L',
-  clipboardToChat: 'CommandOrControl+Shift+V',
-  openHotkeySettings: 'CommandOrControl+Shift+H',
-};
-
-function ensureDir(dir) {
-  fs.mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
-function getLogsDir() {
-  return ensureDir(path.join(app.getPath('userData'), 'logs'));
-}
-
-function appendLog(message) {
-  try {
-    fs.appendFileSync(path.join(getLogsDir(), 'desktop-launcher.log'), `[${new Date().toISOString()}] ${message}\n`, 'utf8');
-  } catch {
-    // Logging must not crash the shell.
-  }
-}
-
-function directoryHasLaunchScript(dir) {
-  try {
-    return !!dir && fs.existsSync(path.join(dir, 'scripts', 'launch.ps1'));
-  } catch {
-    return false;
-  }
-}
-
-function getAppRoot() {
-  const candidates = [];
-  if (process.env.NOTION2COUNCIL_ROOT) candidates.push(process.env.NOTION2COUNCIL_ROOT);
-
-  if (app.isPackaged) {
-    candidates.push(path.join(process.resourcesPath, 'app.asar.unpacked'));
-    candidates.push(path.join(process.resourcesPath, 'app'));
-  }
-
-  try { candidates.push(app.getAppPath()); } catch {}
-  candidates.push(path.resolve(__dirname, '..'));
-  candidates.push(process.cwd());
-
-  for (const candidate of candidates) {
-    if (directoryHasLaunchScript(candidate)) return candidate;
-  }
-
-  return candidates.find(Boolean) || process.cwd();
-}
-
-function getScriptPath(scriptName) {
-  return path.join(getAppRoot(), 'scripts', scriptName);
-}
-
-function resolvePowerShellPath() {
-  const windir = process.env.SystemRoot || process.env.WINDIR || 'C:\\Windows';
-  const candidates = [
-    process.env.NOTION2COUNCIL_POWERSHELL,
-    path.join(windir, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
-    path.join(windir, 'Sysnative', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
-    'powershell.exe',
-    'pwsh.exe',
-  ].filter(Boolean);
-
-  for (const candidate of candidates) {
-    try {
-      if (path.isAbsolute(candidate) && fs.existsSync(candidate)) return candidate;
-    } catch {}
-  }
-
-  return 'powershell.exe';
-}
-
-function getHotkeyConfigPath() {
-  return path.join(app.getPath('userData'), 'hotkeys.json');
-}
-
-function readHotkeys() {
-  try {
-    const file = getHotkeyConfigPath();
-    if (!fs.existsSync(file)) return { ...defaultHotkeys };
-    return { ...defaultHotkeys, ...JSON.parse(fs.readFileSync(file, 'utf8')) };
-  } catch {
-    return { ...defaultHotkeys };
-  }
-}
-
-function writeHotkeys(hotkeys) {
-  const file = getHotkeyConfigPath();
-  ensureDir(path.dirname(file));
-  fs.writeFileSync(file, JSON.stringify({ ...defaultHotkeys, ...hotkeys }, null, 2), 'utf8');
-}
-
-function waitForUrl(url, timeoutMs = 90000) {
-  const started = Date.now();
-  return new Promise((resolve, reject) => {
-    const retry = () => {
-      if (Date.now() - started > timeoutMs) return reject(new Error(`Timed out waiting for ${url}`));
-      setTimeout(tick, 750);
-    };
-    const tick = () => {
-      const request = http.get(url, response => {
-        response.resume();
-        if (response.statusCode >= 200 && response.statusCode < 500) return resolve(true);
-        retry();
-      });
-      request.on('error', retry);
-      request.setTimeout(2500, () => {
-        request.destroy();
-        retry();
-      });
-    };
-    tick();
-  });
-}
-
-function showError(title, message) {
-  appendLog(`${title}: ${message || 'Unknown error'}`);
-  try {
-    dialog.showErrorBox(title, message || 'Unknown error');
-  } catch {}
-}
-
-function runPowerShell(scriptPath, args = []) {
-  if (!fs.existsSync(scriptPath)) {
-    showError(
-      'Launcher script not found',
-      `Could not find ${scriptPath}\n\nSet NOTION2COUNCIL_ROOT to the folder containing scripts\\launch.ps1, or install from the source/runtime bundle.`
-    );
-    return null;
-  }
-
-  const powerShellPath = resolvePowerShellPath();
-  const psArgs = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, ...args];
-  const cwd = getAppRoot();
-  const env = { ...process.env, NOTION2COUNCIL_LOG_DIR: getLogsDir() };
-
-  appendLog(`Starting: ${powerShellPath} ${psArgs.join(' ')}`);
-  appendLog(`cwd=${cwd}`);
-
-  let child;
-  try {
-    child = spawn(powerShellPath, psArgs, {
-      cwd,
-      windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      detached: false,
-      env,
-    });
-  } catch (error) {
-    showError('Failed to start PowerShell', `${error.message}\nTried: ${powerShellPath}`);
-    return null;
-  }
-
-  child.stdout?.on('data', chunk => appendLog(chunk.toString().trimEnd()));
-  child.stderr?.on('data', chunk => appendLog(`ERROR: ${chunk.toString().trimEnd()}`));
-  child.on('error', error => {
-    const detail = `${error.message}\nTried: ${powerShellPath}`;
-    if (error.code === 'ENOENT') showError('PowerShell not found', detail);
-    else showError('PowerShell process error', detail);
-    if (launcherProcess === child) launcherProcess = null;
-  });
-  child.on('exit', code => {
-    appendLog(`PowerShell exited with code ${code}`);
-    if (launcherProcess === child) launcherProcess = null;
-  });
-
-  return child;
-}
-
-function startStack({ noBrowser = true } = {}) {
-  if (launcherProcess && !launcherProcess.killed) return launcherProcess;
-  launcherProcess = runPowerShell(getScriptPath('launch.ps1'), noBrowser ? ['-NoBrowser'] : []);
-  return launcherProcess;
-}
-
-function stopStack() {
-  runPowerShell(getScriptPath('launch.ps1'), ['-Stop']);
-}
-
-function showMainWindow() {
-  if (!mainWindow) createMainWindow();
-  mainWindow.show();
-  if (mainWindow.isMinimized()) mainWindow.restore();
-  mainWindow.focus();
-}
-
-function toggleMainWindow() {
-  if (!mainWindow) return createMainWindow();
-  if (mainWindow.isVisible() && mainWindow.isFocused()) mainWindow.hide();
-  else showMainWindow();
-}
-
-function createMainWindow() {
-  const iconPng = path.join(__dirname, 'icon.png');
-  mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 860,
-    minWidth: 980,
-    minHeight: 650,
-    show: false,
-    backgroundColor: '#060a12',
-    title: 'Notion2Council',
-    icon: fs.existsSync(iconPng) ? iconPng : undefined,
-    webPreferences: { nodeIntegration: false, contextIsolation: true },
-  });
-
-  mainWindow.on('close', event => {
-    if (!app.isQuitting) {
-      event.preventDefault();
-      mainWindow.hide();
-    }
-  });
-
-  mainWindow.loadURL(councilUiUrl);
-}
-
 async function focusChatInput(text) {
+  const mainWindow = getMainWindow();
   if (!mainWindow) return;
   const safeText = JSON.stringify(text || '');
   await mainWindow.webContents.executeJavaScript(`
     (() => {
-      const input = document.querySelector('textarea.message-input, textarea, [contenteditable="true"]');
+      const input = document.querySelector('textarea.message-input') || 
+                    document.querySelector('.input-area textarea') ||
+                    document.querySelector('textarea');
       if (!input) return false;
       input.focus();
       const text = ${safeText};
@@ -261,7 +48,10 @@ async function openChat() {
   showMainWindow();
   try {
     await waitForUrl(councilUiUrl, 90000);
-    if (mainWindow && mainWindow.webContents.getURL() !== councilUiUrl) await mainWindow.loadURL(councilUiUrl);
+    const mainWindow = getMainWindow();
+    if (mainWindow && mainWindow.webContents.getURL() !== councilUiUrl) {
+      await mainWindow.loadURL(councilUiUrl);
+    }
     showMainWindow();
     await focusChatInput('');
   } catch (error) {
@@ -273,35 +63,6 @@ async function openChatWithClipboard() {
   const text = clipboard.readText() || '';
   await openChat();
   await focusChatInput(text);
-}
-
-function openNotionChat() {
-  startStack({ noBrowser: true });
-  shell.openExternal(notionApiUrl);
-}
-
-function openNotionDocs() {
-  startStack({ noBrowser: true });
-  shell.openExternal(notionDocsUrl);
-}
-
-function openCouncilUiExternal() {
-  startStack({ noBrowser: true });
-  shell.openExternal(councilUiUrl);
-}
-
-function openConfigFolder() {
-  const appConfig = path.join(getAppRoot(), 'config');
-  const userConfig = ensureDir(path.join(app.getPath('userData'), 'config'));
-  shell.openPath(fs.existsSync(appConfig) ? appConfig : userConfig).then(errorMessage => {
-    if (errorMessage) showError('Could not open config folder', errorMessage);
-  });
-}
-
-function openLogsFolder() {
-  shell.openPath(getLogsDir()).then(errorMessage => {
-    if (errorMessage) showError('Could not open logs folder', errorMessage);
-  });
 }
 
 function createTray() {
@@ -320,15 +81,15 @@ function refreshTrayMenu() {
     { label: 'Open Chat', click: openChat },
     { label: 'Clipboard to Chat', click: openChatWithClipboard },
     { type: 'separator' },
-    { label: 'Hotkey Settings', click: openHotkeySettings },
-    { label: 'Open Notion2API Chat', click: openNotionChat },
-    { label: 'Open Notion2API Docs', click: openNotionDocs },
-    { label: 'Open Logs', click: openLogsFolder },
+    { label: 'Hotkey Settings', click: () => openHotkeySettings(getMainWindow()) },
+    { label: 'Open Notion2API Chat', click: () => { startStack({ noBrowser: true }); shell.openExternal(notionApiUrl); } },
+    { label: 'Open Notion2API Docs', click: () => { startStack({ noBrowser: true }); shell.openExternal(notionDocsUrl); } },
+    { label: 'Open Logs', click: () => { shell.openPath(path.join(app.getPath('userData'), 'logs')); } },
     { type: 'separator' },
     { label: 'Start Stack', click: () => startStack({ noBrowser: true }) },
     { label: 'Stop Stack', click: stopStack },
     { type: 'separator' },
-    { label: 'Quit', click: () => { app.isQuitting = true; stopStack(); app.quit(); } },
+    { label: 'Quit', click: () => app.quit() },
   ]));
 }
 
@@ -337,19 +98,9 @@ function setApplicationMenu() {
     { label: 'Notion2Council', submenu: [
       { label: 'Open Chat', click: openChat },
       { label: 'Clipboard to Chat', click: openChatWithClipboard },
-      { label: 'Hotkey Settings', click: openHotkeySettings },
+      { label: 'Hotkey Settings', click: () => openHotkeySettings(getMainWindow()) },
       { type: 'separator' },
-      { label: 'Open Notion2API Chat', click: openNotionChat },
-      { label: 'Open Notion2API Docs', click: openNotionDocs },
-      { label: 'Open Council in Browser', click: openCouncilUiExternal },
-      { type: 'separator' },
-      { label: 'Open Config Folder', click: openConfigFolder },
-      { label: 'Open Logs Folder', click: openLogsFolder },
-      { type: 'separator' },
-      { label: 'Start Stack', click: () => startStack({ noBrowser: true }) },
-      { label: 'Stop Stack', click: stopStack },
-      { type: 'separator' },
-      { label: 'Quit', click: () => { app.isQuitting = true; stopStack(); app.quit(); } },
+      { label: 'Quit', click: () => app.quit() },
     ] },
     { label: 'View', submenu: [
       { role: 'reload' },
@@ -374,30 +125,11 @@ function registerHotkeys() {
   bind('toggleWindow', hotkeys.toggleWindow, toggleMainWindow);
   bind('openChat', hotkeys.openChat, openChat);
   bind('clipboardToChat', hotkeys.clipboardToChat, openChatWithClipboard);
-  bind('openHotkeySettings', hotkeys.openHotkeySettings, openHotkeySettings);
+  bind('openHotkeySettings', hotkeys.openHotkeySettings, () => openHotkeySettings(getMainWindow()));
   return registrations;
 }
 
-function openHotkeySettings() {
-  if (hotkeyWindow && !hotkeyWindow.isDestroyed()) {
-    hotkeyWindow.show();
-    hotkeyWindow.focus();
-    return;
-  }
-  hotkeyWindow = new BrowserWindow({
-    width: 720,
-    height: 620,
-    minWidth: 620,
-    minHeight: 520,
-    title: 'Notion2Council Hotkeys',
-    backgroundColor: '#111827',
-    parent: mainWindow || undefined,
-    webPreferences: { preload: path.join(__dirname, 'preload.js'), nodeIntegration: false, contextIsolation: true },
-  });
-  hotkeyWindow.on('closed', () => { hotkeyWindow = null; });
-  hotkeyWindow.loadFile(path.join(__dirname, 'hotkeys.html'));
-}
-
+// IPC Handlers
 ipcMain.handle('hotkeys:get', () => ({ defaults: defaultHotkeys, current: readHotkeys(), configPath: getHotkeyConfigPath() }));
 ipcMain.handle('hotkeys:save', (_event, hotkeys) => {
   writeHotkeys(hotkeys);
@@ -414,28 +146,59 @@ ipcMain.handle('hotkeys:testClipboardToChat', async () => {
   return { ok: true };
 });
 
-process.on('uncaughtException', error => {
-  appendLog(`Uncaught exception: ${error.stack || error.message}`);
-  if (error.code === 'ENOENT') showError('Process launch failed', error.message);
-});
-
+// App Lifecycle
 app.whenReady().then(async () => {
-  appendLog(`App ready. appRoot=${getAppRoot()}`);
-  createMainWindow();
+  appendLog('App ready - starting Notion2Council stack');
+  
+  const mainWindow = createMainWindow(councilUiUrl);
   createTray();
   setApplicationMenu();
   registerHotkeys();
+  
+  // Start backend stack asynchronously
   startStack({ noBrowser: true });
 
   try {
+    // Wait for the UI to be ready before loading
     await waitForUrl(councilUiUrl, 90000);
     await mainWindow.loadURL(councilUiUrl);
   } catch (error) {
-    appendLog(`Council UI not ready yet: ${error.message}`);
+    appendLog(`Council UI failed to load: ${error.message}`);
+    // Optional: Load a local error page
   }
 
   mainWindow.show();
 });
 
-app.on('window-all-closed', event => { event.preventDefault(); });
-app.on('will-quit', () => { globalShortcut.unregisterAll(); });
+app.on('before-quit', () => {
+  appendLog('App quitting - stopping background services');
+  isQuitting = true;
+  stopStack();
+});
+
+app.on('activate', () => {
+  const mainWindow = getMainWindow();
+  if (mainWindow) {
+    showMainWindow();
+  } else {
+    createMainWindow(councilUiUrl);
+  }
+});
+
+app.on('window-all-closed', () => {
+  // On macOS it is common for applications and their menu bar
+  // to stay active until the user quits explicitly with Cmd + Q
+  if (process.platform !== 'darwin') {
+    // We stay in tray on Windows/Linux by default, but let's be explicit
+    // If you want to quit when windows close, uncomment the next line:
+    // if (!isQuitting) app.quit();
+  }
+});
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
+});
+
+process.on('uncaughtException', error => {
+  appendLog(`Uncaught exception: ${error.stack || error.message}`);
+});

@@ -1,0 +1,43 @@
+function Test-HttpOk {
+    param(
+        [string]$Url,
+        [string]$ExpectedTitle = "",
+        [string]$ExpectedContent = ""
+    )
+    try {
+        $response = Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 2
+        if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 500) {
+            return $false
+        }
+        if ($ExpectedTitle -and -not ($response.Content -match "<title>.*$ExpectedTitle.*</title>")) {
+            return $false
+        }
+        if ($ExpectedContent -and -not ($response.Content -match $ExpectedContent)) {
+            return $false
+        }
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+function Wait-HttpOk {
+    param(
+        [string]$Url,
+        [int]$TimeoutSeconds = 45,
+        [string]$ExpectedTitle = "",
+        [string]$ExpectedContent = ""
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    do {
+        if (Test-HttpOk -Url $Url -ExpectedTitle $ExpectedTitle -ExpectedContent $ExpectedContent) {
+            return
+        }
+        Start-Sleep -Milliseconds 750
+    } while ((Get-Date) -lt $deadline)
+
+    throw "Timed out waiting for $Url"
+}
+
+Export-ModuleMember -Function Test-HttpOk, Wait-HttpOk

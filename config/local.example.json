@@ -1,0 +1,11 @@
+{
+  "notion": {
+    "localRoot": "C:\\path\\to\\your\\notion2api",
+    "port": 8000
+  },
+  "council": {
+    "localRoot": "C:\\path\\to\\your\\llm-council-plus",
+    "backendPort": 8001,
+    "frontendPort": 5173
+  }
+}

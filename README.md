@@ -163,6 +163,10 @@ The most useful files are:
 - `logs\council-backend.err.log`
 - `logs\council-frontend.out.log`
 
+## Development
+
+For information about the application architecture, security practices, and modular structure, see [DEVELOPMENT.md](DEVELOPMENT.md).
+
 ## Notes
 
 This is an integration wrapper. It does not replace either upstream project. Update or contribute to each upstream repository independently.
