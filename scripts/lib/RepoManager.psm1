@@ -6,6 +6,16 @@ function Initialize-Repo {
     )
 
     if (Test-Path $Path) {
+        if (Test-Path (Join-Path $Path ".git")) {
+            if ($Branch) {
+                $currentBranch = git -C $Path rev-parse --abbrev-ref HEAD
+                if ($currentBranch -ne $Branch) {
+                    Write-Step "Updating $Path to branch $Branch"
+                    git -C $Path fetch origin
+                    git -C $Path checkout $Branch
+                }
+            }
+        }
         return
     }
 

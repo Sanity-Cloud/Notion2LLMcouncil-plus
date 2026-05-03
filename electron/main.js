@@ -22,21 +22,39 @@ async function focusChatInput(text) {
   const safeText = JSON.stringify(text || '');
   await mainWindow.webContents.executeJavaScript(`
     (() => {
-      const input = document.querySelector('textarea.message-input') || 
-                    document.querySelector('.input-area textarea') ||
-                    document.querySelector('textarea');
+      // Tightened selectors prioritizing specific chat input classes
+      const selectors = [
+        'textarea.council-message-input',
+        'textarea#chat-input',
+        '.chat-container textarea.message-input',
+        '.input-area textarea',
+        'textarea.message-input',
+        'textarea'
+      ];
+      
+      let input = null;
+      for (const selector of selectors) {
+        const found = document.querySelector(selector);
+        // Ensure it's visible and not disabled
+        if (found && found.offsetParent !== null && !found.disabled) {
+          input = found;
+          break;
+        }
+      }
+      
       if (!input) return false;
+      
       input.focus();
       const text = ${safeText};
       if (text) {
-        if ('value' in input) {
-          input.value = text;
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          input.dispatchEvent(new Event('change', { bubbles: true }));
-        } else {
-          input.textContent = text;
-          input.dispatchEvent(new InputEvent('input', { bubbles: true, data: text, inputType: 'insertText' }));
-        }
+        // Clear if we are setting new text
+        input.value = '';
+        input.value = text;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        
+        // For React/Vue apps, sometimes we need to trigger a keydown or similar
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
       }
       return true;
     })();
