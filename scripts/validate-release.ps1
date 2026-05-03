@@ -65,9 +65,9 @@ if (-not $SkipPackageLock -and (Test-Path (Join-Path $RepoRoot "package-lock.jso
         }
     }
     
-    # Extract packages[""].version: "packages": { "": { "version": "x.y.z"
-    # This is a bit more brittle but usually works for standard npm lock files
-    if ($lockContent -match '"packages":\s*\{\s*"":\s*\{\s*"version":\s*"([^"]+)"') {
+    # Extract packages[""].version: "packages": { "": { ... "version": "x.y.z"
+    # Allow any characters (non-greedy) before "version" inside the empty key object
+    if ($lockContent -match '"packages":\s*\{\s*"":\s*\{\s*[^}]*?"version":\s*"([^"]+)"') {
         $pkgVersion = $Matches[1]
         if ($pkgVersion -ne $package.version) {
             throw "package-lock.json packages[''].version '$pkgVersion' does not match package.json '$($package.version)'."
