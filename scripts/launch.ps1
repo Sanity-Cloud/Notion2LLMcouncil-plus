@@ -89,7 +89,7 @@ function New-ApiKey {
     return [Convert]::ToBase64String($bytes).TrimEnd("=").Replace("+", "-").Replace("/", "_")
 }
 
-function Ensure-NotionApiKey {
+function Initialize-NotionApiKey {
     $envPath = Join-Path $NotionRoot ".env"
     $existing = Get-EnvLineValue -Path $envPath -Name "API_KEY"
     if ($existing) {
@@ -105,7 +105,7 @@ function Ensure-NotionApiKey {
     return $generated
 }
 
-function Ensure-NotionMode {
+function Initialize-NotionMode {
     Set-EnvLine -Path (Join-Path $NotionRoot ".env") -Name "APP_MODE" -Value $NotionAppMode
 }
 
@@ -118,7 +118,7 @@ function Test-NotionLogin {
     } finally { Pop-Location }
 }
 
-function Ensure-NotionLogin {
+function Initialize-NotionLogin {
     if (-not (Test-Path (Join-Path $NotionRoot "login.py"))) {
         throw "Notion2API checkout does not contain login.py"
     }
@@ -279,17 +279,17 @@ $ConfiguredChairmanFilter       = Use-ConfigValue -Value (Get-ConfigProperty $Co
 $ConfiguredSearchQueryFilter    = Use-ConfigValue -Value (Get-ConfigProperty $Config @("provider", "searchQueryFilter"))    -Fallback "remote"
 
 if ($UseVendor) { $NotionRoot = Join-Path $VendorRoot "notion2api"; $CouncilRoot = Join-Path $VendorRoot "llm-council-plus" }
-Ensure-Repo -Path $NotionRoot -Url $NotionRepoUrl -Branch $NotionBranch
-Ensure-Repo -Path $CouncilRoot -Url $CouncilRepoUrl -Branch $CouncilBranch
+Initialize-Repo -Path $NotionRoot -Url $NotionRepoUrl -Branch $NotionBranch
+Initialize-Repo -Path $CouncilRoot -Url $CouncilRepoUrl -Branch $CouncilBranch
 $NotionRoot = (Resolve-Path $NotionRoot).Path
 $CouncilRoot = (Resolve-Path $CouncilRoot).Path
 
 if ($Stop) { Stop-ManagedServices; exit 0 }
 
 Write-Step "Preparing Services"
-Ensure-NotionMode
-Ensure-NotionLogin
-$notionApiKey = Ensure-NotionApiKey
+Initialize-NotionMode
+Initialize-NotionLogin
+$notionApiKey = Initialize-NotionApiKey
 
 if ($SetupOnly) { Write-Host "Setup complete"; exit 0 }
 

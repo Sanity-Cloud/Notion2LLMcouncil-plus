@@ -1,4 +1,4 @@
-function Ensure-Repo {
+function Initialize-Repo {
     param(
         [string]$Path,
         [string]$Url,
@@ -31,4 +31,4 @@ function Get-Python {
     return "python"
 }
 
-Export-ModuleMember -Function Ensure-Repo, Get-Python
+Export-ModuleMember -Function Initialize-Repo, Get-Python

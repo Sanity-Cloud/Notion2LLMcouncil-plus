@@ -1,7 +1,7 @@
 function Test-HttpOk {
     param(
-        [string]$Url,
-        [string]$ExpectedTitle = "",
+        [string]$Url
+        [string]$ExpectedTitle = ""
         [string]$ExpectedContent = ""
     )
     try {
@@ -26,9 +26,9 @@ function Test-HttpOk {
 
 function Wait-HttpOk {
     param(
-        [string]$Url,
-        [int]$TimeoutSeconds = 45,
-        [string]$ExpectedTitle = "",
+        [string]$Url
+        [int]$TimeoutSeconds = 45
+        [string]$ExpectedTitle = ""
         [string]$ExpectedContent = ""
     )
 
