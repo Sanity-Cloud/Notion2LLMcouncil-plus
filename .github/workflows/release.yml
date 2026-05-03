@@ -87,6 +87,28 @@ jobs:
           Write-Host "Staged release asset: $stage\$bundle"
           Get-ChildItem $stage -File | Format-Table Name, Length
 
+      - name: Remove existing release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          release_id=$(gh api "repos/${{ github.repository }}/releases/tags/${RELEASE_TAG}" --jq '.id' 2>/dev/null || true)
+          if [ -z "$release_id" ]; then
+            echo "No existing release for ${RELEASE_TAG}; nothing to clean."
+            exit 0
+          fi
+
+          gh api --paginate "repos/${{ github.repository }}/releases/${release_id}/assets" --jq '.[].id' |
+            while read -r asset_id; do
+              if [ -n "$asset_id" ]; then
+                echo "Deleting release asset ${asset_id}"
+                gh api -X DELETE "repos/${{ github.repository }}/releases/assets/${asset_id}"
+              fi
+            done
+
       - name: Upload build artifacts
         if: always()
         uses: actions/upload-artifact@v4
