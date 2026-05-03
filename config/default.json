@@ -1,6 +1,6 @@
 {
   "notion": {
-    "localRoot": "X:\\Code\\notion2api-pub",
+    "localRoot": "vendor\\notion2api",
     "repoUrl": "https://github.com/Sanity-Cloud/notion2api.git",
     "branch": "feat/login-cdp",
     "port": 8000,
@@ -9,7 +9,7 @@
     "loginTimeoutSeconds": 300
   },
   "council": {
-    "localRoot": "X:\\Code\\llm-council-plus",
+    "localRoot": "vendor\\llm-council-plus",
     "repoUrl": "https://github.com/jacob-bd/llm-council-plus.git",
     "branch": "main",
     "backendPort": 8001,
