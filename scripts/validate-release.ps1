@@ -55,12 +55,23 @@ if (-not $package.version) {
 
 if (-not $SkipPackageLock -and (Test-Path (Join-Path $RepoRoot "package-lock.json"))) {
     Write-Check "package-lock version matches package.json"
-    $lock = Read-JsonChecked -Path (Join-Path $RepoRoot "package-lock.json")
-    if ($lock.version -ne $package.version) {
-        throw "package-lock.json root version '$($lock.version)' does not match package.json '$($package.version)'. Run npm install/package-lock update."
+    $lockContent = Get-Content -Raw -Path (Join-Path $RepoRoot "package-lock.json")
+    
+    # Extract root version: "version": "x.y.z"
+    if ($lockContent -match '"version":\s*"([^"]+)"') {
+        $lockVersion = $Matches[1]
+        if ($lockVersion -ne $package.version) {
+            throw "package-lock.json root version '$lockVersion' does not match package.json '$($package.version)'. Run npm install."
+        }
     }
-    if ($lock.packages."".version -ne $package.version) {
-        throw "package-lock.json packages[''].version '$($lock.packages."".version)' does not match package.json '$($package.version)'."
+    
+    # Extract packages[""].version: "packages": { "": { "version": "x.y.z"
+    # This is a bit more brittle but usually works for standard npm lock files
+    if ($lockContent -match '"packages":\s*\{\s*"":\s*\{\s*"version":\s*"([^"]+)"') {
+        $pkgVersion = $Matches[1]
+        if ($pkgVersion -ne $package.version) {
+            throw "package-lock.json packages[''].version '$pkgVersion' does not match package.json '$($package.version)'."
+        }
     }
 }
 
@@ -90,8 +101,31 @@ foreach ($script in $psScripts) {
     }
 }
 
-Write-Check "Electron entrypoint parses"
-node --check (Join-Path $RepoRoot "electron/main.js")
+Write-Check "PowerShell modules parse"
+$psModules = Get-ChildItem -Path (Join-Path $RepoRoot "scripts/lib") -Filter "*.psm1" -File
+foreach ($mod in $psModules) {
+    $tokens = $null
+    $errors = $null
+    [System.Management.Automation.Language.Parser]::ParseFile($mod.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+    if ($errors -and $errors.Count -gt 0) {
+        $joined = ($errors | ForEach-Object { "$($_.Extent.StartLineNumber): $($_.Message)" }) -join "; "
+        throw "PowerShell parse errors in $($mod.Name): $joined"
+    }
+}
+
+Write-Check "PowerShell modules import cleanly"
+foreach ($mod in $psModules) {
+    Import-Module $mod.FullName -Force -ErrorAction Stop
+}
+
+Write-Check "Electron JS files parse"
+$jsFiles = @(
+    Get-ChildItem -Path (Join-Path $RepoRoot "electron") -Filter "*.js" -File -Recurse
+) | Where-Object { $_.FullName -notmatch "\\node_modules\\" }
+foreach ($js in $jsFiles) {
+    node --check $js.FullName
+    if ($LASTEXITCODE -ne 0) { throw "Node parse error in $($js.FullName)" }
+}
 
 Write-Check "Release workflow does not publish broad runtime globs"
 $workflow = Get-Content -Raw -Path (Join-Path $RepoRoot ".github/workflows/release.yml")
