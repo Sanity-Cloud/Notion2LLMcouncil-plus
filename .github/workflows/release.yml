@@ -96,9 +96,15 @@ jobs:
         run: |
           set -euo pipefail
 
-          release_id=$(gh api "repos/${{ github.repository }}/releases/tags/${RELEASE_TAG}" --jq '.id' 2>/dev/null || true)
-          if [ -z "$release_id" ]; then
+          release_json=$(gh api "repos/${{ github.repository }}/releases/tags/${RELEASE_TAG}" 2>/dev/null || true)
+          if [ -z "$release_json" ]; then
             echo "No existing release for ${RELEASE_TAG}; nothing to clean."
+            exit 0
+          fi
+
+          release_id=$(printf '%s' "$release_json" | jq -r '.id // empty')
+          if [ -z "$release_id" ]; then
+            echo "No release id found for ${RELEASE_TAG}; nothing to clean."
             exit 0
           fi
 
