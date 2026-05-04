@@ -36,5 +36,8 @@
     },
     "chairmanFilter": "remote",
     "searchQueryFilter": "remote"
+  },
+  "sigmap": {
+    "scriptPath": ""
   }
 }

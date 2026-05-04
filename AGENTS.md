@@ -4,6 +4,42 @@ Operational guidance for AI agents, automation tools, and maintainers working on
 
 This repository is a Windows-first Electron desktop wrapper and PowerShell orchestrator for running Notion2API and LLM Council Plus together as a local Notion-powered council interface.
 
+## SigMap context tools
+
+Run `sigmap ask "<your question>"` or `sigmap --query "<topic>"` before searching for files relevant to a task.
+
+Available SigMap commands:
+
+```json
+[
+  {
+    "name": "sigmap_ask",
+    "description": "Rank source files by relevance to a natural-language query. Run before exploring the codebase.",
+    "command": "sigmap ask \"$QUERY\""
+  },
+  {
+    "name": "sigmap_validate",
+    "description": "Validate SigMap config and measure context coverage. Run after changing config or source dirs.",
+    "command": "sigmap validate"
+  },
+  {
+    "name": "sigmap_judge",
+    "description": "Score an LLM response for groundedness against source context. Use to verify answer quality.",
+    "command": "sigmap judge --response \"$RESPONSE\" --context \"$CONTEXT\""
+  },
+  {
+    "name": "sigmap_query",
+    "description": "Rank all files by relevance using TF-IDF and write a focused mini-context.",
+    "command": "sigmap --query \"$QUERY\" --context"
+  },
+  {
+    "name": "sigmap_weights",
+    "description": "Show learned file-ranking multipliers accumulated from past sessions.",
+    "command": "sigmap weights"
+  }
+]
+```
+
 ## Repository purpose
 
 Notion2Council does not replace either upstream project. It coordinates them:

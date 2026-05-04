@@ -1,0 +1,101 @@
+
+
+## Auto-generated signatures
+<!-- Updated by gen-context.js -->
+You are a coding assistant with complete knowledge of this codebase.
+The following code signatures were extracted by SigMap v6.5.1 on 2026-05-04T09:52:24.862Z.
+
+These signatures represent every public function, class, and type in the project.
+Refer to them when answering questions about code structure, APIs, and implementation.
+Before answering questions about specific code areas, suggest running `sigmap ask "<query>"` to get the most relevant files. After config changes, `sigmap validate` confirms coverage.
+
+## Code Signatures
+
+## electron
+
+### electron\hotkeys-renderer.js
+```
+function setStatus(text, kind = '')
+function readForm()
+function writeForm(values)
+function formatRegistrations(registrations)
+function getAcceleratorString(e)
+async function load()
+```
+
+### electron\hotkeys.html
+```
+title: Notion2Council Hotkeys
+input#toggleWindow
+input#openChat
+input#clipboardToChat
+input#openHotkeySettings
+button#save
+button#reset
+button#testClipboard
+button#reload
+div#status
+div#path
+```
+
+### electron\main.js
+```
+async function focusChatInput(text)
+async function openChat()
+async function openChatWithClipboard()
+function createTray()
+function refreshTrayMenu()
+function setApplicationMenu()
+function registerHotkeys()
+```
+
+### electron\lib\config.js
+```
+module.exports = { defaultHotkeys, getHotkeyConfigPath, readHotkeys, writeHotkeys }
+function getHotkeyConfigPath()
+function readHotkeys()
+function writeHotkeys(hotkeys)
+```
+
+### electron\lib\launcher.js
+```
+module.exports = { startStack, stopStack }
+function resolvePowerShellPath()
+function showError(title, message)
+function runPowerShell(scriptPath, args = [])
+function getScriptPath(scriptName)
+function startStack({ noBrowser = true } = {})
+function stopStack()
+```
+
+### electron\lib\logger.js
+```
+module.exports = { getLogsDir, appendLog }
+function ensureDir(dir)
+function getLogsDir()
+function appendLog(message)
+```
+
+### electron\lib\utils.js
+```
+module.exports = { ensureDir, getAppRoot, waitForUrl }
+function ensureDir(dir)
+function directoryHasLaunchScript(dir)
+function getAppRoot()
+function waitForUrl(url, timeoutMs = 90000, options = {})
+```
+
+### electron\windows\hotkeys.js
+```
+module.exports = { openHotkeySettings }
+function openHotkeySettings(parentWindow)
+```
+
+### electron\windows\main.js
+```
+module.exports = { createMainWindow, getMainWindow, showMainWindow, toggleMainWindow }
+function createMainWindow(councilUiUrl)
+function getMainWindow()
+function showMainWindow()
+function toggleMainWindow()
+```

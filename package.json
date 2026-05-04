@@ -17,7 +17,8 @@
     "electron:build:msi": "electron-builder --win msi --publish never",
     "electron:pack": "electron-builder --dir",
     "release:local": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/package-release.ps1",
-    "release:dir": "npm run electron:pack"
+    "release:dir": "npm run electron:pack",
+    "context:generate": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/regenerate-context.ps1"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",
