@@ -4,6 +4,61 @@
 <!-- Updated by gen-context.js -->
 # Code signatures
 
+## changes (last 5 commits — 1 second ago)
+```
+.github\copilot-instructions.md               +setStatus  +readForm  +writeForm  +formatRegistrations
+.github\gemini-context.md                     +setStatus  +readForm  +writeForm  +formatRegistrations
+```
+
+## .github
+
+### .github\copilot-instructions.md
+```
+h2 Auto-generated signatures
+h2 SigMap commands
+h1 Code signatures
+h2 electron
+h3 electron\hotkeys-renderer.js
+h3 electron\hotkeys.html
+h3 electron\main.js
+h3 electron\lib\config.js
+h3 electron\lib\launcher.js
+h3 electron\lib\logger.js
+h3 electron\lib\utils.js
+h3 electron\windows\hotkeys.js
+h3 electron\windows\main.js
+code-fence plain
+```
+
+### .github\gemini-context.md
+```
+h2 Auto-generated signatures
+h2 Code Signatures
+h2 electron
+h3 electron\hotkeys-renderer.js
+h3 electron\hotkeys.html
+h3 electron\main.js
+h3 electron\lib\config.js
+h3 electron\lib\launcher.js
+h3 electron\lib\logger.js
+h3 electron\lib\utils.js
+h3 electron\windows\hotkeys.js
+h3 electron\windows\main.js
+code-fence plain
+```
+
+### .github\workflows\release.yml
+```
+keys: [name, on, permissions, env, jobs]
+job: build-windows
+```
+
+### .github\workflows\validate.yml
+```
+keys: [name, on, permissions, jobs]
+job: validate
+```
+
 ## electron
 
 ### electron\hotkeys-renderer.js

@@ -3,13 +3,68 @@
 ## Auto-generated signatures
 <!-- Updated by gen-context.js -->
 You are a coding assistant with complete knowledge of this codebase.
-The following code signatures were extracted by SigMap v6.5.1 on 2026-05-04T09:52:24.862Z.
+The following code signatures were extracted by SigMap v6.5.1 on 2026-05-04T12:07:57.885Z.
 
 These signatures represent every public function, class, and type in the project.
 Refer to them when answering questions about code structure, APIs, and implementation.
 Before answering questions about specific code areas, suggest running `sigmap ask "<query>"` to get the most relevant files. After config changes, `sigmap validate` confirms coverage.
 
 ## Code Signatures
+
+## changes (last 5 commits — 1 second ago)
+```
+.github\copilot-instructions.md               +setStatus  +readForm  +writeForm  +formatRegistrations
+.github\gemini-context.md                     +setStatus  +readForm  +writeForm  +formatRegistrations
+```
+
+## .github
+
+### .github\copilot-instructions.md
+```
+h2 Auto-generated signatures
+h2 SigMap commands
+h1 Code signatures
+h2 electron
+h3 electron\hotkeys-renderer.js
+h3 electron\hotkeys.html
+h3 electron\main.js
+h3 electron\lib\config.js
+h3 electron\lib\launcher.js
+h3 electron\lib\logger.js
+h3 electron\lib\utils.js
+h3 electron\windows\hotkeys.js
+h3 electron\windows\main.js
+code-fence plain
+```
+
+### .github\gemini-context.md
+```
+h2 Auto-generated signatures
+h2 Code Signatures
+h2 electron
+h3 electron\hotkeys-renderer.js
+h3 electron\hotkeys.html
+h3 electron\main.js
+h3 electron\lib\config.js
+h3 electron\lib\launcher.js
+h3 electron\lib\logger.js
+h3 electron\lib\utils.js
+h3 electron\windows\hotkeys.js
+h3 electron\windows\main.js
+code-fence plain
+```
+
+### .github\workflows\release.yml
+```
+keys: [name, on, permissions, env, jobs]
+job: build-windows
+```
+
+### .github\workflows\validate.yml
+```
+keys: [name, on, permissions, jobs]
+job: validate
+```
 
 ## electron
 
