@@ -1,0 +1,10 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"sigmap.scriptPath": "C:\\Users\\harmo\\AppData\\Roaming\\npm\\node_modules\\sigmap\\gen-context.js"
+	}
+}

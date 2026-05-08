@@ -387,3 +387,285 @@ Future maintainers may choose one of:
 - combined ZIP containing selected installers
 
 Do not change the distribution strategy without updating `README.md`, `DEVELOPMENT.md`, this file, and the release workflow body.
+
+
+## Tools
+
+<!-- sigmap-tools -->
+
+```json
+[
+  {
+    "name": "sigmap_ask",
+    "description": "Rank source files by relevance to a natural-language query. Run before exploring the codebase.",
+    "command": "sigmap ask \"$QUERY\""
+  },
+  {
+    "name": "sigmap_validate",
+    "description": "Validate SigMap config and measure context coverage. Run after changing config or source dirs.",
+    "command": "sigmap validate"
+  },
+  {
+    "name": "sigmap_judge",
+    "description": "Score an LLM response for groundedness against source context. Use to verify answer quality.",
+    "command": "sigmap judge --response \"$RESPONSE\" --context \"$CONTEXT\""
+  },
+  {
+    "name": "sigmap_query",
+    "description": "Rank all files by relevance using TF-IDF and write a focused mini-context.",
+    "command": "sigmap --query \"$QUERY\" --context"
+  },
+  {
+    "name": "sigmap_weights",
+    "description": "Show learned file-ranking multipliers accumulated from past sessions.",
+    "command": "sigmap weights"
+  }
+]
+```
+
+## Auto-generated signatures
+<!-- Updated by gen-context.js -->
+# Code signatures
+
+## SigMap commands
+
+| When | Command |
+|------|---------|
+| Before answering a question | `sigmap ask "<your question>"` |
+| After code changes | `sigmap validate` |
+| To query by topic | `sigmap --query "<topic>"` |
+
+Always run `sigmap ask` or `sigmap --query` before searching for files relevant to a task.
+## changes (last 5 commits — 4 days ago)
+```
+.github\copilot-instructions.md               +setStatus  +readForm  +writeForm  +formatRegistrations
+.github\gemini-context.md                     +setStatus  +readForm  +writeForm  +formatRegistrations
+```
+
+## .github
+
+### .github\copilot-instructions.md
+```
+h2 Auto-generated signatures
+h2 SigMap commands
+h1 Code signatures
+h2 changes (last 5 commits — 4 days ago)
+h2 .github
+h3 .github\copilot-instructions.md
+h3 .github\gemini-context.md
+h3 .github\workflows\release.yml
+h3 .github\workflows\validate.yml
+h2 electron
+h3 electron\diagnostics-renderer.js
+h3 electron\diagnostics.html
+h3 electron\hotkeys-renderer.js
+h3 electron\hotkeys.html
+h3 electron\lib\config.js
+h3 electron\lib\diagnostics.js
+h3 electron\lib\integration-config.js
+h3 electron\lib\launcher.js
+h3 electron\lib\logger.js
+h3 electron\lib\utils.js
+h3 electron\main.js
+h3 electron\windows\diagnostics.js
+h3 electron\windows\hotkeys.js
+h3 electron\windows\main.js
+code-fence plain
+```
+
+### .github\gemini-context.md
+```
+h2 Auto-generated signatures
+h2 Code Signatures
+h2 changes (last 5 commits — 4 days ago)
+h2 .github
+h3 .github\copilot-instructions.md
+h3 .github\gemini-context.md
+h3 .github\workflows\release.yml
+h3 .github\workflows\validate.yml
+h2 electron
+h3 electron\diagnostics-renderer.js
+h3 electron\diagnostics.html
+h3 electron\hotkeys-renderer.js
+h3 electron\hotkeys.html
+h3 electron\lib\config.js
+h3 electron\lib\diagnostics.js
+h3 electron\lib\integration-config.js
+h3 electron\lib\launcher.js
+h3 electron\lib\logger.js
+h3 electron\lib\utils.js
+h3 electron\main.js
+h3 electron\windows\diagnostics.js
+h3 electron\windows\hotkeys.js
+h3 electron\windows\main.js
+code-fence plain
+```
+
+### .github\workflows\release.yml
+```
+keys: [name, on, permissions, env, jobs]
+job: build-windows
+```
+
+### .github\workflows\validate.yml
+```
+keys: [name, on, permissions, jobs]
+job: validate
+```
+
+## electron
+
+### electron\diagnostics-renderer.js
+```
+function setStatus(text)
+function formatValue(value)
+function renderDefinitionList(el, entries)
+function renderServices(services)
+function render(data)
+function readConfigForm()
+function writeConfigForm(data)
+async function refresh()
+```
+
+### electron\diagnostics.html
+```
+title: Notion2Council Diagnostics
+div#checkedAt
+button#refresh
+button#start
+button#stop
+button#openUi
+button#openDocs
+button#openLogs
+div#services
+dl#provider
+dl#config
+input#notionLocalRoot
+input#notionPort
+input#councilLocalRoot
+input#councilBackendPort
+input#councilFrontendPort
+input#providerUrlPath
+button#saveConfig
+div#configPath
+pre#state
+pre#log
+div#status
+```
+
+### electron\hotkeys-renderer.js
+```
+function setStatus(text, kind = '')
+function readForm()
+function writeForm(values)
+function formatRegistrations(registrations)
+function getAcceleratorString(e)
+async function load()
+```
+
+### electron\hotkeys.html
+```
+title: Notion2Council Hotkeys
+input#toggleWindow
+input#openChat
+input#clipboardToChat
+input#openHotkeySettings
+button#save
+button#reset
+button#testClipboard
+button#reload
+div#status
+div#path
+```
+
+### electron\lib\config.js
+```
+module.exports = { defaultHotkeys, getHotkeyConfigPath, readHotkeys, writeHotkeys }
+function getHotkeyConfigPath()
+function readHotkeys()
+function writeHotkeys(hotkeys)
+```
+
+### electron\lib\diagnostics.js
+```
+module.exports = { getDiagnosticsStatus }
+function readJson(filePath)
+function readEnvValue(filePath, name)
+function tailFile(filePath, maxChars = 4000)
+function requestText(url, options = {})
+function titleContains(body, expectedTitle)
+async function testService(name, url, options = {})
+async function getDiagnosticsStatus()
+```
+
+### electron\lib\integration-config.js
+```
+module.exports = { getIntegrationConfig, getEditableLocalConfig, saveLocalIntegrationConfig }
+function readJsonFile(filePath)
+function getNested(source, parts)
+function getConfigValue(localConfig, defaultConfig, parts, fallback)
+function resolveRepoPath(repoRoot, value)
+function getIntegrationConfig()
+function getEditableLocalConfig()
+function saveLocalIntegrationConfig(values)
+```
+
+### electron\lib\launcher.js
+```
+module.exports = { startStack, stopStack }
+function resolvePowerShellPath()
+function showError(title, message)
+function runPowerShell(scriptPath, args = [])
+function getScriptPath(scriptName)
+function startStack({ noBrowser = true } = {})
+function stopStack()
+```
+
+### electron\lib\logger.js
+```
+module.exports = { getLogsDir, appendLog }
+function ensureDir(dir)
+function getLogsDir()
+function appendLog(message)
+```
+
+### electron\lib\utils.js
+```
+module.exports = { ensureDir, getAppRoot, waitForUrl }
+function ensureDir(dir)
+function directoryHasLaunchScript(dir)
+function getAppRoot()
+function waitForUrl(url, timeoutMs = 90000, options = {})
+```
+
+### electron\main.js
+```
+async function focusChatInput(text)
+async function openChat()
+async function openChatWithClipboard()
+function createTray()
+function refreshTrayMenu()
+function setApplicationMenu()
+function registerHotkeys()
+```
+
+### electron\windows\diagnostics.js
+```
+module.exports = { openDiagnostics }
+function openDiagnostics(parentWindow)
+```
+
+### electron\windows\hotkeys.js
+```
+module.exports = { openHotkeySettings }
+function openHotkeySettings(parentWindow)
+```
+
+### electron\windows\main.js
+```
+module.exports = { createMainWindow, getMainWindow, showMainWindow, toggleMainWindow }
+function createMainWindow(councilUiUrl)
+function getMainWindow()
+function showMainWindow()
+function toggleMainWindow()
+```

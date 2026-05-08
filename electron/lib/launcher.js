@@ -84,13 +84,19 @@ function getScriptPath(scriptName) {
 
 function startStack({ noBrowser = true } = {}) {
   if (launcherProcess && !launcherProcess.killed) return launcherProcess;
-  launcherProcess = runPowerShell(getScriptPath('launch.ps1'), noBrowser ? ['-NoBrowser'] : []);
+  const args = [];
+  if (process.env.NOTION2COUNCIL_CONFIG) args.push('-ConfigPath', process.env.NOTION2COUNCIL_CONFIG);
+  if (noBrowser) args.push('-NoBrowser');
+  launcherProcess = runPowerShell(getScriptPath('launch.ps1'), args);
   return launcherProcess;
 }
 
 function stopStack() {
   appendLog('[launcher] stopStack: dispatching launch.ps1 -Stop');
-  return runPowerShell(getScriptPath('launch.ps1'), ['-Stop']);
+  const args = [];
+  if (process.env.NOTION2COUNCIL_CONFIG) args.push('-ConfigPath', process.env.NOTION2COUNCIL_CONFIG);
+  args.push('-Stop');
+  return runPowerShell(getScriptPath('launch.ps1'), args);
 }
 
 module.exports = {

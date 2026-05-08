@@ -57,12 +57,23 @@ function waitForUrl(url, timeoutMs = 90000, options = {}) {
       if (finished) return;
       const request = http.get(url, response => {
         if (finished) return;
-        response.resume();
-        if (response.statusCode >= 200 && response.statusCode < 500) {
-          cleanup();
-          return resolve(true);
-        }
-        retry();
+        let body = '';
+        response.setEncoding('utf8');
+        response.on('data', chunk => {
+          if (body.length < 12000) body += chunk;
+        });
+        response.on('end', () => {
+          if (finished) return;
+          const statusOk = response.statusCode >= 200 && response.statusCode < 500;
+          const contentOk = options.expectedContent ? body.includes(options.expectedContent) : true;
+          const titleMatch = /<title>(.*?)<\/title>/is.exec(body);
+          const titleOk = options.expectedTitle ? !!(titleMatch && titleMatch[1].includes(options.expectedTitle)) : true;
+          if (statusOk && contentOk && titleOk) {
+            cleanup();
+            return resolve(true);
+          }
+          retry();
+        });
       });
 
       request.on('error', (err) => {

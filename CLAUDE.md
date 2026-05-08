@@ -4,7 +4,7 @@
 <!-- Updated by gen-context.js -->
 # Code signatures
 
-## changes (last 5 commits — 1 second ago)
+## changes (last 5 commits — 4 days ago)
 ```
 .github\copilot-instructions.md               +setStatus  +readForm  +writeForm  +formatRegistrations
 .github\gemini-context.md                     +setStatus  +readForm  +writeForm  +formatRegistrations
@@ -17,14 +17,25 @@
 h2 Auto-generated signatures
 h2 SigMap commands
 h1 Code signatures
+h2 changes (last 5 commits — 4 days ago)
+h2 .github
+h3 .github\copilot-instructions.md
+h3 .github\gemini-context.md
+h3 .github\workflows\release.yml
+h3 .github\workflows\validate.yml
 h2 electron
+h3 electron\diagnostics-renderer.js
+h3 electron\diagnostics.html
 h3 electron\hotkeys-renderer.js
 h3 electron\hotkeys.html
-h3 electron\main.js
 h3 electron\lib\config.js
+h3 electron\lib\diagnostics.js
+h3 electron\lib\integration-config.js
 h3 electron\lib\launcher.js
 h3 electron\lib\logger.js
 h3 electron\lib\utils.js
+h3 electron\main.js
+h3 electron\windows\diagnostics.js
 h3 electron\windows\hotkeys.js
 h3 electron\windows\main.js
 code-fence plain
@@ -34,14 +45,25 @@ code-fence plain
 ```
 h2 Auto-generated signatures
 h2 Code Signatures
+h2 changes (last 5 commits — 4 days ago)
+h2 .github
+h3 .github\copilot-instructions.md
+h3 .github\gemini-context.md
+h3 .github\workflows\release.yml
+h3 .github\workflows\validate.yml
 h2 electron
+h3 electron\diagnostics-renderer.js
+h3 electron\diagnostics.html
 h3 electron\hotkeys-renderer.js
 h3 electron\hotkeys.html
-h3 electron\main.js
 h3 electron\lib\config.js
+h3 electron\lib\diagnostics.js
+h3 electron\lib\integration-config.js
 h3 electron\lib\launcher.js
 h3 electron\lib\logger.js
 h3 electron\lib\utils.js
+h3 electron\main.js
+h3 electron\windows\diagnostics.js
 h3 electron\windows\hotkeys.js
 h3 electron\windows\main.js
 code-fence plain
@@ -60,6 +82,44 @@ job: validate
 ```
 
 ## electron
+
+### electron\diagnostics-renderer.js
+```
+function setStatus(text)
+function formatValue(value)
+function renderDefinitionList(el, entries)
+function renderServices(services)
+function render(data)
+function readConfigForm()
+function writeConfigForm(data)
+async function refresh()
+```
+
+### electron\diagnostics.html
+```
+title: Notion2Council Diagnostics
+div#checkedAt
+button#refresh
+button#start
+button#stop
+button#openUi
+button#openDocs
+button#openLogs
+div#services
+dl#provider
+dl#config
+input#notionLocalRoot
+input#notionPort
+input#councilLocalRoot
+input#councilBackendPort
+input#councilFrontendPort
+input#providerUrlPath
+button#saveConfig
+div#configPath
+pre#state
+pre#log
+div#status
+```
 
 ### electron\hotkeys-renderer.js
 ```
@@ -86,23 +146,36 @@ div#status
 div#path
 ```
 
-### electron\main.js
-```
-async function focusChatInput(text)
-async function openChat()
-async function openChatWithClipboard()
-function createTray()
-function refreshTrayMenu()
-function setApplicationMenu()
-function registerHotkeys()
-```
-
 ### electron\lib\config.js
 ```
 module.exports = { defaultHotkeys, getHotkeyConfigPath, readHotkeys, writeHotkeys }
 function getHotkeyConfigPath()
 function readHotkeys()
 function writeHotkeys(hotkeys)
+```
+
+### electron\lib\diagnostics.js
+```
+module.exports = { getDiagnosticsStatus }
+function readJson(filePath)
+function readEnvValue(filePath, name)
+function tailFile(filePath, maxChars = 4000)
+function requestText(url, options = {})
+function titleContains(body, expectedTitle)
+async function testService(name, url, options = {})
+async function getDiagnosticsStatus()
+```
+
+### electron\lib\integration-config.js
+```
+module.exports = { getIntegrationConfig, getEditableLocalConfig, saveLocalIntegrationConfig }
+function readJsonFile(filePath)
+function getNested(source, parts)
+function getConfigValue(localConfig, defaultConfig, parts, fallback)
+function resolveRepoPath(repoRoot, value)
+function getIntegrationConfig()
+function getEditableLocalConfig()
+function saveLocalIntegrationConfig(values)
 ```
 
 ### electron\lib\launcher.js
@@ -131,6 +204,23 @@ function ensureDir(dir)
 function directoryHasLaunchScript(dir)
 function getAppRoot()
 function waitForUrl(url, timeoutMs = 90000, options = {})
+```
+
+### electron\main.js
+```
+async function focusChatInput(text)
+async function openChat()
+async function openChatWithClipboard()
+function createTray()
+function refreshTrayMenu()
+function setApplicationMenu()
+function registerHotkeys()
+```
+
+### electron\windows\diagnostics.js
+```
+module.exports = { openDiagnostics }
+function openDiagnostics(parentWindow)
 ```
 
 ### electron\windows\hotkeys.js

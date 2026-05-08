@@ -7,14 +7,16 @@ const { appendLog } = require('./lib/logger');
 const { readHotkeys, writeHotkeys, defaultHotkeys, getHotkeyConfigPath } = require('./lib/config');
 const { waitForUrl } = require('./lib/utils');
 const { startStack, stopStack } = require('./lib/launcher');
+const { getIntegrationConfig, getEditableLocalConfig, saveLocalIntegrationConfig } = require('./lib/integration-config');
+const { getDiagnosticsStatus } = require('./lib/diagnostics');
 const { createMainWindow, getMainWindow, showMainWindow, toggleMainWindow } = require('./windows/main');
 const { openHotkeySettings } = require('./windows/hotkeys');
+const { openDiagnostics } = require('./windows/diagnostics');
 
 let tray = null;
 let isQuitting = false;
-const councilUiUrl = process.env.NOTION2COUNCIL_UI_URL || 'http://127.0.0.1:5173/';
-const notionApiUrl = process.env.NOTION2API_URL || 'http://127.0.0.1:8000/';
-const notionDocsUrl = process.env.NOTION2API_DOCS_URL || 'http://127.0.0.1:8000/docs';
+const initialConfig = getIntegrationConfig();
+const councilUiUrl = initialConfig.councilUiUrl;
 
 async function focusChatInput(text) {
   const mainWindow = getMainWindow();
@@ -62,13 +64,15 @@ async function focusChatInput(text) {
 }
 
 async function openChat() {
+  const config = getIntegrationConfig();
   startStack({ noBrowser: true });
   showMainWindow();
   try {
-    await waitForUrl(councilUiUrl, 90000);
+    await waitForUrl(config.notionHealthUrl, 90000, { expectedContent: 'ok' });
+    await waitForUrl(config.councilUiUrl, 90000, { expectedTitle: 'LLM Council' });
     const mainWindow = getMainWindow();
-    if (mainWindow && mainWindow.webContents.getURL() !== councilUiUrl) {
-      await mainWindow.loadURL(councilUiUrl);
+    if (mainWindow && mainWindow.webContents.getURL() !== config.councilUiUrl) {
+      await mainWindow.loadURL(config.councilUiUrl);
     }
     showMainWindow();
     await focusChatInput('');
@@ -99,10 +103,12 @@ function refreshTrayMenu() {
     { label: 'Open Chat', click: openChat },
     { label: 'Clipboard to Chat', click: openChatWithClipboard },
     { type: 'separator' },
+    { label: 'Diagnostics', click: () => openDiagnostics(getMainWindow()) },
     { label: 'Hotkey Settings', click: () => openHotkeySettings(getMainWindow()) },
-    { label: 'Open Notion2API Chat', click: () => { startStack({ noBrowser: true }); shell.openExternal(notionApiUrl); } },
-    { label: 'Open Notion2API Docs', click: () => { startStack({ noBrowser: true }); shell.openExternal(notionDocsUrl); } },
-    { label: 'Open Logs', click: () => { shell.openPath(path.join(app.getPath('userData'), 'logs')); } },
+    { label: 'Open Notion2API', click: () => { startStack({ noBrowser: true }); shell.openExternal(getIntegrationConfig().notionBaseUrl); } },
+    { label: 'Open Notion2API Docs', click: () => { startStack({ noBrowser: true }); shell.openExternal(process.env.NOTION2API_DOCS_URL || getIntegrationConfig().notionDocsUrl); } },
+    { label: 'Open App Logs', click: () => { shell.openPath(path.join(app.getPath('userData'), 'logs')); } },
+    { label: 'Open Service Logs', click: () => { shell.openPath(getIntegrationConfig().logsDir); } },
     { type: 'separator' },
     { label: 'Start Stack', click: () => startStack({ noBrowser: true }) },
     { label: 'Stop Stack', click: stopStack },
@@ -116,6 +122,7 @@ function setApplicationMenu() {
     { label: 'Notion2Council', submenu: [
       { label: 'Open Chat', click: openChat },
       { label: 'Clipboard to Chat', click: openChatWithClipboard },
+      { label: 'Diagnostics', click: () => openDiagnostics(getMainWindow()) },
       { label: 'Hotkey Settings', click: () => openHotkeySettings(getMainWindow()) },
       { type: 'separator' },
       { label: 'Quit', click: () => app.quit() },
@@ -163,6 +170,14 @@ ipcMain.handle('hotkeys:testClipboardToChat', async () => {
   await openChatWithClipboard();
   return { ok: true };
 });
+ipcMain.handle('diagnostics:status', getDiagnosticsStatus);
+ipcMain.handle('diagnostics:getConfig', getEditableLocalConfig);
+ipcMain.handle('diagnostics:saveConfig', (_event, values) => saveLocalIntegrationConfig(values));
+ipcMain.handle('diagnostics:start', () => ({ ok: !!startStack({ noBrowser: true }) }));
+ipcMain.handle('diagnostics:stop', () => ({ ok: !!stopStack() }));
+ipcMain.handle('diagnostics:openCouncil', () => shell.openExternal(getIntegrationConfig().councilUiUrl));
+ipcMain.handle('diagnostics:openDocs', () => shell.openExternal(process.env.NOTION2API_DOCS_URL || getIntegrationConfig().notionDocsUrl));
+ipcMain.handle('diagnostics:openLogs', () => shell.openPath(getIntegrationConfig().logsDir));
 
 // App Lifecycle
 app.whenReady().then(async () => {
@@ -177,12 +192,14 @@ app.whenReady().then(async () => {
   startStack({ noBrowser: true });
 
   try {
+    const config = getIntegrationConfig();
     // Wait for the UI to be ready before loading
-    await waitForUrl(councilUiUrl, 90000);
-    await mainWindow.loadURL(councilUiUrl);
+    await waitForUrl(config.notionHealthUrl, 90000, { expectedContent: 'ok' });
+    await waitForUrl(config.councilUiUrl, 90000, { expectedTitle: 'LLM Council' });
+    await mainWindow.loadURL(config.councilUiUrl);
   } catch (error) {
     appendLog(`Council UI failed to load: ${error.message}`);
-    // Optional: Load a local error page
+    openDiagnostics(mainWindow);
   }
 
   mainWindow.show();

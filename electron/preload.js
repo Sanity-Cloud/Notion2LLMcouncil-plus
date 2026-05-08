@@ -6,3 +6,14 @@ contextBridge.exposeInMainWorld('notion2CouncilHotkeys', {
   reset: () => ipcRenderer.invoke('hotkeys:reset'),
   testClipboardToChat: () => ipcRenderer.invoke('hotkeys:testClipboardToChat'),
 });
+
+contextBridge.exposeInMainWorld('notion2CouncilDiagnostics', {
+  status: () => ipcRenderer.invoke('diagnostics:status'),
+  getConfig: () => ipcRenderer.invoke('diagnostics:getConfig'),
+  saveConfig: values => ipcRenderer.invoke('diagnostics:saveConfig', values),
+  start: () => ipcRenderer.invoke('diagnostics:start'),
+  stop: () => ipcRenderer.invoke('diagnostics:stop'),
+  openCouncil: () => ipcRenderer.invoke('diagnostics:openCouncil'),
+  openDocs: () => ipcRenderer.invoke('diagnostics:openDocs'),
+  openLogs: () => ipcRenderer.invoke('diagnostics:openLogs'),
+});
