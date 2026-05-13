@@ -199,7 +199,7 @@ function Start-CouncilBackend {
     return $State
 }
 
-function Apply-CouncilSettings {
+function Set-CouncilSettings {
     param([string]$NotionApiKey)
     $settingsUrl = "http://127.0.0.1:$CouncilBackendPort/api/settings"
     $current = Invoke-RestMethod -Method Get -Uri $settingsUrl -TimeoutSec 10
@@ -232,9 +232,12 @@ function Start-CouncilFrontend {
     $allowedPorts = @($CouncilFrontendPort, 5173, 5174, 3000) | Select-Object -Unique
     foreach ($candidate in $allowedPorts) {
         if (Test-HttpOk -Url "http://127.0.0.1:$candidate/" -ExpectedTitle "LLM Council") {
+            # Ensure both script-scoped and local variables reflect the chosen port
             $script:CouncilFrontendPort = $candidate
+            $CouncilFrontendPort = $candidate
             Write-Step "Reusing LLM Council frontend on port $candidate"
-            $State.councilFrontend = @{ name = "LLM Council frontend"; pid = Get-ListeningProcessId -Port $CouncilFrontendPort; port = $CouncilFrontendPort; url = "http://127.0.0.1:$CouncilFrontendPort" }
+            $listeningPid = Get-ListeningProcessId -Port $CouncilFrontendPort
+            $State.councilFrontend = @{ name = "LLM Council frontend"; pid = $listeningPid; port = $CouncilFrontendPort; url = "http://127.0.0.1:$CouncilFrontendPort" }
             return $State
         }
     }
@@ -247,6 +250,9 @@ function Start-CouncilFrontend {
     )
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllLines($envLocalPath, $envLocalLines, $utf8NoBom)
+
+    # If the preferred frontend port is occupied (but not serving LLM Council), pick a free port
+    if (Test-PortInUse -Port $CouncilFrontendPort) { $script:CouncilFrontendPort = Find-FreePort -PreferredPort $CouncilFrontendPort; $CouncilFrontendPort = $script:CouncilFrontendPort }
 
     Write-Step "Starting LLM Council frontend on http://127.0.0.1:$CouncilFrontendPort"
     $process = Start-Process -FilePath "npm.cmd" -ArgumentList @("run", "dev", "--", "--host", "127.0.0.1", "--port", "$CouncilFrontendPort") `
@@ -296,7 +302,7 @@ if ($SetupOnly) { Write-Host "Setup complete"; exit 0 }
 $state = Get-State -StateFile $StateFile
 $state = Start-NotionApi -State $state
 $state = Start-CouncilBackend -State $state
-Apply-CouncilSettings -NotionApiKey $notionApiKey
+Set-CouncilSettings -NotionApiKey $notionApiKey
 $state = Start-CouncilFrontend -State $state
 Save-State -State $state -StateFile $StateFile
 
