@@ -94,7 +94,7 @@ function Test-PythonModules {
     if (-not $Modules -or $Modules.Count -eq 0) { return $true }
 
     $missing = @()
-    $checkCode = 'import importlib.util, os, sys; module=os.environ.get("N2C_PY_MODULE", ""); sys.exit(0 if module and importlib.util.find_spec(module) else 1)'
+    $checkCode = "import importlib.util, os, sys; module=os.environ.get('N2C_PY_MODULE', ''); sys.exit(0 if module and importlib.util.find_spec(module) else 1)"
 
     foreach ($module in $Modules) {
         $oldValue = $env:N2C_PY_MODULE
