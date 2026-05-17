@@ -1,9 +1,8 @@
 diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
-index d8b7df2..0d8a5de 100644
+index d8b7df2..eed2eb5 100644
 --- a/frontend/src/App.jsx
 +++ b/frontend/src/App.jsx
-@@ -215,22 +215,32 @@ function App() {
-   const loadConversations = async (retryCount = 0) => {
+@@ -216,8 +216,10 @@ function App() {
      try {
        const convs = await api.listConversations();
        
@@ -16,7 +15,7 @@ index d8b7df2..0d8a5de 100644
            const local = prev.find((item) => item.id === conv.id);
  
            if (
-             local &&
+@@ -225,12 +227,19 @@ function App() {
              isDefaultConversationTitle(conv.title) &&
              !isDefaultConversationTitle(local.title)
            ) {
@@ -40,7 +39,7 @@ index d8b7df2..0d8a5de 100644
      } catch (error) {
        console.error('Failed to load conversations:', error);
        // Retry up to 3 times with increasing delays (1s, 2s, 3s)
-@@ -255,12 +265,28 @@ function App() {
+@@ -255,18 +264,35 @@ function App() {
  
      if (existingEmpty) {
        // Reuse the existing empty conversation instead of creating a new one
@@ -69,7 +68,6 @@ index d8b7df2..0d8a5de 100644
        setConversations((prev) => [
          {
            id: newConv.id,
-@@ -268,6 +294,7 @@ function App() {
            created_at: newConv.created_at,
            title: newConv.title || 'New Conversation',
            message_count: 0,
@@ -77,7 +75,7 @@ index d8b7df2..0d8a5de 100644
          },
          ...prev.filter((conv) => conv.id !== newConv.id),
        ]);
-@@ -277,6 +304,7 @@ function App() {
+@@ -277,6 +303,7 @@ function App() {
    };
  
    const handleSelectConversation = (id) => {
@@ -85,7 +83,7 @@ index d8b7df2..0d8a5de 100644
      setCurrentConversationId(id);
    };
  
-@@ -287,6 +315,7 @@ function App() {
+@@ -287,6 +314,7 @@ function App() {
        setConversations((prev) => prev.filter(c => c.id !== id));
        // If we deleted the current conversation, clear it
        if (id === currentConversationId) {
@@ -93,7 +91,7 @@ index d8b7df2..0d8a5de 100644
          setCurrentConversationId(null);
          setCurrentConversation(null);
        }
-@@ -310,6 +339,7 @@ function App() {
+@@ -310,6 +338,7 @@ function App() {
      // Assign unique ID to this request to prevent race conditions
      const currentRequestId = ++requestIdRef.current;
      const activeConversationId = currentConversationId;
@@ -101,7 +99,7 @@ index d8b7df2..0d8a5de 100644
  
      // Optimistically update conversation title in list and current state if it is a new/untitled conversation
      const currentConvInList = conversations.find(c => c.id === activeConversationId);
-@@ -333,10 +363,18 @@ function App() {
+@@ -333,10 +362,18 @@ function App() {
      try {
        // Optimistically add user message to UI
        const userMessage = { role: 'user', content };
@@ -124,7 +122,7 @@ index d8b7df2..0d8a5de 100644
  
        // Create a partial assistant message that will be updated progressively
        const assistantMessage = {
-@@ -366,10 +404,18 @@ function App() {
+@@ -366,10 +403,18 @@ function App() {
        };
  
        // Add the partial assistant message

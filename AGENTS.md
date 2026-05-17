@@ -443,7 +443,6 @@ Always run `sigmap ask` or `sigmap --query` before searching for files relevant 
 h2 Auto-generated signatures
 h2 SigMap commands
 h1 Code signatures
-h2 changes (last 5 commits — 0 seconds ago)
 h2 .github
 h3 .github\copilot-instructions.md
 h3 .github\gemini-context.md
@@ -471,7 +470,6 @@ code-fence plain
 ```
 h2 Auto-generated signatures
 h2 Code Signatures
-h2 changes (last 5 commits — 0 seconds ago)
 h2 .github
 h3 .github\copilot-instructions.md
 h3 .github\gemini-context.md
@@ -509,61 +507,6 @@ job: validate
 
 ## electron
 
-### electron\hotkeys-renderer.js
-```
-function setStatus(text, kind = '')
-function readForm()
-function writeForm(values)
-function formatRegistrations(registrations)
-function getAcceleratorString(e)
-async function load()
-```
-
-### electron\hotkeys.html
-```
-title: Notion2Council Hotkeys
-input#toggleWindow
-input#openChat
-input#openNewChat
-input#clipboardToChat
-input#clipboardToNewChat
-input#openHotkeySettings
-button#save
-button#reset
-button#testClipboard
-button#testClipboardToNewChat
-button#reload
-div#status
-div#path
-```
-
-### electron\lib\config.js
-```
-module.exports = { defaultHotkeys, getHotkeyConfigPath, readHotkeys, writeHotkeys }
-function getHotkeyConfigPath()
-function readHotkeys()
-function writeHotkeys(hotkeys)
-```
-
-### electron\main.js
-```
-async function focusChatInput(text, submit = false)
-async function ensureChatInputReady()
-async function clearCouncilUiStorage()
-async function getActiveRuntimeUrls(timeoutMs = 90000)
-async function isRuntimeReady(urls, timeoutMs = 2500)
-async function waitForReadyRuntimeUrls()
-async function openChat()
-async function openChatWithClipboard()
-async function createNewChatInputReady()
-async function openNewChat()
-async function openNewChatWithClipboard()
-function createTray()
-function refreshTrayMenu()
-function setApplicationMenu()
-function registerHotkeys()
-```
-
 ### electron\diagnostics-renderer.js
 ```
 function setStatus(text)
@@ -600,6 +543,42 @@ div#configPath
 pre#state
 pre#log
 div#status
+```
+
+### electron\hotkeys-renderer.js
+```
+function setStatus(text, kind = '')
+function readForm()
+function writeForm(values)
+function formatRegistrations(registrations)
+function getAcceleratorString(e)
+async function load()
+```
+
+### electron\hotkeys.html
+```
+title: Notion2Council Hotkeys
+input#toggleWindow
+input#openChat
+input#openNewChat
+input#clipboardToChat
+input#clipboardToNewChat
+input#openHotkeySettings
+button#save
+button#reset
+button#testClipboard
+button#testClipboardToNewChat
+button#reload
+div#status
+div#path
+```
+
+### electron\lib\config.js
+```
+module.exports = { defaultHotkeys, getHotkeyConfigPath, readHotkeys, writeHotkeys }
+function getHotkeyConfigPath()
+function readHotkeys()
+function writeHotkeys(hotkeys)
 ```
 
 ### electron\lib\diagnostics.js
@@ -664,6 +643,25 @@ function getRuntimeRoot()
 function getAppRoot()
 function waitForUrl(url, timeoutMs = 90000, options = {})
 function waitForRuntimeState(statePath, timeoutMs = 90000)
+```
+
+### electron\main.js
+```
+async function focusChatInput(text, submit = false)
+async function ensureChatInputReady()
+async function clearCouncilUiStorage()
+async function getActiveRuntimeUrls(timeoutMs = 90000)
+async function isRuntimeReady(urls, timeoutMs = 2500)
+async function waitForReadyRuntimeUrls()
+async function openChat()
+async function openChatWithClipboard()
+async function createNewChatInputReady()
+async function openNewChat()
+async function openNewChatWithClipboard()
+function createTray()
+function refreshTrayMenu()
+function setApplicationMenu()
+function registerHotkeys()
 ```
 
 ### electron\windows\diagnostics.js
