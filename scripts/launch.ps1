@@ -21,8 +21,8 @@ $ErrorActionPreference = "Stop"
 # Paths and State
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $LibDir = Join-Path $PSScriptRoot "lib"
-$LogDir = Join-Path $RepoRoot "logs"
-$VendorRoot = Join-Path $RepoRoot "vendor"
+$LogDir = if ($env:NOTION2COUNCIL_LOG_DIR) { $env:NOTION2COUNCIL_LOG_DIR } else { Join-Path $RepoRoot "logs" }
+$VendorRoot = if ($env:NOTION2COUNCIL_RUNTIME_ROOT) { Join-Path $env:NOTION2COUNCIL_RUNTIME_ROOT "vendor" } else { Join-Path $RepoRoot "vendor" }
 $StateFile = Join-Path $LogDir "launcher-state.json"
 $RestartNotionFlag = Join-Path $LogDir "restart-notion.flag"
 
@@ -313,3 +313,7 @@ Write-Host "  LLM Council UI:    http://127.0.0.1:$CouncilFrontendPort"
 Write-Host "  Logs:              $LogDir`n"
 
 if (-not $NoBrowser) { Start-Process "http://127.0.0.1:$CouncilFrontendPort/" }
+
+if (-not $env:GITHUB_ACTIONS) {
+    Pause
+}
