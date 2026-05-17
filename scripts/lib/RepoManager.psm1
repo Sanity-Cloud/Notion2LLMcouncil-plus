@@ -9,7 +9,7 @@ function Initialize-Repo {
         if (Test-Path (Join-Path $Path ".git")) {
             if ($Branch) {
                 Write-Step "Refreshing $Path from origin/$Branch"
-                git -C $Path fetch origin $Branch
+                git -C $Path fetch --quiet origin $Branch
                 if ($LASTEXITCODE -ne 0) {
                     Write-Step "Could not fetch origin/$Branch for $Path; using existing checkout"
                     return
@@ -22,7 +22,7 @@ function Initialize-Repo {
                     if ($LASTEXITCODE -ne 0) { throw "Failed to checkout branch $Branch in $Path" }
                 }
 
-                git -C $Path pull --ff-only origin $Branch
+                git -C $Path pull --quiet --ff-only origin $Branch
                 if ($LASTEXITCODE -ne 0) {
                     Write-Step "Could not fast-forward $Path from origin/$Branch; using existing checkout"
                 }
@@ -38,9 +38,9 @@ function Initialize-Repo {
     
     Write-Step "Cloning $Url to $Path"
     if ($Branch) {
-        git clone --branch $Branch $Url $Path
+        git clone --quiet --branch $Branch $Url $Path
     } else {
-        git clone $Url $Path
+        git clone --quiet $Url $Path
     }
 }
 

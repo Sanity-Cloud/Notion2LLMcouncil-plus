@@ -325,30 +325,174 @@ function Start-CouncilBackend {
 
 function Set-CouncilSettings {
     param([string]$NotionApiKey)
+    $exportUrl = "http://127.0.0.1:$CouncilBackendPort/api/settings/export"
+    $importUrl = "http://127.0.0.1:$CouncilBackendPort/api/settings/import"
+    $resetUrl = "http://127.0.0.1:$CouncilBackendPort/api/settings/reset"
     $settingsUrl = "http://127.0.0.1:$CouncilBackendPort/api/settings"
-    $current = Invoke-RestMethod -Method Get -Uri $settingsUrl -TimeoutSec 10
     
-    $enabled = @{}
-    if ($current.enabled_providers) { foreach ($property in $current.enabled_providers.PSObject.Properties) { $enabled[$property.Name] = [bool]$property.Value } }
-    $enabled[$ProviderEnabledKey] = $true
-
-    $body = [ordered]@{
-        custom_endpoint_name    = $ProviderName
-        custom_endpoint_url     = "http://127.0.0.1:$NotionPort$ProviderUrlPath"
-        custom_endpoint_api_key = $NotionApiKey
-        enabled_providers       = $enabled
-        council_models          = if ($ProviderApplyDefaultCouncil) { $ConfiguredCouncilModels } else { $current.council_models }
-        chairman_model          = if ($ProviderApplyDefaultCouncil) { $ConfiguredChairmanModel } else { $current.chairman_model }
+    $headers = @{}
+    if ($env:LLM_COUNCIL_ADMIN_TOKEN) {
+        $headers["Authorization"] = "Bearer $env:LLM_COUNCIL_ADMIN_TOKEN"
     }
-    if ($ProviderApplyDefaultCouncil) {
-        if ($ConfiguredCouncilMemberFilters) { $body['council_member_filters'] = $ConfiguredCouncilMemberFilters }
-        $body['chairman_filter']     = $ConfiguredChairmanFilter
-        $body['search_query_filter'] = $ConfiguredSearchQueryFilter
-    }
-    $bodyJson = $body | ConvertTo-Json -Depth 20
 
-    Write-Step "Configuring LLM Council custom provider"
-    Invoke-RestMethod -Method Put -Uri $settingsUrl -ContentType "application/json" -Body $bodyJson -TimeoutSec 20 | Out-Null
+    $expectedUrl = "http://127.0.0.1:$NotionPort$ProviderUrlPath"
+
+    Write-Step "Checking current LLM Council settings via export"
+    
+    $needsUpdate = $true
+    $settings = $null
+    
+    try {
+        $settings = Invoke-RestMethod -Method Get -Uri $exportUrl -Headers $headers -TimeoutSec 10
+        
+        $isCustomEnabled = $false
+        if ($settings.enabled_providers -and $settings.enabled_providers.custom -eq $true) {
+            $isCustomEnabled = $true
+        }
+        
+        if ($settings.custom_endpoint_url -eq $expectedUrl -and 
+            $settings.custom_endpoint_api_key -eq $NotionApiKey -and 
+            $isCustomEnabled) {
+            
+            $modelsMatch = $true
+            if ($ProviderApplyDefaultCouncil) {
+                $settingsModelsJson = ConvertTo-Json @($settings.council_models) -Compress
+                $configuredModelsJson = ConvertTo-Json @($ConfiguredCouncilModels) -Compress
+                
+                if ($settingsModelsJson -ne $configuredModelsJson -or 
+                    $settings.chairman_model -ne $ConfiguredChairmanModel) {
+                    $modelsMatch = $false
+                }
+            }
+            
+            if ($modelsMatch) {
+                Write-Step "LLM Council settings are already up to date"
+                $needsUpdate = $false
+            }
+        }
+    } catch {
+        Write-Warning "Failed to export settings: $($_.Exception.Message). Purging stale settings to recover..."
+        try {
+            Invoke-RestMethod -Method Post -Uri $resetUrl -Headers $headers -TimeoutSec 10 | Out-Null
+            $settings = Invoke-RestMethod -Method Get -Uri $exportUrl -Headers $headers -TimeoutSec 10
+        } catch {
+            Write-Warning "Reset/re-export failed: $($_.Exception.Message). Creating default settings payload."
+            # Construct a raw default settings payload
+            $settings = [PSCustomObject]@{
+                search_provider = "duckduckgo"
+                search_keyword_extraction = "direct"
+                search_result_count = 8
+                search_hybrid_mode = $true
+                ollama_base_url = "http://localhost:11434"
+                enabled_providers = [PSCustomObject]@{
+                    openrouter = $false
+                    ollama = $false
+                    groq = $false
+                    direct = $false
+                    custom = $true
+                }
+                direct_provider_toggles = [PSCustomObject]@{
+                    openai = $false
+                    anthropic = $false
+                    google = $false
+                    mistral = $false
+                    deepseek = $false
+                    groq = $false
+                }
+                council_temperature = 0.5
+                chairman_temperature = 0.4
+                stage2_temperature = 0.3
+                full_content_results = 3
+                show_free_only = $false
+                execution_mode = "full"
+            }
+        }
+    }
+    
+    if ($needsUpdate) {
+        Write-Step "Updating LLM Council custom provider configuration"
+        
+        $settings.custom_endpoint_name = $ProviderName
+        $settings.custom_endpoint_url = $expectedUrl
+        $settings.custom_endpoint_api_key = $NotionApiKey
+        
+        # Ensure enabled_providers exists and custom is set to true
+        if (-not $settings.enabled_providers) {
+            $settings.enabled_providers = [PSCustomObject]@{
+                openrouter = $false
+                ollama = $false
+                groq = $false
+                direct = $false
+                custom = $true
+            }
+        } else {
+            if ($settings.enabled_providers.PSObject.Properties['custom']) {
+                $settings.enabled_providers.custom = $true
+            } else {
+                $settings.enabled_providers | Add-Member -MemberType NoteProperty -Name "custom" -Value $true -Force
+            }
+        }
+        
+        if ($ProviderApplyDefaultCouncil) {
+            $settings.council_models = $ConfiguredCouncilModels
+            $settings.chairman_model = $ConfiguredChairmanModel
+            
+            if ($ConfiguredCouncilMemberFilters) {
+                # We need to set council_member_filters. In PowerShell, parsed JSON dictionary can be set:
+                $settings.council_member_filters = $ConfiguredCouncilMemberFilters
+            }
+            $settings.chairman_filter = $ConfiguredChairmanFilter
+            $settings.search_query_filter = $ConfiguredSearchQueryFilter
+        }
+        
+        # Now import the modified settings object back to the server
+        $bodyJson = $settings | ConvertTo-Json -Depth 20
+        Invoke-RestMethod -Method Post -Uri $importUrl -ContentType "application/json" -Body $bodyJson -Headers $headers -TimeoutSec 20 | Out-Null
+        
+        # Verify the settings
+        Write-Step "Verifying updated LLM Council settings"
+        $verifiedSettings = Invoke-RestMethod -Method Get -Uri $exportUrl -Headers $headers -TimeoutSec 10
+        if ($verifiedSettings.custom_endpoint_url -ne $expectedUrl) {
+            throw "Verification failed: custom_endpoint_url is '$($verifiedSettings.custom_endpoint_url)', expected '$expectedUrl'"
+        }
+        if ($verifiedSettings.custom_endpoint_api_key -ne $NotionApiKey) {
+            throw "Verification failed: custom_endpoint_api_key does not match active Notion API Key"
+        }
+        if (-not $verifiedSettings.enabled_providers -or $verifiedSettings.enabled_providers.custom -ne $true) {
+            throw "Verification failed: custom provider is not enabled"
+        }
+        Write-Step "LLM Council settings successfully verified"
+    }
+
+    # API Smoke Test using the newly verified custom endpoint
+    Write-Step "Performing backend end-to-end API smoke test"
+    $askUrl = "http://127.0.0.1:$CouncilBackendPort/api/ask"
+    $testModel = if ($ConfiguredCouncilModels -and $ConfiguredCouncilModels.Count -gt 0) { $ConfiguredCouncilModels[0] } else { "custom:gpt-5.5" }
+
+    $askBody = [ordered]@{
+        content = "Ping! Respond with exactly 'pong' to verify connection."
+        models = @($testModel)
+        execution_mode = "chat_only"
+    } | ConvertTo-Json
+
+    try {
+        Write-Step "Sending smoke test query with model '$testModel'..."
+        $response = Invoke-RestMethod -Method Post -Uri $askUrl -ContentType "application/json" -Body $askBody -TimeoutSec 30
+        if ($response.responses) {
+            $firstResp = $response.responses[0]
+            if ($firstResp.error) {
+                Write-Warning "Smoke test model returned error: $($firstResp.error)"
+            } else {
+                Write-Step "Smoke test successful! Response: $($firstResp.response)"
+            }
+        } elseif ($response.response) {
+            Write-Step "Smoke test successful! Response: $($response.response)"
+        } else {
+            Write-Warning "Smoke test returned empty or unexpected response format: $(ConvertTo-Json $response)"
+        }
+    } catch {
+        Write-Warning "API smoke test warning: $($_.Exception.Message). (Continuing stack startup as services are running)"
+    }
 }
 
 function Start-CouncilFrontend {
