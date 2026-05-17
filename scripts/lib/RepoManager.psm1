@@ -53,6 +53,38 @@ function Get-Python {
     return "python"
 }
 
+function Get-PatchTargetPaths {
+    param([string]$PatchPath)
+
+    if (-not (Test-Path $PatchPath)) { return @() }
+
+    $targets = @()
+    foreach ($line in Get-Content -Path $PatchPath) {
+        if ($line -match '^\+\+\+ b/(.+)$') {
+            $target = $Matches[1]
+            if ($target -and $target -ne "/dev/null") { $targets += $target }
+        }
+    }
+
+    return @($targets | Select-Object -Unique)
+}
+
+function Reset-PatchTargetPaths {
+    param(
+        [string[]]$Targets,
+        [string]$Name
+    )
+
+    foreach ($target in $Targets) {
+        if (-not $target) { continue }
+        Write-Step "Resetting patch target for $Name: $target"
+        cmd.exe /c "git checkout -- `"$target`""
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to reset patch target '$target' for patch: $Name"
+        }
+    }
+}
+
 function Update-RepoPatch {
     param(
         [string]$Root,
@@ -76,6 +108,20 @@ function Update-RepoPatch {
         if ($LASTEXITCODE -eq 0) {
             Write-Step "Patch already applied: $Name"
             return
+        }
+
+        $targets = @(Get-PatchTargetPaths -PatchPath $PatchPath)
+        if ($targets.Count -gt 0) {
+            Write-Step "Patch state drift detected for $Name; resetting managed target file(s) and retrying"
+            Reset-PatchTargetPaths -Targets $targets -Name $Name
+
+            cmd.exe /c "git apply --check `"$PatchPath`" 2>nul"
+            if ($LASTEXITCODE -eq 0) {
+                Write-Step "Applying patch after reset: $Name"
+                cmd.exe /c "git apply `"$PatchPath`""
+                if ($LASTEXITCODE -ne 0) { throw "Failed to apply patch after reset: $Name" }
+                return
+            }
         }
 
         throw "Patch cannot be applied cleanly: $Name"
