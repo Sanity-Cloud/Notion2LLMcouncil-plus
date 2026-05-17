@@ -91,20 +91,38 @@ async function getDiagnosticsStatus() {
   const config = getIntegrationConfig();
   const state = readJson(config.statePath);
   const apiKey = readEnvValue(path.join(config.notionRoot, '.env'), 'API_KEY');
+
+  const runtimeNotionBaseUrl = (state && state.notion && state.notion.url)
+    ? state.notion.url
+    : config.notionBaseUrl;
+
+  const runtimeProviderUrl = `${runtimeNotionBaseUrl}${config.providerUrlPath || '/v1'}`;
+  const notionHealthUrl = `${runtimeNotionBaseUrl}/health`;
+  const notionModelsUrl = `${runtimeProviderUrl}/models`;
+
+  const runtimeCouncilBackendUrl = (state && state.councilBackend && state.councilBackend.url)
+    ? state.councilBackend.url
+    : config.councilBackendUrl;
+
+  const runtimeCouncilUiUrl = (state && state.councilFrontend && state.councilFrontend.url)
+    ? state.councilFrontend.url
+    : config.councilUiUrl;
+
+  const councilSettingsUrl = `${runtimeCouncilBackendUrl}/api/settings`;
+
   const services = await Promise.all([
-    testService('Notion2API health', config.notionHealthUrl, { expectedContent: 'ok' }),
-    testService('LLM Council backend', config.councilSettingsUrl, { expectedContent: 'council_models' }),
-    testService('LLM Council frontend', config.councilUiUrl, { expectedTitle: 'LLM Council' }),
+    testService('Notion2API health', notionHealthUrl, { expectedContent: 'ok' }),
+    testService('LLM Council backend', councilSettingsUrl, { expectedContent: 'council_models' }),
+    testService('LLM Council frontend', runtimeCouncilUiUrl, { expectedTitle: 'LLM Council' }),
     apiKey
-      ? testService('Notion2API models', config.notionModelsUrl, { headers: { Authorization: `Bearer ${apiKey}` }, requireSuccess: true })
-      : Promise.resolve({ name: 'Notion2API models', url: config.notionModelsUrl, ok: false, detail: 'API_KEY is missing from Notion2API .env' }),
+      ? testService('Notion2API models', notionModelsUrl, { headers: { Authorization: `Bearer ${apiKey}` }, requireSuccess: true })
+      : Promise.resolve({ name: 'Notion2API models', url: notionModelsUrl, ok: false, detail: 'API_KEY is missing from Notion2API .env' }),
   ]);
 
-  const capabilitiesUrl = config.councilBackendUrl;
   const [settingsExportRes, askRes, healthRes] = await Promise.all([
-    requestText(`${capabilitiesUrl}/api/settings/export`),
-    requestText(`${capabilitiesUrl}/api/ask`),
-    requestText(`${capabilitiesUrl}/api/health`),
+    requestText(`${runtimeCouncilBackendUrl}/api/settings/export`),
+    requestText(`${runtimeCouncilBackendUrl}/api/ask`),
+    requestText(`${runtimeCouncilBackendUrl}/api/health`),
   ]);
 
   const capabilities = {
@@ -115,25 +133,25 @@ async function getDiagnosticsStatus() {
     health: healthRes.ok,
   };
 
-  const settingsResponse = await requestText(config.councilSettingsUrl);
+  const settingsResponse = await requestText(councilSettingsUrl);
   let provider = { ok: false, detail: 'Settings endpoint is unavailable' };
   if (settingsResponse.ok) {
     try {
       const settings = JSON.parse(settingsResponse.body);
       const enabled = settings.enabled_providers && settings.enabled_providers[config.providerEnabledKey] === true;
-      const urlMatches = settings.custom_endpoint_url === config.providerUrl;
-      const keyPresent = !!settings.custom_endpoint_api_key;
+      const urlMatches = settings.custom_endpoint_url === runtimeProviderUrl;
+      const keyPresent = !!(settings.custom_endpoint_api_key || settings.custom_endpoint_api_key_set);
       provider = {
         ok: !!(enabled && urlMatches && keyPresent),
         name: settings.custom_endpoint_name || '',
         endpointUrl: settings.custom_endpoint_url || '',
-        expectedEndpointUrl: config.providerUrl,
+        expectedEndpointUrl: runtimeProviderUrl,
         enabled,
         keyPresent,
         urlMatches,
         detail: (enabled && urlMatches && keyPresent)
           ? ''
-          : `${!enabled ? 'Custom provider disabled. ' : ''}${!urlMatches ? `URL mismatch (expected '${config.providerUrl}', got '${settings.custom_endpoint_url || '-'}'). ` : ''}${!keyPresent ? 'API key missing. ' : ''}`.trim(),
+          : `${!enabled ? 'Custom provider disabled. ' : ''}${!urlMatches ? `URL mismatch (expected '${runtimeProviderUrl}', got '${settings.custom_endpoint_url || '-'}'). ` : ''}${!keyPresent ? 'API key missing. ' : ''}`.trim(),
       };
     } catch (error) {
       provider = { ok: false, detail: `Could not parse settings JSON: ${error.message}` };

@@ -102,6 +102,7 @@ function getIntegrationConfig() {
     verifyProvider,
     askSmokeTest,
     clearUiStorageOnProviderDrift,
+    providerUrlPath,
   };
 }
 
