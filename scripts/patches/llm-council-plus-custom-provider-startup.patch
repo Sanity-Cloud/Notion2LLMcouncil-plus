@@ -1,0 +1,25 @@
+diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
+index 657b4c3..c0cdc2c 100644
+--- a/frontend/src/App.jsx
++++ b/frontend/src/App.jsx
+@@ -42,13 +42,19 @@ function App() {
+       setExecutionMode(settings.execution_mode || DEFAULT_EXECUTION_MODE);
+       setSearchProvider(settings.search_provider || 'duckduckgo');
+ 
++      const hasCustomEndpoint =
++        settings.enabled_providers?.custom === true &&
++        !!settings.custom_endpoint_url &&
++        !!(settings.custom_endpoint_api_key_set || settings.custom_endpoint_api_key);
++
+       const hasApiKey = settings.openrouter_api_key_set ||
+         settings.groq_api_key_set ||
+         settings.openai_api_key_set ||
+         settings.anthropic_api_key_set ||
+         settings.google_api_key_set ||
+         settings.mistral_api_key_set ||
+-        settings.deepseek_api_key_set;
++        settings.deepseek_api_key_set ||
++        hasCustomEndpoint;
+ 
+       // 2. Test Ollama Connection
+       // We do this regardless to update the status indicator
