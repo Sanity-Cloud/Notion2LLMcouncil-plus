@@ -1,24 +1,24 @@
 {
   "name": "notion2council-desktop",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "description": "Electron shell and launcher menu for Notion2LLMcouncil Plus.",
   "author": "Sanity Cloud",
   "main": "electron/main.js",
   "scripts": {
-    "setup": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/setup-desktop.ps1",
+    "setup": "powershell -NoProfile -File ./scripts/setup-desktop.ps1",
     "electron:dev": "cross-env NODE_ENV=development electron .",
     "start": "npm run electron:dev",
-    "validate": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/validate-release.ps1",
-    "validate:ci": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/validate-release.ps1",
+    "validate": "powershell -NoProfile -File ./scripts/validate-release.ps1",
+    "validate:ci": "powershell -NoProfile -File ./scripts/validate-release.ps1",
     "electron:build": "npm run validate && npm run electron:build:exe && npm run electron:build:zip && npm run electron:build:msi",
     "electron:build:exe": "electron-builder --config electron-builder.portable.json --win portable --publish never",
-    "electron:build:zip": "electron-builder --config electron-builder.portable.json --win zip --config.artifactName=Notion2Council-0.1.4-win-x64.zip --publish never",
+    "electron:build:zip": "electron-builder --config electron-builder.portable.json --win zip --config.artifactName=Notion2Council-0.1.5-win-x64.zip --publish never",
     "electron:build:msi": "electron-builder --win msi --publish never",
     "electron:pack": "electron-builder --dir",
-    "release:local": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/package-release.ps1",
+    "release:local": "powershell -NoProfile -File ./scripts/package-release.ps1",
     "release:dir": "npm run electron:pack",
-    "context:generate": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/regenerate-context.ps1"
+    "context:generate": "powershell -NoProfile -File ./scripts/regenerate-context.ps1"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",
@@ -33,7 +33,7 @@
     "asarUnpack": ["scripts/**/*", "config/**/*"],
     "extraMetadata": { "main": "electron/main.js" },
     "win": { "icon": "electron/icon.png" },
-    "portable": { "artifactName": "Notion2Council-0.1.4-portable.exe" },
-    "msi": { "artifactName": "Notion2Council-0.1.4-setup.msi", "upgradeCode": "AD379612-CB12-4220-A03D-76A8A3C98E51" }
+    "portable": { "artifactName": "Notion2Council-0.1.5-portable.exe" },
+    "msi": { "artifactName": "Notion2Council-0.1.5-setup.msi", "upgradeCode": "AD379612-CB12-4220-A03D-76A8A3C98E51" }
   }
 }
