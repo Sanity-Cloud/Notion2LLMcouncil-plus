@@ -20,51 +20,102 @@ const councilUiUrl = initialConfig.councilUiUrl;
 
 async function focusChatInput(text, submit = false) {
   const mainWindow = getMainWindow();
-  if (!mainWindow) return;
+  if (!mainWindow) return false;
+
   const safeText = JSON.stringify(text || '');
   const shouldSubmit = JSON.stringify(!!submit);
-  await mainWindow.webContents.executeJavaScript(`
+  return mainWindow.webContents.executeJavaScript(`
     (() => {
-      // Tightened selectors prioritizing specific chat input classes
       const selectors = [
+        'textarea.message-input',
         'textarea.council-message-input',
         'textarea#chat-input',
         '.chat-container textarea.message-input',
         '.input-area textarea',
-        'textarea.message-input',
         'textarea'
       ];
-      
+
       let input = null;
       for (const selector of selectors) {
         const found = document.querySelector(selector);
-        // Ensure it's visible and not disabled
         if (found && found.offsetParent !== null && !found.disabled) {
           input = found;
           break;
         }
       }
-      
+
       if (!input) return false;
-      
-      input.focus();
+
       const text = ${safeText};
+      input.focus();
+
       if (text) {
-        // Clear if we are setting new text
-        input.value = '';
-        input.value = text;
-        input.dispatchEvent(new Event('input', { bubbles: true }));
+        const descriptor = Object.getOwnPropertyDescriptor(
+          window.HTMLTextAreaElement.prototype,
+          'value'
+        );
+        const setter = descriptor && descriptor.set;
+
+        if (setter) {
+          setter.call(input, text);
+        } else {
+          input.value = text;
+        }
+
+        input.dispatchEvent(new InputEvent('input', {
+          bubbles: true,
+          inputType: 'insertText',
+          data: text
+        }));
         input.dispatchEvent(new Event('change', { bubbles: true }));
-        
-        // Only auto-submit when explicitly requested. Clipboard-to-chat should populate, not send.
-        const doSubmit = ${shouldSubmit};
-        if (doSubmit) {
-          input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+        if (${shouldSubmit}) {
+          input.dispatchEvent(new KeyboardEvent('keydown', {
+            key: 'Enter',
+            code: 'Enter',
+            bubbles: true
+          }));
         }
       }
+
       return true;
     })();
-  `).catch(error => appendLog(`focusChatInput failed: ${error.message}`));
+  `).catch(error => {
+    appendLog(`focusChatInput failed: ${error.message}`);
+    return false;
+  });
+}
+
+async function ensureChatInputReady() {
+  const mainWindow = getMainWindow();
+  if (!mainWindow) return false;
+
+  return mainWindow.webContents.executeJavaScript(`
+    (async () => {
+      const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+      const hasInput = () => !!document.querySelector('textarea.message-input, .input-area textarea, textarea');
+
+      if (hasInput()) return true;
+
+      const buttons = Array.from(document.querySelectorAll('button'));
+      const newChatButton = document.querySelector('.new-council-btn') || buttons.find(btn =>
+        /new|chat|conversation|discussion/i.test(btn.textContent || '')
+      );
+
+      if (newChatButton && !newChatButton.disabled) {
+        newChatButton.click();
+        for (let i = 0; i < 40; i += 1) {
+          if (hasInput()) return true;
+          await sleep(250);
+        }
+      }
+
+      return hasInput();
+    })();
+  `).catch(error => {
+    appendLog(`ensureChatInputReady failed: ${error.message}`);
+    return false;
+  });
 }
 
 async function clearCouncilUiStorage() {
@@ -93,28 +144,82 @@ async function clearCouncilUiStorage() {
   }
 }
 
-async function openChat() {
+async function getActiveRuntimeUrls(timeoutMs = 90000) {
   const config = getIntegrationConfig();
-  startStack({ noBrowser: true });
-  showMainWindow();
+
   try {
-    await waitForUrl(config.notionHealthUrl, 90000, { expectedContent: 'ok' });
-    await waitForUrl(config.councilUiUrl, 90000, { expectedTitle: 'LLM Council' });
+    const state = await waitForRuntimeState(config.statePath, timeoutMs);
+    return {
+      notionHealthUrl: `${state.notion.url}/health`,
+      councilUiUrl: state.councilFrontend.url,
+      councilBackendUrl: state.councilBackend.url,
+    };
+  } catch {
+    return {
+      notionHealthUrl: config.notionHealthUrl,
+      councilUiUrl: config.councilUiUrl,
+      councilBackendUrl: config.councilBackendUrl,
+    };
+  }
+}
+
+async function isRuntimeReady(urls, timeoutMs = 2500) {
+  try {
+    await waitForUrl(urls.notionHealthUrl, timeoutMs, { expectedContent: 'ok' });
+    await waitForUrl(urls.councilUiUrl, timeoutMs, { expectedTitle: 'LLM Council' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForReadyRuntimeUrls() {
+  let urls = await getActiveRuntimeUrls(1000);
+
+  if (!(await isRuntimeReady(urls, 2500))) {
+    startStack({ noBrowser: true });
+    urls = await getActiveRuntimeUrls(90000);
+  }
+
+  await waitForUrl(urls.notionHealthUrl, 90000, { expectedContent: 'ok' });
+  await waitForUrl(urls.councilUiUrl, 90000, { expectedTitle: 'LLM Council' });
+  return urls;
+}
+
+async function openChat() {
+  showMainWindow();
+
+  try {
+    const urls = await waitForReadyRuntimeUrls();
     const mainWindow = getMainWindow();
-    if (mainWindow && mainWindow.webContents.getURL() !== config.councilUiUrl) {
-      await mainWindow.loadURL(config.councilUiUrl);
+
+    if (mainWindow && !mainWindow.webContents.getURL().startsWith(urls.councilUiUrl)) {
+      await mainWindow.loadURL(urls.councilUiUrl);
     }
+
     showMainWindow();
-    await focusChatInput('');
+    const ready = await ensureChatInputReady();
+    if (!ready) {
+      appendLog('Could not open chat input: no active conversation/input was available');
+      return false;
+    }
+
+    return focusChatInput('');
   } catch (error) {
     appendLog(`Could not open chat: ${error.message}`);
+    return false;
   }
 }
 
 async function openChatWithClipboard() {
   const text = clipboard.readText() || '';
-  await openChat();
-  await focusChatInput(text);
+  const opened = await openChat();
+  if (!opened) return;
+
+  const injected = await focusChatInput(text);
+  if (!injected) {
+    appendLog('Clipboard to Chat failed: chat input was not found');
+  }
 }
 
 function createTray() {
@@ -217,7 +322,10 @@ ipcMain.handle('diagnostics:getConfig', getEditableLocalConfig);
 ipcMain.handle('diagnostics:saveConfig', (_event, values) => saveLocalIntegrationConfig(values));
 ipcMain.handle('diagnostics:start', () => ({ ok: !!startStack({ noBrowser: true }) }));
 ipcMain.handle('diagnostics:stop', () => ({ ok: !!stopStack() }));
-ipcMain.handle('diagnostics:openCouncil', () => shell.openExternal(getIntegrationConfig().councilUiUrl));
+ipcMain.handle('diagnostics:openCouncil', async () => {
+  const urls = await getActiveRuntimeUrls(1000);
+  return shell.openExternal(urls.councilUiUrl);
+});
 ipcMain.handle('diagnostics:openDocs', () => shell.openExternal(process.env.NOTION2API_DOCS_URL || getIntegrationConfig().notionDocsUrl));
 ipcMain.handle('diagnostics:openLogs', () => shell.openPath(getIntegrationConfig().logsDir));
 
