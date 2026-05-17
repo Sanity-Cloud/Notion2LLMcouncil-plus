@@ -1,12 +1,11 @@
 diff --git a/backend/storage.py b/backend/storage.py
-index cfcd17a..ef813c0 100644
+index cfcd17a..1b3048e 100644
 --- a/backend/storage.py
 +++ b/backend/storage.py
-@@ -60,6 +60,20 @@ def rebuild_index() -> List[Dict[str, Any]]:
+@@ -60,6 +60,19 @@ def rebuild_index() -> List[Dict[str, Any]]:
              try:
                  with open(path, 'r') as f:
                      data = json.load(f)
-+                    
 +                    # Auto-repair title if missing/default and there is a first user message
 +                    if data.get("title") in (None, "", "New Conversation", "Untitled Conversation"):
 +                        first_content = ""
@@ -23,7 +22,7 @@ index cfcd17a..ef813c0 100644
                      index.append({
                          "id": data["id"],
                          "created_at": data["created_at"],
-@@ -197,9 +211,51 @@ def list_conversations() -> List[Dict[str, Any]]:
+@@ -197,9 +210,51 @@ def list_conversations() -> List[Dict[str, Any]]:
      if index is None:
          return rebuild_index()
          
@@ -75,7 +74,7 @@ index cfcd17a..ef813c0 100644
  def add_user_message(conversation_id: str, content: str, conversation: Optional[Dict[str, Any]] = None):
      """Add a user message to a conversation.
  
-@@ -213,6 +269,14 @@ def add_user_message(conversation_id: str, content: str, conversation: Optional[
+@@ -213,6 +268,14 @@ def add_user_message(conversation_id: str, content: str, conversation: Optional[
      if conversation is None:
          raise ValueError(f"Conversation {conversation_id} not found")
  
@@ -91,7 +90,7 @@ index cfcd17a..ef813c0 100644
          "role": "user",
          "content": content
 diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
-index 657b4c3..6cc2a7f 100644
+index 657b4c3..d8b7df2 100644
 --- a/frontend/src/App.jsx
 +++ b/frontend/src/App.jsx
 @@ -6,6 +6,23 @@ import { api, DEFAULT_EXECUTION_MODE } from './api';
@@ -118,7 +117,7 @@ index 657b4c3..6cc2a7f 100644
  function App() {
    const [conversations, setConversations] = useState([]);
    const [currentConversationId, setCurrentConversationId] = useState(null);
-@@ -26,6 +43,7 @@ function App() {
+@@ -27,6 +44,7 @@ function App() {
    const abortControllerRef = useRef(null);
    const requestIdRef = useRef(0);
    const isInitialMount = useRef(true);
@@ -147,7 +146,7 @@ index 657b4c3..6cc2a7f 100644
  
        // 2. Test Ollama Connection
        // We do this regardless to update the status indicator
-@@ -129,6 +153,10 @@ function App() {
+@@ -125,6 +149,10 @@ function App() {
      loadConversations();
    }, []);
  
@@ -158,7 +157,7 @@ index 657b4c3..6cc2a7f 100644
    // Auto-save execution mode preference when changed
    useEffect(() => {
      // Skip saving on initial mount
-@@ -187,7 +215,25 @@ function App() {
+@@ -187,7 +215,22 @@ function App() {
    const loadConversations = async (retryCount = 0) => {
      try {
        const convs = await api.listConversations();
@@ -182,7 +181,7 @@ index 657b4c3..6cc2a7f 100644
      } catch (error) {
        console.error('Failed to load conversations:', error);
        // Retry up to 3 times with increasing delays (1s, 2s, 3s)
-@@ -218,9 +264,14 @@ function App() {
+@@ -218,9 +261,14 @@ function App() {
  
      try {
        const newConv = await api.createConversation();
@@ -200,8 +199,7 @@ index 657b4c3..6cc2a7f 100644
        ]);
        setCurrentConversationId(newConv.id);
      } catch (error) {
-@@ -232,7 +283,7 @@ function App() {
-   const handleDeleteConversation = async (id) => {
+@@ -236,7 +284,7 @@ function App() {
      try {
        await api.deleteConversation(id);
        // Remove from local state
@@ -210,7 +208,8 @@ index 657b4c3..6cc2a7f 100644
        // If we deleted the current conversation, clear it
        if (id === currentConversationId) {
          setCurrentConversationId(null);
-@@ -262,7 +313,24 @@ function App() {
+@@ -261,6 +309,22 @@ function App() {
+ 
      // Assign unique ID to this request to prevent race conditions
      const currentRequestId = ++requestIdRef.current;
 +    const activeConversationId = currentConversationId;
@@ -232,7 +231,7 @@ index 657b4c3..6cc2a7f 100644
  
      // Create new AbortController for this request
      abortControllerRef.current = new AbortController();
-@@ -302,9 +370,14 @@ function App() {
+@@ -309,9 +373,14 @@ function App() {
  
        // Send message with streaming
        await api.sendMessageStream(
@@ -248,7 +247,7 @@ index 657b4c3..6cc2a7f 100644
            switch (eventType) {
              case 'search_start':
                setCurrentConversation((prev) => {
-@@ -597,6 +670,14 @@ function App() {
+@@ -597,6 +666,14 @@ function App() {
                break;
  
              case 'title_complete':
@@ -263,7 +262,7 @@ index 657b4c3..6cc2a7f 100644
                // Reload conversations to get updated title
                loadConversations();
                break;
-@@ -623,7 +704,7 @@ function App() {
+@@ -622,7 +699,7 @@ function App() {
          console.log('Request aborted');
          // Mark the assistant message as aborted and stop timers
          setCurrentConversation((prev) => {
@@ -272,7 +271,7 @@ index 657b4c3..6cc2a7f 100644
            const messages = [...prev.messages];
            const lastMsg = messages[messages.length - 1];
            if (lastMsg.role === 'assistant') {
-@@ -652,10 +733,13 @@ function App() {
+@@ -651,10 +728,13 @@ function App() {
        }
        console.error('Failed to send message:', error);
        // Remove optimistic messages on error
@@ -291,10 +290,10 @@ index 657b4c3..6cc2a7f 100644
      } finally {
        // Only clear the controller if this is still the current request
 diff --git a/frontend/src/components/ChatInterface.jsx b/frontend/src/components/ChatInterface.jsx
-index 3c1eb65..a9220c1 100644
+index 3c1eb65..3879816 100644
 --- a/frontend/src/components/ChatInterface.jsx
 +++ b/frontend/src/components/ChatInterface.jsx
-@@ -119,7 +119,7 @@ export default function ChatInterface({
+@@ -137,7 +137,7 @@ export default function ChatInterface({
                                          )}
  
                                          {/* Stage 1: Council Grid Visualization */}
@@ -303,7 +302,7 @@ index 3c1eb65..a9220c1 100644
                                              <div className="stage-container">
                                                  <div className="stage-header">
                                                      <h3>Stage 1: Council Deliberation</h3>
-@@ -148,7 +148,7 @@ export default function ChatInterface({
+@@ -162,7 +162,7 @@ export default function ChatInterface({
                                          )}
  
                                          {/* Stage 1 Results (Accordion/List - kept for detail view) */}
