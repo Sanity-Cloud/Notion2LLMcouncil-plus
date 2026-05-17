@@ -30,10 +30,24 @@ index e3d4bb2..5601012 100644
      if (id.startsWith('groq:')) return PROVIDER_CONFIG.groq;
  
 diff --git a/frontend/src/components/Stage1.jsx b/frontend/src/components/Stage1.jsx
-index 8d87cd1..1cce0cc 100644
+index 8d87cd1..95e5781 100644
 --- a/frontend/src/components/Stage1.jsx
 +++ b/frontend/src/components/Stage1.jsx
-@@ -96,7 +96,7 @@ export default function Stage1({ responses, startTime, endTime }) {
+@@ -76,7 +76,12 @@ export default function Stage1({ responses, startTime, endTime }) {
+               style={safeActiveTab === index ? { borderColor: visuals.color, color: visuals.color } : {}}
+               title={resp?.model}
+             >
+-              <span className="tab-icon" style={{ backgroundColor: safeActiveTab === index ? 'transparent' : 'rgba(255,255,255,0.1)' }}>
++              <span
++                className="tab-icon"
++                style={{
++                  backgroundColor: safeActiveTab === index ? visuals.color : 'rgba(255,255,255,0.1)',
++                  color: safeActiveTab === index ? '#ffffff' : undefined
++                }}>
+                 {visuals.icon}
+               </span>
+               <span className="tab-name">{shortName}</span>
+@@ -96,7 +101,7 @@ export default function Stage1({ responses, startTime, endTime }) {
                {currentVisuals.icon}
              </span>
              <div className="model-info">
@@ -42,6 +56,45 @@ index 8d87cd1..1cce0cc 100644
                <span className="model-provider-badge" style={{ borderColor: currentVisuals.color, color: currentVisuals.color }}>
                  {currentVisuals.name}
                </span>
+diff --git a/frontend/src/components/Stage2.jsx b/frontend/src/components/Stage2.jsx
+index a000334..091bb81 100644
+--- a/frontend/src/components/Stage2.jsx
++++ b/frontend/src/components/Stage2.jsx
+@@ -93,7 +93,12 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
+                             style={safeActiveTab === index ? { borderColor: visuals.color, color: visuals.color } : {}}
+                             title={rank?.model}
+                         >
+-                            <span className="tab-icon" style={{ backgroundColor: safeActiveTab === index ? 'transparent' : 'rgba(255,255,255,0.1)' }}>
++                            <span
++                                className="tab-icon"
++                                style={{
++                                    backgroundColor: safeActiveTab === index ? visuals.color : 'rgba(255,255,255,0.1)',
++                                    color: safeActiveTab === index ? '#ffffff' : undefined
++                                }}>
+                                 {visuals.icon}
+                             </span>
+                             <span className="tab-name">{shortName}</span>
+@@ -212,7 +217,8 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
+                     <h4>🏆 Visual Leaderboard</h4>
+                     <p className="stage-description">
+-                        Combined results across all peer evaluations. Bar length corresponds to average rank value.
++                        Combined results across all peer evaluations. Lower average rank is better; #1 is the top-ranked response.
++                        Bar length shows the numeric average rank, so shorter is better.
+                     </p>
+                     <div className="aggregate-list">
+                         {aggregateRankings.map((agg, index) => {
+diff --git a/frontend/src/components/Stage3.jsx b/frontend/src/components/Stage3.jsx
+index a3d3946..643da5a 100644
+--- a/frontend/src/components/Stage3.jsx
++++ b/frontend/src/components/Stage3.jsx
+@@ -46,7 +46,7 @@ export default function Stage3({ finalResponse, startTime, endTime }) {
+                         <div className="chairman-info">
+                             <span className="chairman-role">
+-                                <span>👨‍⚖️</span> Chairman's Verdict
++                                <span>👨‍⚖️</span> Chairman / Synthesizer
+                             </span>
+                             <span className="chairman-model">{shortName}</span>
+                             <span className="chairman-provider-badge">{visuals.name}</span>
 diff --git a/frontend/src/utils/modelHelpers.js b/frontend/src/utils/modelHelpers.js
 index e289e91..8591b10 100644
 --- a/frontend/src/utils/modelHelpers.js
