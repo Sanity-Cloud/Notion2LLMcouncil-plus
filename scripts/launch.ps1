@@ -124,7 +124,10 @@ function Get-PyprojectDependencies {
     if (-not (Test-Path $Path)) { return @() }
 
     $content = Get-Content -Raw -Path $Path
-    $match = [regex]::Match($content, '(?ms)^dependencies\s*=\s*\[(?<deps>.*?)\]')
+    $match = [regex]::Match($content, '(?ms)^dependencies\s*=\s*\[(?<deps>.*?)\r?\n\s*\]')
+    if (-not $match.Success) {
+        $match = [regex]::Match($content, '(?ms)^dependencies\s*=\s*\[(?<deps>.*?)\]')
+    }
     if (-not $match.Success) { return @() }
 
     $deps = @()
@@ -224,7 +227,7 @@ function Test-NotionLogin {
     $python = Get-Python -Root $NotionRoot
     Push-Location $NotionRoot
     try {
-        & $python "login.py" "--check"
+        $null = & $python "login.py" "--check"
         return ($LASTEXITCODE -eq 0)
     } finally { Pop-Location }
 }
@@ -364,12 +367,12 @@ function Start-CouncilFrontend {
             $installed = $false
             if (Test-Path (Join-Path $frontendRoot "package-lock.json")) {
                 Write-Step "Running npm ci in $frontendRoot"
-                & npm ci
+                & npm ci | Out-Host
                 if ($LASTEXITCODE -eq 0) { $installed = $true }
             }
             if (-not $installed) {
                 Write-Step "Running npm install in $frontendRoot"
-                & npm install
+                & npm install | Out-Host
                 if ($LASTEXITCODE -ne 0) {
                     throw "Failed to install frontend dependencies in '$frontendRoot'."
                 }
