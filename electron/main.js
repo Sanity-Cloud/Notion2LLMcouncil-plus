@@ -67,6 +67,22 @@ async function focusChatInput(text, submit = false) {
   `).catch(error => appendLog(`focusChatInput failed: ${error.message}`));
 }
 
+async function clearCouncilUiStorage() {
+  const mainWindow = getMainWindow();
+  if (!mainWindow) return;
+
+  const config = getIntegrationConfig();
+  try {
+    await mainWindow.webContents.session.clearStorageData({
+      origin: config.councilUiUrl,
+      storages: ['localstorage', 'indexdb', 'cookies']
+    });
+    appendLog('Successfully cleared LLM Council UI storage (localstorage, indexdb, cookies)');
+  } catch (error) {
+    appendLog(`Failed to clear LLM Council UI storage: ${error.message}`);
+  }
+}
+
 async function openChat() {
   const config = getIntegrationConfig();
   startStack({ noBrowser: true });
@@ -109,6 +125,12 @@ function refreshTrayMenu() {
     { type: 'separator' },
     { label: 'Diagnostics', click: () => openDiagnostics(getMainWindow()) },
     { label: 'Hotkey Settings', click: () => openHotkeySettings(getMainWindow()) },
+    { label: 'Reset LLM Council UI State', click: async () => {
+        await clearCouncilUiStorage();
+        const mainWindow = getMainWindow();
+        if (mainWindow) mainWindow.reload();
+      }
+    },
     { label: 'Open Notion2API', click: () => { startStack({ noBrowser: true }); shell.openExternal(getIntegrationConfig().notionBaseUrl); } },
     { label: 'Open Notion2API Docs', click: () => { startStack({ noBrowser: true }); shell.openExternal(process.env.NOTION2API_DOCS_URL || getIntegrationConfig().notionDocsUrl); } },
     { label: 'Open App Logs', click: () => { shell.openPath(path.join(app.getPath('userData'), 'logs')); } },
@@ -128,6 +150,12 @@ function setApplicationMenu() {
       { label: 'Clipboard to Chat', click: openChatWithClipboard },
       { label: 'Diagnostics', click: () => openDiagnostics(getMainWindow()) },
       { label: 'Hotkey Settings', click: () => openHotkeySettings(getMainWindow()) },
+      { label: 'Reset LLM Council UI State', click: async () => {
+          await clearCouncilUiStorage();
+          const mainWindow = getMainWindow();
+          if (mainWindow) mainWindow.reload();
+        }
+      },
       { type: 'separator' },
       { label: 'Quit', click: () => app.quit() },
     ] },
@@ -200,6 +228,17 @@ app.whenReady().then(async () => {
     // Wait for the UI to be ready before loading
     await waitForUrl(config.notionHealthUrl, 90000, { expectedContent: 'ok' });
     await waitForUrl(config.councilUiUrl, 90000, { expectedTitle: 'LLM Council' });
+    if (config.clearUiStorageOnProviderDrift !== false) {
+      try {
+        const diagnostics = await getDiagnosticsStatus();
+        if (diagnostics && diagnostics.provider && !diagnostics.provider.ok) {
+          appendLog(`Provider drift detected on startup (Detail: ${diagnostics.provider.detail}). Auto-clearing LLM Council UI storage...`);
+          await clearCouncilUiStorage();
+        }
+      } catch (diagError) {
+        appendLog(`Failed to check provider drift during startup: ${diagError.message}`);
+      }
+    }
     await mainWindow.loadURL(config.councilUiUrl);
   } catch (error) {
     appendLog(`Council UI failed to load: ${error.message}`);

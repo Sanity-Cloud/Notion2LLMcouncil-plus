@@ -68,6 +68,10 @@ function getIntegrationConfig() {
   const providerName = getConfigValue(localConfig, defaultConfig, ['provider', 'name'], 'Notion2API');
   const notionRoot = resolveRuntimePath(repoRoot, getConfigValue(localConfig, defaultConfig, ['notion', 'localRoot'], ''), 'vendor\\notion2api');
   const councilRoot = resolveRuntimePath(repoRoot, getConfigValue(localConfig, defaultConfig, ['council', 'localRoot'], ''), 'vendor\\llm-council-plus');
+  const settingsMode = getConfigValue(localConfig, defaultConfig, ['council', 'settingsMode'], 'auto');
+  const verifyProvider = getConfigValue(localConfig, defaultConfig, ['council', 'verifyProvider'], true);
+  const askSmokeTest = getConfigValue(localConfig, defaultConfig, ['council', 'askSmokeTest'], true);
+  const clearUiStorageOnProviderDrift = getConfigValue(localConfig, defaultConfig, ['council', 'clearUiStorageOnProviderDrift'], true);
   const logsDir = getLogsDir();
   const notionBaseUrl = process.env.NOTION2API_URL || `http://127.0.0.1:${notionPort}`;
   const councilBackendUrl = process.env.NOTION2COUNCIL_API_URL || `http://127.0.0.1:${councilBackendPort}`;
@@ -94,6 +98,10 @@ function getIntegrationConfig() {
     providerUrl: `${notionBaseUrl}${providerUrlPath}`,
     providerName,
     providerEnabledKey,
+    settingsMode,
+    verifyProvider,
+    askSmokeTest,
+    clearUiStorageOnProviderDrift,
   };
 }
 

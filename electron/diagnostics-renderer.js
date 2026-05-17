@@ -70,6 +70,13 @@ function render(data) {
     ['Enabled', data.provider.enabled],
     ['Endpoint', data.provider.endpointUrl],
     ['Expected', data.provider.expectedEndpointUrl],
+    ['URL Match', data.provider.urlMatches],
+    ['API Key Present', data.provider.keyPresent],
+    ['/api/settings', data.capabilities?.settings ? 'yes' : 'no'],
+    ['/api/settings/export', data.capabilities?.settingsExport ? 'yes' : 'no'],
+    ['/api/settings/import', data.capabilities?.settingsImport ? 'yes' : 'no'],
+    ['/api/ask', data.capabilities?.ask ? 'yes' : 'no'],
+    ['/api/health', data.capabilities?.health ? 'yes' : 'no'],
     ['Detail', data.provider.detail],
   ]);
   renderDefinitionList(configEl, [

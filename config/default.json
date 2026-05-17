@@ -13,7 +13,11 @@
     "repoUrl": "https://github.com/jacob-bd/llm-council-plus.git",
     "branch": "main",
     "backendPort": 8001,
-    "frontendPort": 5173
+    "frontendPort": 5173,
+    "settingsMode": "auto",
+    "verifyProvider": true,
+    "askSmokeTest": true,
+    "clearUiStorageOnProviderDrift": true
   },
   "provider": {
     "name": "Notion2API",

@@ -100,6 +100,21 @@ async function getDiagnosticsStatus() {
       : Promise.resolve({ name: 'Notion2API models', url: config.notionModelsUrl, ok: false, detail: 'API_KEY is missing from Notion2API .env' }),
   ]);
 
+  const capabilitiesUrl = config.councilBackendUrl;
+  const [settingsExportRes, askRes, healthRes] = await Promise.all([
+    requestText(`${capabilitiesUrl}/api/settings/export`),
+    requestText(`${capabilitiesUrl}/api/ask`),
+    requestText(`${capabilitiesUrl}/api/health`),
+  ]);
+
+  const capabilities = {
+    settings: services.find(s => s.name === 'LLM Council backend')?.ok || false,
+    settingsExport: settingsExportRes.ok,
+    settingsImport: settingsExportRes.ok,
+    ask: askRes.statusCode !== 404,
+    health: healthRes.ok,
+  };
+
   const settingsResponse = await requestText(config.councilSettingsUrl);
   let provider = { ok: false, detail: 'Settings endpoint is unavailable' };
   if (settingsResponse.ok) {
@@ -107,13 +122,18 @@ async function getDiagnosticsStatus() {
       const settings = JSON.parse(settingsResponse.body);
       const enabled = settings.enabled_providers && settings.enabled_providers[config.providerEnabledKey] === true;
       const urlMatches = settings.custom_endpoint_url === config.providerUrl;
+      const keyPresent = !!settings.custom_endpoint_api_key;
       provider = {
-        ok: !!(enabled && urlMatches),
+        ok: !!(enabled && urlMatches && keyPresent),
         name: settings.custom_endpoint_name || '',
         endpointUrl: settings.custom_endpoint_url || '',
         expectedEndpointUrl: config.providerUrl,
         enabled,
-        detail: enabled && urlMatches ? '' : 'Council custom provider is not pointed at the configured Notion2API endpoint',
+        keyPresent,
+        urlMatches,
+        detail: (enabled && urlMatches && keyPresent)
+          ? ''
+          : `${!enabled ? 'Custom provider disabled. ' : ''}${!urlMatches ? `URL mismatch (expected '${config.providerUrl}', got '${settings.custom_endpoint_url || '-'}'). ` : ''}${!keyPresent ? 'API key missing. ' : ''}`.trim(),
       };
     } catch (error) {
       provider = { ok: false, detail: `Could not parse settings JSON: ${error.message}` };
@@ -125,6 +145,7 @@ async function getDiagnosticsStatus() {
     config,
     state,
     provider,
+    capabilities,
     services,
     logs: {
       notionError: tailFile(path.join(config.logsDir, 'notion2api.err.log')),

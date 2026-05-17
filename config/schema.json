@@ -22,7 +22,11 @@
         "repoUrl": { "type": "string" },
         "branch": { "type": "string" },
         "backendPort": { "type": "integer" },
-        "frontendPort": { "type": "integer" }
+        "frontendPort": { "type": "integer" },
+        "settingsMode": { "type": "string", "enum": ["auto", "legacy", "export_import"] },
+        "verifyProvider": { "type": "boolean" },
+        "askSmokeTest": { "type": "boolean" },
+        "clearUiStorageOnProviderDrift": { "type": "boolean" }
       }
     },
     "provider": {
