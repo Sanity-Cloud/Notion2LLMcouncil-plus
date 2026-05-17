@@ -1,8 +1,46 @@
 diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
-index d8b7df2..90616db 100644
+index d8b7df2..0d8a5de 100644
 --- a/frontend/src/App.jsx
 +++ b/frontend/src/App.jsx
-@@ -255,12 +255,26 @@ function App() {
+@@ -215,22 +215,32 @@ function App() {
+   const loadConversations = async (retryCount = 0) => {
+     try {
+       const convs = await api.listConversations();
+       
+-      setConversations((prev) =>
+-        convs.map((conv) => {
++      setConversations((prev) => {
++        const remoteIds = new Set(convs.map((conv) => conv.id));
++
++        const mergedRemote = convs.map((conv) => {
+           const local = prev.find((item) => item.id === conv.id);
+ 
+           if (
+             local &&
+             isDefaultConversationTitle(conv.title) &&
+             !isDefaultConversationTitle(local.title)
+           ) {
+-            return { ...conv, title: local.title };
++            return { ...conv, title: local.title, isOptimistic: false };
+           }
+ 
+-          return conv;
+-        })
+-      );
++          return { ...conv, isOptimistic: false };
++        });
++
++        const localOnly = prev.filter((local) =>
++          !remoteIds.has(local.id) &&
++          (local.id === currentConversationId || local.isOptimistic === true)
++        );
++
++        return [...localOnly, ...mergedRemote];
++      });
+     } catch (error) {
+       console.error('Failed to load conversations:', error);
+       // Retry up to 3 times with increasing delays (1s, 2s, 3s)
+@@ -255,12 +265,28 @@ function App() {
  
      if (existingEmpty) {
        // Reuse the existing empty conversation instead of creating a new one
@@ -12,6 +50,7 @@ index d8b7df2..90616db 100644
 +        created_at: existingEmpty.created_at,
 +        title: existingEmpty.title || 'New Conversation',
 +        messages: [],
++        isOptimistic: existingEmpty.isOptimistic === true,
 +      });
        setCurrentConversationId(existingEmpty.id);
        return;
@@ -25,11 +64,20 @@ index d8b7df2..90616db 100644
 +        created_at: newConv.created_at,
 +        title: newConv.title || 'New Conversation',
 +        messages: [],
++        isOptimistic: true,
 +      });
        setConversations((prev) => [
          {
            id: newConv.id,
-@@ -277,6 +291,7 @@ function App() {
+@@ -268,6 +294,7 @@ function App() {
+           created_at: newConv.created_at,
+           title: newConv.title || 'New Conversation',
+           message_count: 0,
++          isOptimistic: true,
+         },
+         ...prev.filter((conv) => conv.id !== newConv.id),
+       ]);
+@@ -277,6 +304,7 @@ function App() {
    };
  
    const handleSelectConversation = (id) => {
@@ -37,7 +85,7 @@ index d8b7df2..90616db 100644
      setCurrentConversationId(id);
    };
  
-@@ -287,6 +302,7 @@ function App() {
+@@ -287,6 +315,7 @@ function App() {
        setConversations((prev) => prev.filter(c => c.id !== id));
        // If we deleted the current conversation, clear it
        if (id === currentConversationId) {
@@ -45,7 +93,7 @@ index d8b7df2..90616db 100644
          setCurrentConversationId(null);
          setCurrentConversation(null);
        }
-@@ -310,6 +326,7 @@ function App() {
+@@ -310,6 +339,7 @@ function App() {
      // Assign unique ID to this request to prevent race conditions
      const currentRequestId = ++requestIdRef.current;
      const activeConversationId = currentConversationId;
@@ -53,7 +101,7 @@ index d8b7df2..90616db 100644
  
      // Optimistically update conversation title in list and current state if it is a new/untitled conversation
      const currentConvInList = conversations.find(c => c.id === activeConversationId);
-@@ -333,10 +350,18 @@ function App() {
+@@ -333,10 +363,18 @@ function App() {
      try {
        // Optimistically add user message to UI
        const userMessage = { role: 'user', content };
@@ -76,7 +124,7 @@ index d8b7df2..90616db 100644
  
        // Create a partial assistant message that will be updated progressively
        const assistantMessage = {
-@@ -366,10 +391,18 @@ function App() {
+@@ -366,10 +404,18 @@ function App() {
        };
  
        // Add the partial assistant message
