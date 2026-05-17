@@ -1,15 +1,19 @@
 function Get-State
 {
     param([string]$StateFile)
+
     $state = Read-JsonFile -Path $StateFile
-    if ($state) {
-        return $state
+    if (-not $state) {
+        $state = [pscustomobject]@{}
     }
-    return [pscustomobject]@{
-        notion = $null
-        councilBackend = $null
-        councilFrontend = $null
+
+    foreach ($propertyName in @("notion", "councilBackend", "councilFrontend")) {
+        if (-not ($state.PSObject.Properties.Name -contains $propertyName)) {
+            $state | Add-Member -NotePropertyName $propertyName -NotePropertyValue $null
+        }
     }
+
+    return $state
 }
 
 function Save-State

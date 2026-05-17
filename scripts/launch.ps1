@@ -354,6 +354,31 @@ function Start-CouncilFrontend {
     }
 
     $frontendRoot = Join-Path $CouncilRoot "frontend"
+
+    # Run npm ci / install preflight if node_modules is missing
+    $nodeModulesPath = Join-Path $frontendRoot "node_modules"
+    if (-not (Test-Path $nodeModulesPath)) {
+        Write-Step "LLM Council frontend node_modules is missing. Running npm preflight..."
+        Push-Location $frontendRoot
+        try {
+            $installed = $false
+            if (Test-Path (Join-Path $frontendRoot "package-lock.json")) {
+                Write-Step "Running npm ci in $frontendRoot"
+                & npm ci
+                if ($LASTEXITCODE -eq 0) { $installed = $true }
+            }
+            if (-not $installed) {
+                Write-Step "Running npm install in $frontendRoot"
+                & npm install
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Failed to install frontend dependencies in '$frontendRoot'."
+                }
+            }
+        } finally {
+            Pop-Location
+        }
+    }
+
     $envLocalPath = Join-Path $frontendRoot ".env.local"
     $envLocalLines = @(
         "VITE_API_URL=http://127.0.0.1:$CouncilBackendPort",
