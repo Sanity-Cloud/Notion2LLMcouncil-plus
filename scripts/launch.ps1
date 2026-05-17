@@ -592,6 +592,11 @@ Update-RepoPatch `
 
 Update-RepoPatch `
     -Root $CouncilRoot `
+    -PatchPath (Join-Path $RepoRoot "scripts\patches\llm-council-plus-kimi-model-icon.patch") `
+    -Name "LLM Council Kimi model icon"
+
+Update-RepoPatch `
+    -Root $CouncilRoot `
     -PatchPath (Join-Path $RepoRoot "scripts\patches\llm-council-plus-custom-provider-startup.patch") `
     -Name "LLM Council custom provider startup detection"
 
