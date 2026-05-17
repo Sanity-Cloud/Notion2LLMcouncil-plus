@@ -3,6 +3,13 @@ const fs = require('fs');
 const path = require('path');
 
 const defaultHotkeys = {
+  toggleWindow: 'CommandOrControl+Alt+Space',
+  openChat: 'CommandOrControl+Alt+L',
+  clipboardToChat: 'CommandOrControl+Alt+V',
+  openHotkeySettings: 'CommandOrControl+Alt+H',
+};
+
+const legacyDefaultHotkeys = {
   toggleWindow: 'Alt+Space',
   openChat: 'CommandOrControl+Shift+L',
   clipboardToChat: 'CommandOrControl+Shift+V',
@@ -17,7 +24,17 @@ function readHotkeys() {
   try {
     const file = getHotkeyConfigPath();
     if (!fs.existsSync(file)) return { ...defaultHotkeys };
-    return { ...defaultHotkeys, ...JSON.parse(fs.readFileSync(file, 'utf8')) };
+
+    const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const merged = { ...defaultHotkeys, ...saved };
+
+    // Migrate only the known old defaults that commonly conflict on Windows.
+    // User-customized accelerators are preserved.
+    for (const [name, legacyValue] of Object.entries(legacyDefaultHotkeys)) {
+      if (merged[name] === legacyValue) merged[name] = defaultHotkeys[name];
+    }
+
+    return merged;
   } catch {
     return { ...defaultHotkeys };
   }
