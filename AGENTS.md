@@ -438,8 +438,8 @@ Do not change the distribution strategy without updating `README.md`, `DEVELOPME
 Always run `sigmap ask` or `sigmap --query` before searching for files relevant to a task.
 ## changes (last 5 commits — 1 second ago)
 ```
-electron\lib\config.js                        ~readHotkeys
-electron\main.js                              +ensureChatInputReady  +getActiveRuntimeUrls  +isRuntimeReady  +waitForReadyRuntimeUrls
+.github\copilot-instructions.md               +requestJsonPost  +waitForRuntimeState  +ensureChatInputReady  +clearCouncilUiStorage
+.github\gemini-context.md                     +requestJsonPost  +waitForRuntimeState  +ensureChatInputReady  +clearCouncilUiStorage
 ```
 
 ## .github
@@ -515,80 +515,12 @@ job: validate
 
 ## electron
 
-### electron\diagnostics-renderer.js
-```
-function setStatus(text)
-function formatValue(value)
-function renderDefinitionList(el, entries)
-function renderServices(services)
-function render(data)
-function readConfigForm()
-function writeConfigForm(data)
-async function refresh()
-```
-
 ### electron\lib\config.js
 ```
 module.exports = { defaultHotkeys, getHotkeyConfigPath, readHotkeys, writeHotkeys }
 function getHotkeyConfigPath()
 function readHotkeys()
 function writeHotkeys(hotkeys)
-```
-
-### electron\lib\diagnostics.js
-```
-module.exports = { getDiagnosticsStatus }
-function readJson(filePath)
-function readEnvValue(filePath, name)
-function tailFile(filePath, maxChars = 4000)
-function requestText(url, options = {})
-function requestJsonPost(url, bodyObject, options = {})
-function titleContains(body, expectedTitle)
-async function testService(name, url, options = {})
-async function getDiagnosticsStatus()
-```
-
-### electron\lib\integration-config.js
-```
-module.exports = { getIntegrationConfig, getEditableLocalConfig, saveLocalIntegrationConfig }
-function readJsonFile(filePath)
-function getNested(source, parts)
-function getConfigValue(localConfig, defaultConfig, parts, fallback)
-function getDefaultConfigPath(repoRoot)
-function getLocalConfigPath(repoRoot)
-function resolveRuntimePath(repoRoot, value, fallbackRelative)
-function getIntegrationConfig()
-function getEditableLocalConfig()
-function saveLocalIntegrationConfig(values)
-```
-
-### electron\lib\launcher.js
-```
-module.exports = { startStack, stopStack }
-function resolvePowerShellPath()
-function showError(title, message)
-function readEnvValue(filePath, name)
-function hasSavedNotionAccount(integration)
-function runPowerShell(scriptPath, args = [])
-function runVisibleNotionLogin(integration, afterLogin)
-function getScriptPath(scriptName)
-function getBaseLaunchArgs()
-function startStack({ noBrowser = true } = {})
-function stopStack()
-```
-
-### electron\lib\utils.js
-```
-module.exports = { ensureDir, getAppRoot, getRuntimeRoot, getUserDataRoot, isInsideAsar, toUnpackedAsarPath, waitForUrl, waitForRuntimeState }
-function ensureDir(dir)
-function isInsideAsar(value)
-function toUnpackedAsarPath(value)
-function directoryHasLaunchScript(dir)
-function getUserDataRoot()
-function getRuntimeRoot()
-function getAppRoot()
-function waitForUrl(url, timeoutMs = 90000, options = {})
-function waitForRuntimeState(statePath, timeoutMs = 90000)
 ```
 
 ### electron\main.js
@@ -605,6 +537,18 @@ function createTray()
 function refreshTrayMenu()
 function setApplicationMenu()
 function registerHotkeys()
+```
+
+### electron\diagnostics-renderer.js
+```
+function setStatus(text)
+function formatValue(value)
+function renderDefinitionList(el, entries)
+function renderServices(services)
+function render(data)
+function readConfigForm()
+function writeConfigForm(data)
+async function refresh()
 ```
 
 ### electron\diagnostics.html
@@ -658,12 +602,68 @@ div#status
 div#path
 ```
 
+### electron\lib\diagnostics.js
+```
+module.exports = { getDiagnosticsStatus }
+function readJson(filePath)
+function readEnvValue(filePath, name)
+function tailFile(filePath, maxChars = 4000)
+function requestText(url, options = {})
+function requestJsonPost(url, bodyObject, options = {})
+function titleContains(body, expectedTitle)
+async function testService(name, url, options = {})
+async function getDiagnosticsStatus()
+```
+
+### electron\lib\integration-config.js
+```
+module.exports = { getIntegrationConfig, getEditableLocalConfig, saveLocalIntegrationConfig }
+function readJsonFile(filePath)
+function getNested(source, parts)
+function getConfigValue(localConfig, defaultConfig, parts, fallback)
+function getDefaultConfigPath(repoRoot)
+function getLocalConfigPath(repoRoot)
+function resolveRuntimePath(repoRoot, value, fallbackRelative)
+function getIntegrationConfig()
+function getEditableLocalConfig()
+function saveLocalIntegrationConfig(values)
+```
+
+### electron\lib\launcher.js
+```
+module.exports = { startStack, stopStack }
+function resolvePowerShellPath()
+function showError(title, message)
+function readEnvValue(filePath, name)
+function hasSavedNotionAccount(integration)
+function runPowerShell(scriptPath, args = [])
+function runVisibleNotionLogin(integration, afterLogin)
+function getScriptPath(scriptName)
+function getBaseLaunchArgs()
+function startStack({ noBrowser = true } = {})
+function stopStack()
+```
+
 ### electron\lib\logger.js
 ```
 module.exports = { getLogsDir, appendLog }
 function ensureDir(dir)
 function getLogsDir()
 function appendLog(message)
+```
+
+### electron\lib\utils.js
+```
+module.exports = { ensureDir, getAppRoot, getRuntimeRoot, getUserDataRoot, isInsideAsar, toUnpackedAsarPath, waitForUrl, waitForRuntimeState }
+function ensureDir(dir)
+function isInsideAsar(value)
+function toUnpackedAsarPath(value)
+function directoryHasLaunchScript(dir)
+function getUserDataRoot()
+function getRuntimeRoot()
+function getAppRoot()
+function waitForUrl(url, timeoutMs = 90000, options = {})
+function waitForRuntimeState(statePath, timeoutMs = 90000)
 ```
 
 ### electron\windows\diagnostics.js

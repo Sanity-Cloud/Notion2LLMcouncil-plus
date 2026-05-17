@@ -77,7 +77,7 @@ function Reset-PatchTargetPaths {
 
     foreach ($target in $Targets) {
         if (-not $target) { continue }
-        Write-Step "Resetting patch target for $Name: $target"
+        Write-Step "Resetting patch target for $($Name): $target"
         cmd.exe /c "git checkout -- `"$target`""
         if ($LASTEXITCODE -ne 0) {
             throw "Failed to reset patch target '$target' for patch: $Name"
