@@ -1,5 +1,5 @@
 # SigMap Query Context
-Generated: 2026-05-17T04:06:22.785Z
+Generated: 2026-05-17T04:23:31.248Z
 
 ## .github\copilot-instructions.md
 ```
@@ -49,50 +49,26 @@ h3 electron\lib\utils.js
 h3 electron\main.js
 ```
 
-## electron\diagnostics.html
+## .github\workflows\release.yml
 ```
-title: Notion2Council Diagnostics
-div#checkedAt
-button#refresh
-button#start
-button#stop
-button#openUi
-button#openDocs
-button#openLogs
-div#services
-dl#provider
-dl#config
-input#notionLocalRoot
-input#notionPort
-input#councilLocalRoot
-input#councilBackendPort
-input#councilFrontendPort
-input#providerUrlPath
-button#saveConfig
-div#configPath
-pre#state
+keys: [name, on, permissions, env, jobs]
+job: build-windows
 ```
 
-## electron\lib\diagnostics.js
+## .github\workflows\validate.yml
 ```
-module.exports = { getDiagnosticsStatus }
-function readJson(filePath)
-function readEnvValue(filePath, name)
-function tailFile(filePath, maxChars = 4000)
-function requestText(url, options = {})
-function titleContains(body, expectedTitle)
-async function testService(name, url, options = {})
-async function getDiagnosticsStatus()
+keys: [name, on, permissions, jobs]
+job: validate
 ```
 
-## electron\lib\integration-config.js
+## electron\diagnostics-renderer.js
 ```
-module.exports = { getIntegrationConfig, getEditableLocalConfig, saveLocalIntegrationConfig }
-function readJsonFile(filePath)
-function getNested(source, parts)
-function getConfigValue(localConfig, defaultConfig, parts, fallback)
-function resolveRepoPath(repoRoot, value)
-function getIntegrationConfig()
-function getEditableLocalConfig()
-function saveLocalIntegrationConfig(values)
+function setStatus(text)
+function formatValue(value)
+function renderDefinitionList(el, entries)
+function renderServices(services)
+function render(data)
+function readConfigForm()
+function writeConfigForm(data)
+async function refresh()
 ```

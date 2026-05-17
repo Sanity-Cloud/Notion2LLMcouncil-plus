@@ -3,19 +3,13 @@
 ## Auto-generated signatures
 <!-- Updated by gen-context.js -->
 You are a coding assistant with complete knowledge of this codebase.
-The following code signatures were extracted by SigMap v6.5.1 on 2026-05-08T10:31:55.544Z.
+The following code signatures were extracted by SigMap v6.5.1 on 2026-05-17T04:19:30.905Z.
 
 These signatures represent every public function, class, and type in the project.
 Refer to them when answering questions about code structure, APIs, and implementation.
 Before answering questions about specific code areas, suggest running `sigmap ask "<query>"` to get the most relevant files. After config changes, `sigmap validate` confirms coverage.
 
 ## Code Signatures
-
-## changes (last 5 commits — 4 days ago)
-```
-.github\copilot-instructions.md               +setStatus  +readForm  +writeForm  +formatRegistrations
-.github\gemini-context.md                     +setStatus  +readForm  +writeForm  +formatRegistrations
-```
 
 ## .github
 
@@ -102,6 +96,17 @@ function writeConfigForm(data)
 async function refresh()
 ```
 
+### electron\main.js
+```
+async function focusChatInput(text, submit = false)
+async function openChat()
+async function openChatWithClipboard()
+function createTray()
+function refreshTrayMenu()
+function setApplicationMenu()
+function registerHotkeys()
+```
+
 ### electron\diagnostics.html
 ```
 title: Notion2Council Diagnostics
@@ -179,7 +184,9 @@ module.exports = { getIntegrationConfig, getEditableLocalConfig, saveLocalIntegr
 function readJsonFile(filePath)
 function getNested(source, parts)
 function getConfigValue(localConfig, defaultConfig, parts, fallback)
-function resolveRepoPath(repoRoot, value)
+function getDefaultConfigPath(repoRoot)
+function getLocalConfigPath(repoRoot)
+function resolveRuntimePath(repoRoot, value, fallbackRelative)
 function getIntegrationConfig()
 function getEditableLocalConfig()
 function saveLocalIntegrationConfig(values)
@@ -190,8 +197,12 @@ function saveLocalIntegrationConfig(values)
 module.exports = { startStack, stopStack }
 function resolvePowerShellPath()
 function showError(title, message)
+function readEnvValue(filePath, name)
+function hasSavedNotionAccount(integration)
 function runPowerShell(scriptPath, args = [])
+function runVisibleNotionLogin(integration, afterLogin)
 function getScriptPath(scriptName)
+function getBaseLaunchArgs()
 function startStack({ noBrowser = true } = {})
 function stopStack()
 ```
@@ -206,22 +217,15 @@ function appendLog(message)
 
 ### electron\lib\utils.js
 ```
-module.exports = { ensureDir, getAppRoot, waitForUrl }
+module.exports = { ensureDir, getAppRoot, getRuntimeRoot, getUserDataRoot, isInsideAsar, toUnpackedAsarPath, waitForUrl }
 function ensureDir(dir)
+function isInsideAsar(value)
+function toUnpackedAsarPath(value)
 function directoryHasLaunchScript(dir)
+function getUserDataRoot()
+function getRuntimeRoot()
 function getAppRoot()
 function waitForUrl(url, timeoutMs = 90000, options = {})
-```
-
-### electron\main.js
-```
-async function focusChatInput(text)
-async function openChat()
-async function openChatWithClipboard()
-function createTray()
-function refreshTrayMenu()
-function setApplicationMenu()
-function registerHotkeys()
 ```
 
 ### electron\windows\diagnostics.js

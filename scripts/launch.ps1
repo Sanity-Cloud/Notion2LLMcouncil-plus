@@ -258,11 +258,21 @@ function Start-NotionApi {
     $pidToStop = Get-ListeningProcessId -Port $NotionPort
     
     if ($pidToStop -and (Test-HttpOk -Url $healthUrl -ExpectedContent "ok")) {
+        $keyMatches = $true
+        if ($notionApiKey) {
+            $modelsUrl = "http://127.0.0.1:$NotionPort/v1/models"
+            $keyMatches = Test-HttpOk -Url $modelsUrl -BearerToken $notionApiKey
+        }
+
         if (Test-Path $RestartNotionFlag) {
             Write-Step "Restarting Notion2API (forced by flag)"
             Stop-ProcessId -ProcessId $pidToStop -Tree
             Start-Sleep -Seconds 1
             Remove-Item $RestartNotionFlag -ErrorAction SilentlyContinue
+        } elseif (-not $keyMatches) {
+            Write-Step "Reused Notion2API is using a different API key. Restarting to apply current key..."
+            Stop-ProcessId -ProcessId $pidToStop -Tree
+            Start-Sleep -Seconds 1
         } else {
             Write-Step "Reusing Notion2API on http://127.0.0.1:$NotionPort"
             $State.notion = @{ name = "Notion2API"; pid = $pidToStop; port = $NotionPort; url = "http://127.0.0.1:$NotionPort" }

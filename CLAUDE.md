@@ -4,12 +4,6 @@
 <!-- Updated by gen-context.js -->
 # Code signatures
 
-## changes (last 5 commits — 4 days ago)
-```
-.github\copilot-instructions.md               +setStatus  +readForm  +writeForm  +formatRegistrations
-.github\gemini-context.md                     +setStatus  +readForm  +writeForm  +formatRegistrations
-```
-
 ## .github
 
 ### .github\copilot-instructions.md
@@ -95,6 +89,17 @@ function writeConfigForm(data)
 async function refresh()
 ```
 
+### electron\main.js
+```
+async function focusChatInput(text, submit = false)
+async function openChat()
+async function openChatWithClipboard()
+function createTray()
+function refreshTrayMenu()
+function setApplicationMenu()
+function registerHotkeys()
+```
+
 ### electron\diagnostics.html
 ```
 title: Notion2Council Diagnostics
@@ -172,7 +177,9 @@ module.exports = { getIntegrationConfig, getEditableLocalConfig, saveLocalIntegr
 function readJsonFile(filePath)
 function getNested(source, parts)
 function getConfigValue(localConfig, defaultConfig, parts, fallback)
-function resolveRepoPath(repoRoot, value)
+function getDefaultConfigPath(repoRoot)
+function getLocalConfigPath(repoRoot)
+function resolveRuntimePath(repoRoot, value, fallbackRelative)
 function getIntegrationConfig()
 function getEditableLocalConfig()
 function saveLocalIntegrationConfig(values)
@@ -183,8 +190,12 @@ function saveLocalIntegrationConfig(values)
 module.exports = { startStack, stopStack }
 function resolvePowerShellPath()
 function showError(title, message)
+function readEnvValue(filePath, name)
+function hasSavedNotionAccount(integration)
 function runPowerShell(scriptPath, args = [])
+function runVisibleNotionLogin(integration, afterLogin)
 function getScriptPath(scriptName)
+function getBaseLaunchArgs()
 function startStack({ noBrowser = true } = {})
 function stopStack()
 ```
@@ -199,22 +210,15 @@ function appendLog(message)
 
 ### electron\lib\utils.js
 ```
-module.exports = { ensureDir, getAppRoot, waitForUrl }
+module.exports = { ensureDir, getAppRoot, getRuntimeRoot, getUserDataRoot, isInsideAsar, toUnpackedAsarPath, waitForUrl }
 function ensureDir(dir)
+function isInsideAsar(value)
+function toUnpackedAsarPath(value)
 function directoryHasLaunchScript(dir)
+function getUserDataRoot()
+function getRuntimeRoot()
 function getAppRoot()
 function waitForUrl(url, timeoutMs = 90000, options = {})
-```
-
-### electron\main.js
-```
-async function focusChatInput(text)
-async function openChat()
-async function openChatWithClipboard()
-function createTray()
-function refreshTrayMenu()
-function setApplicationMenu()
-function registerHotkeys()
 ```
 
 ### electron\windows\diagnostics.js

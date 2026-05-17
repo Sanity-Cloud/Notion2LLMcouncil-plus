@@ -3,10 +3,15 @@ function Test-HttpOk
     param(
         [string]$Url,
         [string]$ExpectedTitle = "",
-        [string]$ExpectedContent = ""
+        [string]$ExpectedContent = "",
+        [string]$BearerToken = ""
     )
     try {
-        $response = Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 2
+        $headers = @{}
+        if ($BearerToken) {
+            $headers["Authorization"] = "Bearer $BearerToken"
+        }
+        $response = Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 2 -Headers $headers
         if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 500) {
             return $false
         }
