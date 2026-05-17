@@ -61,10 +61,6 @@ jobs:
       - name: Build MSI setup
         run: npm run electron:build:msi
 
-      - name: Create source/runtime bundle
-        shell: powershell
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\package-release.ps1 -SkipNpmInstall -SkipBuild -NoPause
-
       - name: Stage single GitHub release package
         shell: powershell
         run: |
@@ -79,15 +75,23 @@ jobs:
           $assetRoot = Join-Path $stage "Notion2Council-$version"
           New-Item -ItemType Directory -Force -Path $assetRoot | Out-Null
 
-          Get-ChildItem release -File -Include "*.exe","*.msi","*.zip","*.blockmap","*.yml" -Recurse -ErrorAction SilentlyContinue |
-            Copy-Item -Destination $assetRoot -Force
+          $expectedArtifacts = @(
+            "release\Notion2Council-$version-portable.exe",
+            "release\Notion2Council-$version-win-x64.zip",
+            "release\Notion2Council-$version-setup.msi"
+          )
 
-          Get-ChildItem dist-release -File -Filter "*.zip" -Recurse -ErrorAction SilentlyContinue |
-            Copy-Item -Destination $assetRoot -Force
+          foreach ($artifact in $expectedArtifacts) {
+            if (-not (Test-Path $artifact)) {
+              throw "Expected release artifact missing: $artifact"
+            }
+            Copy-Item -Path $artifact -Destination $assetRoot -Force
+          }
 
           Compress-Archive -Path (Join-Path $assetRoot "*") -DestinationPath (Join-Path $stage $bundle) -Force
 
           Write-Host "Staged release asset: $stage\$bundle"
+          Get-ChildItem $assetRoot -File | Format-Table Name, Length
           Get-ChildItem $stage -File | Format-Table Name, Length
 
       - name: Remove existing release assets
@@ -134,7 +138,7 @@ jobs:
           body: |
             Notion2Council desktop release ${{ steps.version.outputs.tag }}.
 
-            This release publishes a single Windows package containing the portable EXE, ZIP package, MSI setup installer, and source/runtime bundle.
+            This release publishes a single Windows package containing the portable EXE, ZIP package, and MSI setup installer.
           draft: false
           prerelease: false
           make_latest: true
