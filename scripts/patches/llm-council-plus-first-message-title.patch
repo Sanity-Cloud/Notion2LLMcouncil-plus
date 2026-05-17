@@ -91,13 +91,16 @@ index cfcd17a..ef813c0 100644
          "role": "user",
          "content": content
 diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
-index 657b4c3..dfe44f4 100644
+index 657b4c3..6cc2a7f 100644
 --- a/frontend/src/App.jsx
 +++ b/frontend/src/App.jsx
-@@ -6,6 +6,20 @@ import { api, DEFAULT_EXECUTION_MODE } from './api';
+@@ -6,6 +6,23 @@ import { api, DEFAULT_EXECUTION_MODE } from './api';
  import './App.css';
  import './components/StageCopyButtons.css';
  
++const isDefaultConversationTitle = (title) =>
++  !title || title === 'New Conversation' || title === 'Untitled Conversation';
++
 +const deriveConversationTitle = (content) => {
 +  if (!content || typeof content !== 'string') return 'Untitled Conversation';
 +
@@ -115,7 +118,15 @@ index 657b4c3..dfe44f4 100644
  function App() {
    const [conversations, setConversations] = useState([]);
    const [currentConversationId, setCurrentConversationId] = useState(null);
-@@ -42,13 +56,19 @@ function App() {
+@@ -26,6 +43,7 @@ function App() {
+   const abortControllerRef = useRef(null);
+   const requestIdRef = useRef(0);
+   const isInitialMount = useRef(true);
++  const activeConversationIdRef = useRef(null);
+ 
+   // Check initial configuration on mount
+   useEffect(() => {
+@@ -42,13 +60,19 @@ function App() {
        setExecutionMode(settings.execution_mode || DEFAULT_EXECUTION_MODE);
        setSearchProvider(settings.search_provider || 'duckduckgo');
  
@@ -136,15 +147,23 @@ index 657b4c3..dfe44f4 100644
  
        // 2. Test Ollama Connection
        // We do this regardless to update the status indicator
-@@ -187,7 +207,25 @@ function App() {
+@@ -129,6 +153,10 @@ function App() {
+     loadConversations();
+   }, []);
+ 
++  useEffect(() => {
++    activeConversationIdRef.current = currentConversationId;
++  }, [currentConversationId]);
++
+   // Auto-save execution mode preference when changed
+   useEffect(() => {
+     // Skip saving on initial mount
+@@ -187,7 +215,25 @@ function App() {
    const loadConversations = async (retryCount = 0) => {
      try {
        const convs = await api.listConversations();
 -      setConversations(convs);
 +      
-+      const isDefaultConversationTitle = (title) =>
-+        !title || title === 'New Conversation' || title === 'Untitled Conversation';
-+
 +      setConversations((prev) =>
 +        convs.map((conv) => {
 +          const local = prev.find((item) => item.id === conv.id);
@@ -163,7 +182,7 @@ index 657b4c3..dfe44f4 100644
      } catch (error) {
        console.error('Failed to load conversations:', error);
        // Retry up to 3 times with increasing delays (1s, 2s, 3s)
-@@ -218,9 +256,14 @@ function App() {
+@@ -218,9 +264,14 @@ function App() {
  
      try {
        const newConv = await api.createConversation();
@@ -181,41 +200,115 @@ index 657b4c3..dfe44f4 100644
        ]);
        setCurrentConversationId(newConv.id);
      } catch (error) {
-@@ -262,6 +305,22 @@ function App() {
+@@ -232,7 +283,7 @@ function App() {
+   const handleDeleteConversation = async (id) => {
+     try {
+       await api.deleteConversation(id);
+       // Remove from local state
+-      setConversations(conversations.filter(c => c.id !== id));
++      setConversations((prev) => prev.filter(c => c.id !== id));
+       // If we deleted the current conversation, clear it
+       if (id === currentConversationId) {
+         setCurrentConversationId(null);
+@@ -262,7 +313,24 @@ function App() {
      // Assign unique ID to this request to prevent race conditions
      const currentRequestId = ++requestIdRef.current;
- 
++    const activeConversationId = currentConversationId;
++
 +    // Optimistically update conversation title in list and current state if it is a new/untitled conversation
-+    const currentConvInList = conversations.find(c => c.id === currentConversationId);
-+    const hasNoTitle = !currentConvInList || !currentConvInList.title || 
-+                        currentConvInList.title === 'New Conversation' || 
-+                        currentConvInList.title === 'Untitled Conversation';
++    const currentConvInList = conversations.find(c => c.id === activeConversationId);
++    const currentTitle = currentConvInList?.title || currentConversation?.title;
++    const hasNoTitle = isDefaultConversationTitle(currentTitle);
 +
 +    if (hasNoTitle) {
 +      const optimisticTitle = deriveConversationTitle(content);
-+      // Update in conversations list (sidebar)
-+      setConversations(prev => prev.map(c => 
-+        c.id === currentConversationId ? { ...c, title: optimisticTitle } : c
++      setConversations(prev => prev.map(c =>
++        c.id === activeConversationId ? { ...c, title: optimisticTitle } : c
 +      ));
-+      // Update in current active conversation state
-+      setCurrentConversation(prev => prev ? { ...prev, title: optimisticTitle } : prev);
++      setCurrentConversation(prev =>
++        prev && prev.id === activeConversationId ? { ...prev, title: optimisticTitle } : prev
++      );
 +    }
-+
+ 
      // Create new AbortController for this request
      abortControllerRef.current = new AbortController();
+@@ -302,9 +370,14 @@ function App() {
  
-@@ -597,6 +656,14 @@ function App() {
+       // Send message with streaming
+       await api.sendMessageStream(
+-        currentConversationId,
++        activeConversationId,
+         { content, webSearch, executionMode },
+         (eventType, event) => {
++          const isActiveConversation = activeConversationIdRef.current === activeConversationId;
++          if (!isActiveConversation && !['title_complete', 'complete', 'error'].includes(eventType)) {
++            return;
++          }
++
+           switch (eventType) {
+             case 'search_start':
+               setCurrentConversation((prev) => {
+@@ -597,6 +670,14 @@ function App() {
                break;
  
              case 'title_complete':
 +              // Update with final generated title optimistically
 +              if (event.data && event.data.title) {
 +                const finalTitle = event.data.title;
-+                setConversations(prev => prev.map(c => 
-+                  c.id === currentConversationId ? { ...c, title: finalTitle } : c
++                setConversations(prev => prev.map(c =>
++                  c.id === activeConversationId ? { ...c, title: finalTitle } : c
 +                ));
-+                setCurrentConversation(prev => prev ? { ...prev, title: finalTitle } : prev);
++                setCurrentConversation(prev => prev && prev.id === activeConversationId ? { ...prev, title: finalTitle } : prev);
 +              }
                // Reload conversations to get updated title
                loadConversations();
                break;
+@@ -623,7 +704,7 @@ function App() {
+         console.log('Request aborted');
+         // Mark the assistant message as aborted and stop timers
+         setCurrentConversation((prev) => {
+-          if (!prev || prev.messages.length < 2) return prev;
++          if (!prev || prev.id !== activeConversationId || prev.messages.length < 2) return prev;
+           const messages = [...prev.messages];
+           const lastMsg = messages[messages.length - 1];
+           if (lastMsg.role === 'assistant') {
+@@ -652,10 +733,13 @@ function App() {
+       }
+       console.error('Failed to send message:', error);
+       // Remove optimistic messages on error
+-      setCurrentConversation((prev) => ({
+-        ...prev,
+-        messages: prev.messages.slice(0, -2),
+-      }));
++      setCurrentConversation((prev) => {
++        if (!prev || prev.id !== activeConversationId) return prev;
++        return {
++          ...prev,
++          messages: prev.messages.slice(0, -2),
++        };
++      });
+       setIsLoading(false);
+     } finally {
+       // Only clear the controller if this is still the current request
+diff --git a/frontend/src/components/ChatInterface.jsx b/frontend/src/components/ChatInterface.jsx
+index 3c1eb65..a9220c1 100644
+--- a/frontend/src/components/ChatInterface.jsx
++++ b/frontend/src/components/ChatInterface.jsx
+@@ -119,7 +119,7 @@ export default function ChatInterface({
+                                         )}
+ 
+                                         {/* Stage 1: Council Grid Visualization */}
+-                                        {(msg.loading?.stage1 || (msg.stage1 && !msg.stage2)) && (
++                                        {(msg.loading?.stage1 || msg.stage1) && (
+                                             <div className="stage-container">
+                                                 <div className="stage-header">
+                                                     <h3>Stage 1: Council Deliberation</h3>
+@@ -148,7 +148,7 @@ export default function ChatInterface({
+                                         )}
+ 
+                                         {/* Stage 1 Results (Accordion/List - kept for detail view) */}
+-                                        {(msg.loading?.stage1 || (msg.stage1 && !msg.stage2)) ? (
++                                        {(msg.loading?.stage1 || msg.stage1) ? (
+                                             msg.loading?.stage1 && !msg.stage1 ? (
+                                                 <Stage1Skeleton />
+                                             ) : msg.stage1 && (
