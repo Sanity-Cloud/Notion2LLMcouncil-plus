@@ -1,8 +1,9 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { appendLog } = require('./logger');
+const { appendLog, getLogsDir } = require('./logger');
 const { getAppRoot } = require('./utils');
+const { getIntegrationConfig } = require('./integration-config');
 const { dialog } = require('electron');
 
 let launcherProcess = null;
@@ -42,9 +43,16 @@ function runPowerShell(scriptPath, args = []) {
     return null;
   }
 
+  const integration = getIntegrationConfig();
   const powerShellPath = resolvePowerShellPath();
   const psArgs = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, ...args];
   const cwd = getAppRoot();
+  const env = {
+    ...process.env,
+    NOTION2COUNCIL_CONFIG: integration.configPath,
+    NOTION2COUNCIL_LOG_DIR: getLogsDir(),
+    NOTION2COUNCIL_RUNTIME_ROOT: path.dirname(path.dirname(integration.notionRoot)),
+  };
   
   appendLog(`Starting PowerShell: ${powerShellPath} ${psArgs.join(' ')} (cwd: ${cwd})`);
 
@@ -55,7 +63,7 @@ function runPowerShell(scriptPath, args = []) {
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: false,
-      env: { ...process.env },
+      env,
     });
   } catch (error) {
     showError('Failed to start PowerShell', `${error.message}\nTried: ${powerShellPath}`);
@@ -82,10 +90,21 @@ function getScriptPath(scriptName) {
   return path.join(getAppRoot(), 'scripts', scriptName);
 }
 
+function getBaseLaunchArgs() {
+  const integration = getIntegrationConfig();
+  return [
+    '-ConfigPath', integration.configPath,
+    '-NotionRoot', integration.notionRoot,
+    '-CouncilRoot', integration.councilRoot,
+    '-NotionPort', `${integration.notionPort}`,
+    '-CouncilBackendPort', `${integration.councilBackendPort}`,
+    '-CouncilFrontendPort', `${integration.councilFrontendPort}`,
+  ];
+}
+
 function startStack({ noBrowser = true } = {}) {
   if (launcherProcess && !launcherProcess.killed) return launcherProcess;
-  const args = [];
-  if (process.env.NOTION2COUNCIL_CONFIG) args.push('-ConfigPath', process.env.NOTION2COUNCIL_CONFIG);
+  const args = getBaseLaunchArgs();
   if (noBrowser) args.push('-NoBrowser');
   launcherProcess = runPowerShell(getScriptPath('launch.ps1'), args);
   return launcherProcess;
@@ -93,8 +112,7 @@ function startStack({ noBrowser = true } = {}) {
 
 function stopStack() {
   appendLog('[launcher] stopStack: dispatching launch.ps1 -Stop');
-  const args = [];
-  if (process.env.NOTION2COUNCIL_CONFIG) args.push('-ConfigPath', process.env.NOTION2COUNCIL_CONFIG);
+  const args = getBaseLaunchArgs();
   args.push('-Stop');
   return runPowerShell(getScriptPath('launch.ps1'), args);
 }
