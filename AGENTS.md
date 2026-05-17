@@ -436,6 +436,12 @@ Do not change the distribution strategy without updating `README.md`, `DEVELOPME
 | To query by topic | `sigmap --query "<topic>"` |
 
 Always run `sigmap ask` or `sigmap --query` before searching for files relevant to a task.
+## changes (last 5 commits — 1 second ago)
+```
+.github\copilot-instructions.md               +focusChatInput  +openChat  +openChatWithClipboard  +createTray
+.github\gemini-context.md                     +focusChatInput  +openChat  +openChatWithClipboard  +createTray
+```
+
 ## .github
 
 ### .github\copilot-instructions.md
@@ -443,7 +449,6 @@ Always run `sigmap ask` or `sigmap --query` before searching for files relevant 
 h2 Auto-generated signatures
 h2 SigMap commands
 h1 Code signatures
-h2 changes (last 5 commits — 4 days ago)
 h2 .github
 h3 .github\copilot-instructions.md
 h3 .github\gemini-context.md
@@ -451,6 +456,7 @@ h3 .github\workflows\release.yml
 h3 .github\workflows\validate.yml
 h2 electron
 h3 electron\diagnostics-renderer.js
+h3 electron\main.js
 h3 electron\diagnostics.html
 h3 electron\hotkeys-renderer.js
 h3 electron\hotkeys.html
@@ -460,7 +466,6 @@ h3 electron\lib\integration-config.js
 h3 electron\lib\launcher.js
 h3 electron\lib\logger.js
 h3 electron\lib\utils.js
-h3 electron\main.js
 h3 electron\windows\diagnostics.js
 h3 electron\windows\hotkeys.js
 h3 electron\windows\main.js
@@ -471,7 +476,6 @@ code-fence plain
 ```
 h2 Auto-generated signatures
 h2 Code Signatures
-h2 changes (last 5 commits — 4 days ago)
 h2 .github
 h3 .github\copilot-instructions.md
 h3 .github\gemini-context.md
@@ -479,6 +483,7 @@ h3 .github\workflows\release.yml
 h3 .github\workflows\validate.yml
 h2 electron
 h3 electron\diagnostics-renderer.js
+h3 electron\main.js
 h3 electron\diagnostics.html
 h3 electron\hotkeys-renderer.js
 h3 electron\hotkeys.html
@@ -488,7 +493,6 @@ h3 electron\lib\integration-config.js
 h3 electron\lib\launcher.js
 h3 electron\lib\logger.js
 h3 electron\lib\utils.js
-h3 electron\main.js
 h3 electron\windows\diagnostics.js
 h3 electron\windows\hotkeys.js
 h3 electron\windows\main.js
@@ -519,17 +523,6 @@ function render(data)
 function readConfigForm()
 function writeConfigForm(data)
 async function refresh()
-```
-
-### electron\main.js
-```
-async function focusChatInput(text, submit = false)
-async function openChat()
-async function openChatWithClipboard()
-function createTray()
-function refreshTrayMenu()
-function setApplicationMenu()
-function registerHotkeys()
 ```
 
 ### electron\diagnostics.html
@@ -651,6 +644,17 @@ function getUserDataRoot()
 function getRuntimeRoot()
 function getAppRoot()
 function waitForUrl(url, timeoutMs = 90000, options = {})
+```
+
+### electron\main.js
+```
+async function focusChatInput(text, submit = false)
+async function openChat()
+async function openChatWithClipboard()
+function createTray()
+function refreshTrayMenu()
+function setApplicationMenu()
+function registerHotkeys()
 ```
 
 ### electron\windows\diagnostics.js

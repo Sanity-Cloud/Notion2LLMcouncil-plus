@@ -413,6 +413,8 @@ function Start-CouncilFrontend {
 }
 
 # Execution
+if ($Stop) { Stop-ManagedServices; exit 0 }
+
 $Config = Read-IntegrationConfig -RepoRoot $RepoRoot -ConfigPath $ConfigPath
 if (-not ($BoundParameters -contains "NotionRoot")) { $NotionRoot = Use-ConfigValue -Value (Get-ConfigProperty $Config @("notion", "localRoot")) -Fallback $NotionRoot }
 if (-not ($BoundParameters -contains "CouncilRoot")) { $CouncilRoot = Use-ConfigValue -Value (Get-ConfigProperty $Config @("council", "localRoot")) -Fallback $CouncilRoot }
@@ -438,8 +440,6 @@ Initialize-Repo -Path $NotionRoot -Url $NotionRepoUrl -Branch $NotionBranch
 Initialize-Repo -Path $CouncilRoot -Url $CouncilRepoUrl -Branch $CouncilBranch
 $NotionRoot = (Resolve-Path $NotionRoot).Path
 $CouncilRoot = (Resolve-Path $CouncilRoot).Path
-
-if ($Stop) { Stop-ManagedServices; exit 0 }
 
 Write-Step "Preparing Services"
 Initialize-PythonRequirements -Root $NotionRoot -Label "Notion2API" -RequiredModules @("cloudscraper", "fastapi", "uvicorn", "dotenv", "slowapi", "websocket")
