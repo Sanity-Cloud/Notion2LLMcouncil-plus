@@ -126,8 +126,12 @@ function Initialize-PythonRequirements {
     )
 
     $requirementsPath = Join-Path $Root "requirements.txt"
-    if (-not (Test-Path $requirementsPath)) {
-        Write-Step "$Label requirements.txt not found; skipping Python dependency install"
+    $pyprojectPath = Join-Path $Root "pyproject.toml"
+    $hasRequirements = Test-Path $requirementsPath
+    $hasPyproject = Test-Path $pyprojectPath
+
+    if (-not $hasRequirements -and -not $hasPyproject) {
+        Write-Step "$Label requirements.txt or pyproject.toml not found; skipping Python dependency install"
         return
     }
 
@@ -140,23 +144,33 @@ function Initialize-PythonRequirements {
     }
 
     $python = Get-Python -Root $Root
-    $requirementsHash = (Get-FileHash -Path $requirementsPath -Algorithm SHA256).Hash
+    if ($hasRequirements) {
+        $dependencySource = $requirementsPath
+        $installArgs = @("-m", "pip", "install", "--disable-pip-version-check", "-r", $requirementsPath)
+        $installLabel = "$Label Python requirements"
+    } else {
+        $dependencySource = $pyprojectPath
+        $installArgs = @("-m", "pip", "install", "--disable-pip-version-check", "-e", $Root)
+        $installLabel = "$Label Python project dependencies"
+    }
+
+    $requirementsHash = (Get-FileHash -Path $dependencySource -Algorithm SHA256).Hash
     $markerPath = Join-Path $Root ".notion2council-requirements.sha256"
     $markerHash = if (Test-Path $markerPath) { (Get-Content -Path $markerPath -Raw).Trim() } else { "" }
     $modulesOk = Test-PythonModules -Python $python -Modules $RequiredModules
 
     if ($modulesOk -and $markerHash -eq $requirementsHash) {
-        Write-Step "$Label Python requirements are current"
+        Write-Step "$installLabel are current"
         return
     }
 
-    Write-Step "Installing $Label Python requirements"
-    & $python -m pip install --disable-pip-version-check -r $requirementsPath
-    if ($LASTEXITCODE -ne 0) { throw "Failed to install Python requirements for $Label" }
+    Write-Step "Installing $installLabel"
+    & $python @installArgs
+    if ($LASTEXITCODE -ne 0) { throw "Failed to install Python dependencies for $Label" }
 
     Set-Content -Path $markerPath -Value $requirementsHash -Encoding ASCII
     if (-not (Test-PythonModules -Python $python -Modules $RequiredModules)) {
-        throw "$Label Python requirements installed, but one or more required modules are still unavailable"
+        throw "$Label Python dependencies installed, but one or more required modules are still unavailable"
     }
 }
 
@@ -365,7 +379,7 @@ if ($Stop) { Stop-ManagedServices; exit 0 }
 
 Write-Step "Preparing Services"
 Initialize-PythonRequirements -Root $NotionRoot -Label "Notion2API" -RequiredModules @("cloudscraper", "fastapi", "uvicorn", "dotenv", "slowapi", "websocket")
-Initialize-PythonRequirements -Root $CouncilRoot -Label "LLM Council" -RequiredModules @("fastapi", "uvicorn")
+Initialize-PythonRequirements -Root $CouncilRoot -Label "LLM Council" -RequiredModules @("fastapi", "uvicorn", "dotenv", "httpx", "pydantic", "ddgs", "yake", "mcp")
 Initialize-NotionMode
 Initialize-NotionLogin
 $notionApiKey = Initialize-NotionApiKey
