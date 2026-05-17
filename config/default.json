@@ -17,7 +17,7 @@
     "settingsMode": "auto",
     "verifyProvider": true,
     "askSmokeTest": true,
-    "clearUiStorageOnProviderDrift": true
+    "clearUiStorageOnProviderDrift": false
   },
   "provider": {
     "name": "Notion2API",

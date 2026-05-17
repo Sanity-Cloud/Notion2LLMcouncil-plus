@@ -71,7 +71,7 @@ function render(data) {
     ['Endpoint', data.provider.endpointUrl],
     ['Expected', data.provider.expectedEndpointUrl],
     ['URL Match', data.provider.urlMatches],
-    ['API Key Present', data.provider.keyPresent],
+    ['API Key', data.provider.apiKeyStatus],
     ['/api/settings', data.capabilities?.settings ? 'yes' : 'no'],
     ['/api/settings/export', data.capabilities?.settingsExport ? 'yes' : 'no'],
     ['/api/settings/import', data.capabilities?.settingsImport ? 'yes' : 'no'],

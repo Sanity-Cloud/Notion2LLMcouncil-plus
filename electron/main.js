@@ -228,17 +228,8 @@ app.whenReady().then(async () => {
     // Wait for the UI to be ready before loading
     await waitForUrl(config.notionHealthUrl, 90000, { expectedContent: 'ok' });
     await waitForUrl(config.councilUiUrl, 90000, { expectedTitle: 'LLM Council' });
-    if (config.clearUiStorageOnProviderDrift !== false) {
-      try {
-        const diagnostics = await getDiagnosticsStatus();
-        if (diagnostics && diagnostics.provider && !diagnostics.provider.ok) {
-          appendLog(`Provider drift detected on startup (Detail: ${diagnostics.provider.detail}). Auto-clearing LLM Council UI storage...`);
-          await clearCouncilUiStorage();
-        }
-      } catch (diagError) {
-        appendLog(`Failed to check provider drift during startup: ${diagError.message}`);
-      }
-    }
+    // Clear storage on provider drift has been disabled to prevent destruction of UI metadata.
+    // UI state can still be reset manually via the "Reset LLM Council UI State" menu action.
     await mainWindow.loadURL(config.councilUiUrl);
   } catch (error) {
     appendLog(`Council UI failed to load: ${error.message}`);

@@ -66,6 +66,54 @@ function requestText(url, options = {}) {
   });
 }
 
+function requestJsonPost(url, bodyObject, options = {}) {
+  return new Promise(resolve => {
+    const parsedUrl = new URL(url);
+    const bodyStr = JSON.stringify(bodyObject);
+    const headers = {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(bodyStr),
+      ...(options.headers || {})
+    };
+    const started = Date.now();
+    const reqOptions = {
+      method: 'POST',
+      hostname: parsedUrl.hostname,
+      port: parsedUrl.port,
+      path: parsedUrl.pathname + parsedUrl.search,
+      headers,
+      timeout: options.timeoutMs || 5000
+    };
+
+    const request = http.request(reqOptions, response => {
+      let body = '';
+      response.setEncoding('utf8');
+      response.on('data', chunk => {
+        if (body.length < 12000) body += chunk;
+      });
+      response.on('end', () => {
+        const ok = response.statusCode >= 200 && response.statusCode < 300;
+        resolve({
+          ok,
+          statusCode: response.statusCode,
+          ms: Date.now() - started,
+          body
+        });
+      });
+    });
+
+    request.on('timeout', () => {
+      request.destroy();
+      resolve({ ok: false, error: 'Timed out' });
+    });
+    request.on('error', error => resolve({ ok: false, error: error.message }));
+
+    request.write(bodyStr);
+    request.end();
+  });
+}
+
+
 function titleContains(body, expectedTitle) {
   if (!expectedTitle) return true;
   const match = /<title>(.*?)<\/title>/is.exec(body || '');
@@ -141,17 +189,69 @@ async function getDiagnosticsStatus() {
       const enabled = settings.enabled_providers && settings.enabled_providers[config.providerEnabledKey] === true;
       const urlMatches = settings.custom_endpoint_url === runtimeProviderUrl;
       const keyPresent = !!(settings.custom_endpoint_api_key || settings.custom_endpoint_api_key_set);
+
+      let apiKeyStatus = 'unknown';
+      if (keyPresent) {
+        const val = settings.custom_endpoint_api_key;
+        if (val) {
+          if (val.includes('**') || val === 'set' || val === 'true') {
+            apiKeyStatus = 'redacted';
+          } else {
+            apiKeyStatus = 'saved';
+          }
+        } else if (settings.custom_endpoint_api_key_set) {
+          apiKeyStatus = 'saved/redacted';
+        }
+      }
+
+      let smokeTestOk = true;
+      let smokeDetail = '';
+      if (enabled && urlMatches && config.council.askSmokeTest !== false) {
+        try {
+          const testModel = (config.provider.councilModels && config.provider.councilModels.length > 0)
+            ? config.provider.councilModels[0]
+            : 'custom:gpt-5.5';
+          const smokePayload = {
+            content: 'Ping! Respond with exactly \'pong\' to verify connection.',
+            models: [testModel],
+            execution_mode: 'chat_only'
+          };
+          const smokeRes = await requestJsonPost(`${runtimeCouncilBackendUrl}/api/ask`, smokePayload);
+          if (smokeRes.ok) {
+            const smokeJson = JSON.parse(smokeRes.body);
+            if (smokeJson.responses && smokeJson.responses[0]) {
+              const firstResp = smokeJson.responses[0];
+              if (firstResp.error) {
+                smokeTestOk = false;
+                smokeDetail = `Smoke test model returned error: ${firstResp.error}`;
+              }
+            } else if (smokeJson.error) {
+              smokeTestOk = false;
+              smokeDetail = `Smoke test returned error: ${smokeJson.error}`;
+            }
+          } else {
+            smokeTestOk = false;
+            smokeDetail = `Smoke test HTTP failed: ${smokeRes.statusCode || smokeRes.error || 'unknown error'}`;
+          }
+        } catch (smokeError) {
+          smokeTestOk = false;
+          smokeDetail = `Smoke test failed: ${smokeError.message}`;
+        }
+      }
+
       provider = {
-        ok: !!(enabled && urlMatches && keyPresent),
+        ok: !!(enabled && urlMatches && smokeTestOk),
         name: settings.custom_endpoint_name || '',
         endpointUrl: settings.custom_endpoint_url || '',
         expectedEndpointUrl: runtimeProviderUrl,
         enabled,
-        keyPresent,
         urlMatches,
-        detail: (enabled && urlMatches && keyPresent)
+        keyPresent,
+        apiKeyStatus,
+        smokeTestOk,
+        detail: (enabled && urlMatches && smokeTestOk)
           ? ''
-          : `${!enabled ? 'Custom provider disabled. ' : ''}${!urlMatches ? `URL mismatch (expected '${runtimeProviderUrl}', got '${settings.custom_endpoint_url || '-'}'). ` : ''}${!keyPresent ? 'API key missing. ' : ''}`.trim(),
+          : `${!enabled ? 'Custom provider disabled. ' : ''}${!urlMatches ? `URL mismatch (expected '${runtimeProviderUrl}', got '${settings.custom_endpoint_url || '-'}'). ` : ''}${!smokeTestOk ? `${smokeDetail}. ` : ''}`.trim(),
       };
     } catch (error) {
       provider = { ok: false, detail: `Could not parse settings JSON: ${error.message}` };
