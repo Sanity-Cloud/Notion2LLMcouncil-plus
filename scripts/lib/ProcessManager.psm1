@@ -57,7 +57,7 @@ function Stop-ProcessId
         if ($Tree) {
             Write-Host "Stopping process tree for PID $ProcessId ($($process.Name))"
             # Attempt to kill the process and its children
-            taskkill /F /T /PID $ProcessId 2>$null
+            cmd.exe /c "taskkill /F /T /PID $ProcessId 2>nul"
         } else {
             Write-Host "Stopping PID $ProcessId ($($process.Name))"
             Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
