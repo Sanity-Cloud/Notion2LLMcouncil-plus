@@ -1,57 +1,60 @@
 diff --git a/backend/storage.py b/backend/storage.py
-index cfcd17a..6a9e1f3 100644
+index cfcd17a..ef813c0 100644
 --- a/backend/storage.py
 +++ b/backend/storage.py
-@@ -61,13 +61,17 @@ def rebuild_index() -> List[Dict[str, Any]]:
+@@ -60,6 +60,20 @@ def rebuild_index() -> List[Dict[str, Any]]:
              try:
                  with open(path, 'r') as f:
                      data = json.load(f)
-+                    if _ensure_conversation_title(data):
-+                        with open(path, 'w') as repaired_file:
-+                            json.dump(data, repaired_file, indent=2)
++                    
++                    # Auto-repair title if missing/default and there is a first user message
++                    if data.get("title") in (None, "", "New Conversation", "Untitled Conversation"):
++                        first_content = ""
++                        for msg in data.get("messages", []):
++                            if msg.get("role") == "user" and msg.get("content"):
++                                first_content = msg.get("content")
++                                break
++                        if first_content:
++                            data["title"] = _derive_conversation_title(first_content)
++                            # Save back to file
++                            with open(path, 'w') as out_f:
++                                json.dump(data, out_f, indent=2)
 +
                      index.append({
                          "id": data["id"],
                          "created_at": data["created_at"],
-                         "title": data.get("title", "New Conversation"),
-                         "message_count": len(data["messages"])
-                     })
-             except (json.JSONDecodeError, OSError):
-                 continue
-@@ -151,6 +155,8 @@ def save_conversation(conversation: Dict[str, Any]):
-     """
-     ensure_data_dir()
- 
-+    _ensure_conversation_title(conversation)
-+
-     path = get_conversation_path(conversation['id'])
-     with open(path, 'w') as f:
-         json.dump(conversation, f, indent=2)
-@@ -181,10 +187,61 @@ def list_conversations() -> List[Dict[str, Any]]:
-     # If index missing or invalid, rebuild it
+@@ -197,9 +211,51 @@ def list_conversations() -> List[Dict[str, Any]]:
      if index is None:
          return rebuild_index()
--        
+         
++    # Check if we have any entries with default/stale titles that actually have messages
++    # If we do, we can repair them by loading the conversation file, deriving the title, and saving it.
++    repaired_any = False
++    for entry in index:
++        if entry.get("title") in (None, "", "New Conversation", "Untitled Conversation") and entry.get("message_count", 0) > 0:
++            # Load conversation
++            conv = get_conversation(entry["id"])
++            if conv:
++                # Find first user message
++                first_content = ""
++                for msg in conv.get("messages", []):
++                    if msg.get("role") == "user" and msg.get("content"):
++                        first_content = msg.get("content")
++                        break
++                if first_content:
++                    new_title = _derive_conversation_title(first_content)
++                    conv["title"] = new_title
++                    # Save conversation to file (this also updates the entry in index and saves index)
++                    save_conversation(conv)
++                    repaired_any = True
 +
-+    # Backfill stale index entries for conversations created before title repair.
-+    # The index only stores metadata, so rebuild from the full conversation files
-+    # when a non-empty conversation still has a default title.
-+    if any(
-+        _is_default_conversation_title(item.get("title")) and item.get("message_count", 0) > 0
-+        for item in index
-+    ):
-+        return rebuild_index()
++    if repaired_any:
++        # Reload index after repairs are written
++        index = _load_index() or []
 +
      return index
  
  
-+DEFAULT_CONVERSATION_TITLES = {None, "", "New Conversation", "Untitled Conversation"}
-+
-+
-+def _is_default_conversation_title(title: Optional[str]) -> bool:
-+    return title in DEFAULT_CONVERSATION_TITLES
-+
-+
 +def _derive_conversation_title(content: str) -> str:
 +    """Create a stable fallback title from the first user message."""
 +    if not content or not isinstance(content, str):
@@ -69,30 +72,10 @@ index cfcd17a..6a9e1f3 100644
 +    return title
 +
 +
-+def _first_user_message_content(conversation: Dict[str, Any]) -> str:
-+    for msg in conversation.get("messages", []):
-+        if msg.get("role") == "user" and msg.get("content"):
-+            return msg.get("content", "")
-+    return ""
-+
-+
-+def _ensure_conversation_title(conversation: Dict[str, Any]) -> bool:
-+    """Backfill default conversation titles from the first user message."""
-+    if not _is_default_conversation_title(conversation.get("title")):
-+        return False
-+
-+    first_user_message = _first_user_message_content(conversation)
-+    if not first_user_message:
-+        return False
-+
-+    conversation["title"] = _derive_conversation_title(first_user_message)
-+    return True
-+
-+
  def add_user_message(conversation_id: str, content: str, conversation: Optional[Dict[str, Any]] = None):
      """Add a user message to a conversation.
  
-@@ -213,6 +270,14 @@ def add_user_message(conversation_id: str, content: str, conversation: Optional[
+@@ -213,6 +269,14 @@ def add_user_message(conversation_id: str, content: str, conversation: Optional[
      if conversation is None:
          raise ValueError(f"Conversation {conversation_id} not found")
  
@@ -101,23 +84,20 @@ index cfcd17a..6a9e1f3 100644
 +        for msg in conversation.get("messages", [])
 +    )
 +
-+    if is_first_user_message and _is_default_conversation_title(conversation.get("title")):
++    if is_first_user_message and conversation.get("title") in (None, "", "New Conversation", "Untitled Conversation"):
 +        conversation["title"] = _derive_conversation_title(content)
 +
      conversation["messages"].append({
          "role": "user",
          "content": content
 diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
-index 657b4c3..3fb7c4e 100644
+index 657b4c3..dfe44f4 100644
 --- a/frontend/src/App.jsx
 +++ b/frontend/src/App.jsx
-@@ -6,6 +6,23 @@ import { api, DEFAULT_EXECUTION_MODE } from './api';
+@@ -6,6 +6,20 @@ import { api, DEFAULT_EXECUTION_MODE } from './api';
  import './App.css';
  import './components/StageCopyButtons.css';
  
-+const isDefaultConversationTitle = (title) =>
-+  !title || title === 'New Conversation' || title === 'Untitled Conversation';
-+
 +const deriveConversationTitle = (content) => {
 +  if (!content || typeof content !== 'string') return 'Untitled Conversation';
 +
@@ -135,7 +115,7 @@ index 657b4c3..3fb7c4e 100644
  function App() {
    const [conversations, setConversations] = useState([]);
    const [currentConversationId, setCurrentConversationId] = useState(null);
-@@ -42,13 +59,19 @@ function App() {
+@@ -42,13 +56,19 @@ function App() {
        setExecutionMode(settings.execution_mode || DEFAULT_EXECUTION_MODE);
        setSearchProvider(settings.search_provider || 'duckduckgo');
  
@@ -156,11 +136,15 @@ index 657b4c3..3fb7c4e 100644
  
        // 2. Test Ollama Connection
        // We do this regardless to update the status indicator
-@@ -181,7 +204,20 @@ function App() {
+@@ -187,7 +207,25 @@ function App() {
    const loadConversations = async (retryCount = 0) => {
      try {
        const convs = await api.listConversations();
 -      setConversations(convs);
++      
++      const isDefaultConversationTitle = (title) =>
++        !title || title === 'New Conversation' || title === 'Untitled Conversation';
++
 +      setConversations((prev) =>
 +        convs.map((conv) => {
 +          const local = prev.find((item) => item.id === conv.id);
@@ -179,25 +163,13 @@ index 657b4c3..3fb7c4e 100644
      } catch (error) {
        console.error('Failed to load conversations:', error);
        // Retry up to 3 times with increasing delays (1s, 2s, 3s)
-@@ -204,7 +240,9 @@ function App() {
- 
-   const handleNewConversation = async () => {
-     // Check if there's already an empty/unused conversation
--    const existingEmpty = conversations.find(conv => !conv.title && conv.message_count === 0);
-+    const existingEmpty = conversations.find(conv =>
-+      isDefaultConversationTitle(conv.title) && conv.message_count === 0
-+    );
- 
-     if (existingEmpty) {
-       // Reuse the existing empty conversation instead of creating a new one
-@@ -215,10 +253,15 @@ function App() {
+@@ -218,9 +256,14 @@ function App() {
  
      try {
        const newConv = await api.createConversation();
 -      setConversations([
 -        { id: newConv.id, created_at: newConv.created_at, message_count: 0 },
 -        ...conversations,
--      ]);
 +      setConversations((prev) => [
 +        {
 +          id: newConv.id,
@@ -206,33 +178,23 @@ index 657b4c3..3fb7c4e 100644
 +          message_count: 0,
 +        },
 +        ...prev.filter((conv) => conv.id !== newConv.id),
-+      ]);
+       ]);
        setCurrentConversationId(newConv.id);
      } catch (error) {
-       console.error('Failed to create conversation:', error);
-@@ -230,7 +273,7 @@ function App() {
-   const handleDeleteConversation = async (id) => {
-     try {
-       await api.deleteConversation(id);
-       // Remove from local state
--      setConversations(conversations.filter(c => c.id !== id));
-+      setConversations((prev) => prev.filter(c => c.id !== id));
-       // If we deleted the current conversation, clear it
-       if (id === currentConversationId) {
-         setCurrentConversationId(null);
 @@ -262,6 +305,22 @@ function App() {
      // Assign unique ID to this request to prevent race conditions
      const currentRequestId = ++requestIdRef.current;
  
 +    // Optimistically update conversation title in list and current state if it is a new/untitled conversation
 +    const currentConvInList = conversations.find(c => c.id === currentConversationId);
-+    const currentTitle = currentConvInList?.title || currentConversation?.title;
-+    const hasNoTitle = isDefaultConversationTitle(currentTitle);
++    const hasNoTitle = !currentConvInList || !currentConvInList.title || 
++                        currentConvInList.title === 'New Conversation' || 
++                        currentConvInList.title === 'Untitled Conversation';
 +
 +    if (hasNoTitle) {
 +      const optimisticTitle = deriveConversationTitle(content);
 +      // Update in conversations list (sidebar)
-+      setConversations(prev => prev.map(c =>
++      setConversations(prev => prev.map(c => 
 +        c.id === currentConversationId ? { ...c, title: optimisticTitle } : c
 +      ));
 +      // Update in current active conversation state
@@ -249,7 +211,7 @@ index 657b4c3..3fb7c4e 100644
 +              // Update with final generated title optimistically
 +              if (event.data && event.data.title) {
 +                const finalTitle = event.data.title;
-+                setConversations(prev => prev.map(c =>
++                setConversations(prev => prev.map(c => 
 +                  c.id === currentConversationId ? { ...c, title: finalTitle } : c
 +                ));
 +                setCurrentConversation(prev => prev ? { ...prev, title: finalTitle } : prev);

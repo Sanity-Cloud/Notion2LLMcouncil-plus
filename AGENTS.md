@@ -438,8 +438,9 @@ Do not change the distribution strategy without updating `README.md`, `DEVELOPME
 Always run `sigmap ask` or `sigmap --query` before searching for files relevant to a task.
 ## changes (last 5 commits — 1 second ago)
 ```
-.github\copilot-instructions.md               +getHotkeyConfigPath  +readHotkeys  +writeHotkeys  +focusChatInput
-.github\gemini-context.md                     +getHotkeyConfigPath  +readHotkeys  +writeHotkeys  +focusChatInput
+electron\main.js                              +createNewChatInputReady  +openNewChat  +openNewChatWithClipboard  ~openChatWithClipboard
+.github\copilot-instructions.md               +getHotkeyConfigPath  +readHotkeys  +writeHotkeys  +requestJsonPost
+.github\gemini-context.md                     +getHotkeyConfigPath  +readHotkeys  +writeHotkeys  +requestJsonPost
 ```
 
 ## .github
@@ -457,7 +458,6 @@ h3 .github\workflows\release.yml
 h3 .github\workflows\validate.yml
 h2 electron
 h3 electron\lib\config.js
-h3 electron\main.js
 h3 electron\diagnostics-renderer.js
 h3 electron\diagnostics.html
 h3 electron\hotkeys-renderer.js
@@ -467,6 +467,7 @@ h3 electron\lib\integration-config.js
 h3 electron\lib\launcher.js
 h3 electron\lib\logger.js
 h3 electron\lib\utils.js
+h3 electron\main.js
 h3 electron\windows\diagnostics.js
 h3 electron\windows\hotkeys.js
 h3 electron\windows\main.js
@@ -485,7 +486,6 @@ h3 .github\workflows\release.yml
 h3 .github\workflows\validate.yml
 h2 electron
 h3 electron\lib\config.js
-h3 electron\main.js
 h3 electron\diagnostics-renderer.js
 h3 electron\diagnostics.html
 h3 electron\hotkeys-renderer.js
@@ -495,6 +495,7 @@ h3 electron\lib\integration-config.js
 h3 electron\lib\launcher.js
 h3 electron\lib\logger.js
 h3 electron\lib\utils.js
+h3 electron\main.js
 h3 electron\windows\diagnostics.js
 h3 electron\windows\hotkeys.js
 h3 electron\windows\main.js
@@ -515,12 +516,59 @@ job: validate
 
 ## electron
 
+### electron\hotkeys-renderer.js
+```
+function setStatus(text, kind = '')
+function readForm()
+function writeForm(values)
+function formatRegistrations(registrations)
+function getAcceleratorString(e)
+async function load()
+```
+
+### electron\hotkeys.html
+```
+title: Notion2Council Hotkeys
+input#toggleWindow
+input#openChat
+input#openNewChat
+input#clipboardToChat
+input#clipboardToNewChat
+input#openHotkeySettings
+button#save
+button#reset
+button#testClipboard
+button#testClipboardToNewChat
+button#reload
+div#status
+div#path
+```
+
 ### electron\lib\config.js
 ```
 module.exports = { defaultHotkeys, getHotkeyConfigPath, readHotkeys, writeHotkeys }
 function getHotkeyConfigPath()
 function readHotkeys()
 function writeHotkeys(hotkeys)
+```
+
+### electron\main.js
+```
+async function focusChatInput(text, submit = false)
+async function ensureChatInputReady()
+async function clearCouncilUiStorage()
+async function getActiveRuntimeUrls(timeoutMs = 90000)
+async function isRuntimeReady(urls, timeoutMs = 2500)
+async function waitForReadyRuntimeUrls()
+async function openChat()
+async function openChatWithClipboard()
+async function createNewChatInputReady()
+async function openNewChat()
+async function openNewChatWithClipboard()
+function createTray()
+function refreshTrayMenu()
+function setApplicationMenu()
+function registerHotkeys()
 ```
 
 ### electron\diagnostics-renderer.js
@@ -559,31 +607,6 @@ div#configPath
 pre#state
 pre#log
 div#status
-```
-
-### electron\hotkeys-renderer.js
-```
-function setStatus(text, kind = '')
-function readForm()
-function writeForm(values)
-function formatRegistrations(registrations)
-function getAcceleratorString(e)
-async function load()
-```
-
-### electron\hotkeys.html
-```
-title: Notion2Council Hotkeys
-input#toggleWindow
-input#openChat
-input#clipboardToChat
-input#openHotkeySettings
-button#save
-button#reset
-button#testClipboard
-button#reload
-div#status
-div#path
 ```
 
 ### electron\lib\diagnostics.js
@@ -648,22 +671,6 @@ function getRuntimeRoot()
 function getAppRoot()
 function waitForUrl(url, timeoutMs = 90000, options = {})
 function waitForRuntimeState(statePath, timeoutMs = 90000)
-```
-
-### electron\main.js
-```
-async function focusChatInput(text, submit = false)
-async function ensureChatInputReady()
-async function clearCouncilUiStorage()
-async function getActiveRuntimeUrls(timeoutMs = 90000)
-async function isRuntimeReady(urls, timeoutMs = 2500)
-async function waitForReadyRuntimeUrls()
-async function openChat()
-async function openChatWithClipboard()
-function createTray()
-function refreshTrayMenu()
-function setApplicationMenu()
-function registerHotkeys()
 ```
 
 ### electron\windows\diagnostics.js
