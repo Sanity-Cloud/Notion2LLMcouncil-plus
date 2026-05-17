@@ -5,7 +5,9 @@ const path = require('path');
 const defaultHotkeys = {
   toggleWindow: 'CommandOrControl+Alt+Space',
   openChat: 'CommandOrControl+Alt+L',
+  openNewChat: 'CommandOrControl+Alt+N',
   clipboardToChat: 'CommandOrControl+Alt+V',
+  clipboardToNewChat: 'CommandOrControl+Alt+Shift+V',
   openHotkeySettings: 'CommandOrControl+Alt+H',
 };
 

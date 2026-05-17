@@ -1,8 +1,8 @@
 diff --git a/frontend/src/components/CouncilGrid.jsx b/frontend/src/components/CouncilGrid.jsx
-index e3d4bb2..9d33b6e 100644
+index e3d4bb2..5601012 100644
 --- a/frontend/src/components/CouncilGrid.jsx
 +++ b/frontend/src/components/CouncilGrid.jsx
-@@ -24,14 +24,23 @@ const PROVIDER_CONFIG = {
+@@ -23,6 +23,7 @@ const PROVIDER_CONFIG = {
      deepseek: { color: '#4e61e6', label: 'DeepSeek', logo: deepseekLogo },
      openrouter: { color: '#7f5af0', label: 'OpenRouter', logo: openrouterLogo },
      custom: { color: '#06b6d4', label: 'Custom', logo: customLogo },
@@ -10,7 +10,7 @@ index e3d4bb2..9d33b6e 100644
      default: { color: '#888888', label: 'Model', logo: null, icon: '🤖' }
  };
  
- const getProviderInfo = (modelId) => {
+@@ -30,8 +31,16 @@ const getProviderInfo = (modelId) => {
      if (!modelId) return PROVIDER_CONFIG.default;
      const id = modelId.toLowerCase();
  
@@ -29,3 +29,32 @@ index e3d4bb2..9d33b6e 100644
      if (id.startsWith('ollama:')) return PROVIDER_CONFIG.ollama;
      if (id.startsWith('groq:')) return PROVIDER_CONFIG.groq;
  
+diff --git a/frontend/src/components/Stage1.jsx b/frontend/src/components/Stage1.jsx
+index 8d87cd1..1cce0cc 100644
+--- a/frontend/src/components/Stage1.jsx
++++ b/frontend/src/components/Stage1.jsx
+@@ -96,7 +96,7 @@ export default function Stage1({ responses, startTime, endTime }) {
+               {currentVisuals.icon}
+             </span>
+             <div className="model-info">
+-              <span className="model-name-large">{currentResponse.model || 'Unknown Model'}</span>
++              <span className="model-name-large">{getShortModelName(currentResponse.model) || 'Unknown Model'}</span>
+               <span className="model-provider-badge" style={{ borderColor: currentVisuals.color, color: currentVisuals.color }}>
+                 {currentVisuals.name}
+               </span>
+diff --git a/frontend/src/utils/modelHelpers.js b/frontend/src/utils/modelHelpers.js
+index e289e91..8591b10 100644
+--- a/frontend/src/utils/modelHelpers.js
++++ b/frontend/src/utils/modelHelpers.js
+@@ -46,6 +46,11 @@ export const getModelVisuals = (modelId) => {
+     return { name: 'DeepSeek', color: '#4e80ee', short: 'DeepSeek', icon: '🐋' };
+   }
+ 
++  // Kimi / Moonshot
++  if (id.includes('kimi') || id.includes('moonshot')) {
++    return { name: 'Kimi', color: '#111827', short: 'Kimi', icon: '月' };
++  }
++
+   // Local (fallback for models without provider prefix or slash)
+   if (!id.includes('/') && !id.includes(':')) {
+     return { name: 'Local', color: '#f1f5f9', short: 'Local', icon: '💻' };

@@ -41,3 +41,87 @@ index cfcd17a..824e8e8 100644
      conversation["messages"].append({
          "role": "user",
          "content": content
+diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
+index 657b4c3..91dc818 100644
+--- a/frontend/src/App.jsx
++++ b/frontend/src/App.jsx
+@@ -6,6 +6,20 @@ import { api, DEFAULT_EXECUTION_MODE } from './api';
+ import './App.css';
+ import './components/StageCopyButtons.css';
+ 
++const deriveConversationTitle = (content) => {
++  if (!content || typeof content !== 'string') return 'Untitled Conversation';
++
++  let title = content.trim().replace(/\s+/g, ' ');
++  if (!title) return 'Untitled Conversation';
++
++  title = title.replace(/^["']+|["']+$/g, '');
++
++  if (title.length > 50) {
++    title = `${title.substring(0, 47)}...`;
++  }
++  return title;
++};
++
+ function App() {
+   const [conversations, setConversations] = useState([]);
+   const [currentConversationId, setCurrentConversationId] = useState(null);
+@@ -42,13 +56,19 @@ function App() {
+       setExecutionMode(settings.execution_mode || DEFAULT_EXECUTION_MODE);
+       setSearchProvider(settings.search_provider || 'duckduckgo');
+ 
++      const hasCustomEndpoint =
++        settings.enabled_providers?.custom === true &&
++        !!settings.custom_endpoint_url &&
++        !!(settings.custom_endpoint_api_key_set || settings.custom_endpoint_api_key);
++
+       const hasApiKey = settings.openrouter_api_key_set ||
+         settings.groq_api_key_set ||
+         settings.openai_api_key_set ||
+         settings.anthropic_api_key_set ||
+         settings.google_api_key_set ||
+         settings.mistral_api_key_set ||
+-        settings.deepseek_api_key_set;
++        settings.deepseek_api_key_set ||
++        hasCustomEndpoint;
+ 
+       // 2. Test Ollama Connection
+       // We do this regardless to update the status indicator
+@@ -262,6 +282,22 @@ function App() {
+     // Assign unique ID to this request to prevent race conditions
+     const currentRequestId = ++requestIdRef.current;
+ 
++    // Optimistically update conversation title in list and current state if it is a new/untitled conversation
++    const currentConvInList = conversations.find(c => c.id === currentConversationId);
++    const hasNoTitle = !currentConvInList || !currentConvInList.title || 
++                        currentConvInList.title === 'New Conversation' || 
++                        currentConvInList.title === 'Untitled Conversation';
++
++    if (hasNoTitle) {
++      const optimisticTitle = deriveConversationTitle(content);
++      // Update in conversations list (sidebar)
++      setConversations(prev => prev.map(c => 
++        c.id === currentConversationId ? { ...c, title: optimisticTitle } : c
++      ));
++      // Update in current active conversation state
++      setCurrentConversation(prev => prev ? { ...prev, title: optimisticTitle } : prev);
++    }
++
+     // Create new AbortController for this request
+     abortControllerRef.current = new AbortController();
+ 
+@@ -597,6 +633,14 @@ function App() {
+               break;
+ 
+             case 'title_complete':
++              // Update with final generated title optimistically
++              if (event.data && event.data.title) {
++                const finalTitle = event.data.title;
++                setConversations(prev => prev.map(c => 
++                  c.id === currentConversationId ? { ...c, title: finalTitle } : c
++                ));
++                setCurrentConversation(prev => prev ? { ...prev, title: finalTitle } : prev);
++              }
+               // Reload conversations to get updated title
+               loadConversations();
+               break;

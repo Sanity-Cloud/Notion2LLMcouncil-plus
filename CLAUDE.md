@@ -91,22 +91,6 @@ function readHotkeys()
 function writeHotkeys(hotkeys)
 ```
 
-### electron\main.js
-```
-async function focusChatInput(text, submit = false)
-async function ensureChatInputReady()
-async function clearCouncilUiStorage()
-async function getActiveRuntimeUrls(timeoutMs = 90000)
-async function isRuntimeReady(urls, timeoutMs = 2500)
-async function waitForReadyRuntimeUrls()
-async function openChat()
-async function openChatWithClipboard()
-function createTray()
-function refreshTrayMenu()
-function setApplicationMenu()
-function registerHotkeys()
-```
-
 ### electron\diagnostics-renderer.js
 ```
 function setStatus(text)
@@ -232,6 +216,22 @@ function getRuntimeRoot()
 function getAppRoot()
 function waitForUrl(url, timeoutMs = 90000, options = {})
 function waitForRuntimeState(statePath, timeoutMs = 90000)
+```
+
+### electron\main.js
+```
+async function focusChatInput(text, submit = false)
+async function ensureChatInputReady()
+async function clearCouncilUiStorage()
+async function getActiveRuntimeUrls(timeoutMs = 90000)
+async function isRuntimeReady(urls, timeoutMs = 2500)
+async function waitForReadyRuntimeUrls()
+async function openChat()
+async function openChatWithClipboard()
+function createTray()
+function refreshTrayMenu()
+function setApplicationMenu()
+function registerHotkeys()
 ```
 
 ### electron\windows\diagnostics.js

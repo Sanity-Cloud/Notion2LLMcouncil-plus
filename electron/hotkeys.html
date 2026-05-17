@@ -172,10 +172,26 @@
 
       <div class="row">
         <div>
+          <label for="openNewChat">Open New Chat</label>
+          <div class="hint">Force a fresh chat thread and focus input.</div>
+        </div>
+        <input id="openNewChat" autocomplete="off" spellcheck="false" />
+      </div>
+
+      <div class="row">
+        <div>
           <label for="clipboardToChat">Clipboard to Chat</label>
           <div class="hint">Open chat and place clipboard text into the prompt box.</div>
         </div>
         <input id="clipboardToChat" autocomplete="off" spellcheck="false" />
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="clipboardToNewChat">Clipboard to New Chat</label>
+          <div class="hint">Start a fresh chat thread and paste clipboard.</div>
+        </div>
+        <input id="clipboardToNewChat" autocomplete="off" spellcheck="false" />
       </div>
 
       <div class="row">
@@ -191,6 +207,7 @@
       <button class="primary" id="save">Save and Register</button>
       <button id="reset">Reset Defaults</button>
       <button id="testClipboard">Test Clipboard to Chat</button>
+      <button id="testClipboardToNewChat">Test Clipboard to New Chat</button>
       <button id="reload">Reload</button>
     </div>
 

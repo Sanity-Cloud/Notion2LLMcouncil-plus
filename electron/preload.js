@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('notion2CouncilHotkeys', {
   save: hotkeys => ipcRenderer.invoke('hotkeys:save', hotkeys),
   reset: () => ipcRenderer.invoke('hotkeys:reset'),
   testClipboardToChat: () => ipcRenderer.invoke('hotkeys:testClipboardToChat'),
+  testClipboardToNewChat: () => ipcRenderer.invoke('hotkeys:testClipboardToNewChat'),
 });
 
 contextBridge.exposeInMainWorld('notion2CouncilDiagnostics', {

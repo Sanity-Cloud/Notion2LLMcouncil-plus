@@ -222,6 +222,75 @@ async function openChatWithClipboard() {
   }
 }
 
+async function createNewChatInputReady() {
+  const mainWindow = getMainWindow();
+  if (!mainWindow) return false;
+
+  return mainWindow.webContents.executeJavaScript(`
+    (async () => {
+      const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+      const hasInput = () => !!document.querySelector('textarea.message-input, .input-area textarea, textarea');
+
+      const buttons = Array.from(document.querySelectorAll('button'));
+      const newChatButton = document.querySelector('.new-council-btn') || buttons.find(btn =>
+        /new|chat|conversation|discussion/i.test(btn.textContent || '')
+      );
+
+      if (!newChatButton || newChatButton.disabled) return false;
+
+      newChatButton.click();
+
+      for (let i = 0; i < 40; i += 1) {
+        if (hasInput()) return true;
+        await sleep(250);
+      }
+
+      return hasInput();
+    })();
+  `).catch(error => {
+    appendLog(`createNewChatInputReady failed: ${error.message}`);
+    return false;
+  });
+}
+
+async function openNewChat() {
+  showMainWindow();
+
+  try {
+    const urls = await waitForReadyRuntimeUrls();
+    const mainWindow = getMainWindow();
+
+    if (mainWindow && !mainWindow.webContents.getURL().startsWith(urls.councilUiUrl)) {
+      await mainWindow.loadURL(urls.councilUiUrl);
+    }
+
+    showMainWindow();
+
+    const ready = await createNewChatInputReady();
+    if (!ready) {
+      appendLog('Could not create new chat input');
+      return false;
+    }
+
+    return focusChatInput('');
+  } catch (error) {
+    appendLog(`Could not open new chat: ${error.message}`);
+    return false;
+  }
+}
+
+async function openNewChatWithClipboard() {
+  const text = clipboard.readText() || '';
+  const opened = await openNewChat();
+  if (!opened) return;
+
+  const injected = await focusChatInput(text);
+  if (!injected) {
+    appendLog('Clipboard to New Chat failed: chat input was not found');
+  }
+}
+
+
 function createTray() {
   const iconPng = path.join(__dirname, 'icon.png');
   const icon = fs.existsSync(iconPng) ? nativeImage.createFromPath(iconPng) : nativeImage.createEmpty();
@@ -236,7 +305,9 @@ function refreshTrayMenu() {
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Show / Hide', click: toggleMainWindow },
     { label: 'Open Chat', click: openChat },
+    { label: 'Open New Chat', click: openNewChat },
     { label: 'Clipboard to Chat', click: openChatWithClipboard },
+    { label: 'Clipboard to New Chat', click: openNewChatWithClipboard },
     { type: 'separator' },
     { label: 'Diagnostics', click: () => openDiagnostics(getMainWindow()) },
     { label: 'Hotkey Settings', click: () => openHotkeySettings(getMainWindow()) },
@@ -262,7 +333,9 @@ function setApplicationMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: 'Notion2Council', submenu: [
       { label: 'Open Chat', click: openChat },
+      { label: 'Open New Chat', click: openNewChat },
       { label: 'Clipboard to Chat', click: openChatWithClipboard },
+      { label: 'Clipboard to New Chat', click: openNewChatWithClipboard },
       { label: 'Diagnostics', click: () => openDiagnostics(getMainWindow()) },
       { label: 'Hotkey Settings', click: () => openHotkeySettings(getMainWindow()) },
       { label: 'Reset LLM Council UI State', click: async () => {
@@ -296,7 +369,9 @@ function registerHotkeys() {
   };
   bind('toggleWindow', hotkeys.toggleWindow, toggleMainWindow);
   bind('openChat', hotkeys.openChat, openChat);
+  bind('openNewChat', hotkeys.openNewChat, openNewChat);
   bind('clipboardToChat', hotkeys.clipboardToChat, openChatWithClipboard);
+  bind('clipboardToNewChat', hotkeys.clipboardToNewChat, openNewChatWithClipboard);
   bind('openHotkeySettings', hotkeys.openHotkeySettings, () => openHotkeySettings(getMainWindow()));
   return registrations;
 }
@@ -315,6 +390,10 @@ ipcMain.handle('hotkeys:reset', () => {
 });
 ipcMain.handle('hotkeys:testClipboardToChat', async () => {
   await openChatWithClipboard();
+  return { ok: true };
+});
+ipcMain.handle('hotkeys:testClipboardToNewChat', async () => {
+  await openNewChatWithClipboard();
   return { ok: true };
 });
 ipcMain.handle('diagnostics:status', getDiagnosticsStatus);

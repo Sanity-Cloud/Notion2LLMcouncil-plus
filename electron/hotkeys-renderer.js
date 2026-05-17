@@ -1,5 +1,5 @@
 const api = window.notion2CouncilHotkeys;
-const fields = ['toggleWindow', 'openChat', 'clipboardToChat', 'openHotkeySettings'];
+const fields = ['toggleWindow', 'openChat', 'openNewChat', 'clipboardToChat', 'clipboardToNewChat', 'openHotkeySettings'];
 const status = document.getElementById('status');
 const pathEl = document.getElementById('path');
 
@@ -131,6 +131,15 @@ document.getElementById('testClipboard').addEventListener('click', async () => {
     setStatus('Clipboard-to-chat command sent.', 'ok');
   } catch (error) {
     setStatus(`Clipboard-to-chat test failed: ${error.message}`, 'error');
+  }
+});
+
+document.getElementById('testClipboardToNewChat').addEventListener('click', async () => {
+  try {
+    await api.testClipboardToNewChat();
+    setStatus('Clipboard-to-new-chat command sent.', 'ok');
+  } catch (error) {
+    setStatus(`Clipboard-to-new-chat test failed: ${error.message}`, 'error');
   }
 });
 
