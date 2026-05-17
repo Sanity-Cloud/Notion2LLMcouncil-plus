@@ -10,12 +10,33 @@ function ensureDir(dir) {
   return dir;
 }
 
+function isInsideAsar(value) {
+  return !!value && /(^|[\\/])app\.asar([\\/]|$)/i.test(value);
+}
+
+function toUnpackedAsarPath(value) {
+  if (!value) return value;
+  return value.replace(/([\\/])app\.asar([\\/]|$)/i, '$1app.asar.unpacked$2');
+}
+
 function directoryHasLaunchScript(dir) {
   try {
-    return !!dir && fs.existsSync(path.join(dir, 'scripts', 'launch.ps1'));
+    return !!dir && !isInsideAsar(dir) && fs.existsSync(path.join(dir, 'scripts', 'launch.ps1'));
   } catch {
     return false;
   }
+}
+
+function getUserDataRoot() {
+  try {
+    return ensureDir(app.getPath('userData'));
+  } catch {
+    return ensureDir(path.join(process.cwd(), '.notion2council-userdata'));
+  }
+}
+
+function getRuntimeRoot() {
+  return ensureDir(path.join(getUserDataRoot(), 'runtime'));
 }
 
 function getAppRoot() {
@@ -27,12 +48,21 @@ function getAppRoot() {
     candidates.push(path.join(process.resourcesPath, 'app'));
   }
 
-  try { candidates.push(app.getAppPath()); } catch {}
+  try {
+    const appPath = app.getAppPath();
+    candidates.push(toUnpackedAsarPath(appPath));
+    candidates.push(appPath);
+  } catch {}
+
   candidates.push(path.resolve(__dirname, '..', '..')); // Adjusted for nested lib folder
   candidates.push(process.cwd());
 
   const validRoot = candidates.find(candidate => directoryHasLaunchScript(candidate));
   if (validRoot) return validRoot;
+
+  if (app.isPackaged) {
+    return getRuntimeRoot();
+  }
 
   throw new Error('Could not find application root directory (scripts/launch.ps1 missing in candidates)');
 }
@@ -76,7 +106,7 @@ function waitForUrl(url, timeoutMs = 90000, options = {}) {
         });
       });
 
-      request.on('error', (err) => {
+      request.on('error', () => {
         if (finished) return;
         retry();
       });
@@ -100,5 +130,9 @@ function waitForUrl(url, timeoutMs = 90000, options = {}) {
 module.exports = {
   ensureDir,
   getAppRoot,
+  getRuntimeRoot,
+  getUserDataRoot,
+  isInsideAsar,
+  toUnpackedAsarPath,
   waitForUrl
 };
