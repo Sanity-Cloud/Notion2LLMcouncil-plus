@@ -1,0 +1,94 @@
+diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
+index d8b7df2..b9c0e2a 100644
+--- a/frontend/src/App.jsx
++++ b/frontend/src/App.jsx
+@@ -241,11 +241,23 @@ function App() {
+ 
+     if (existingEmpty) {
+       // Reuse the existing empty conversation instead of creating a new one
++      activeConversationIdRef.current = existingEmpty.id;
++      setCurrentConversation({
++        id: existingEmpty.id,
++        created_at: existingEmpty.created_at,
++        title: existingEmpty.title || 'New Conversation',
++        messages: [],
++      });
+       setCurrentConversationId(existingEmpty.id);
+       return;
+     }
+ 
+     try {
+       const newConv = await api.createConversation();
++      activeConversationIdRef.current = newConv.id;
++      setCurrentConversation({
++        id: newConv.id,
++        created_at: newConv.created_at,
++        title: newConv.title || 'New Conversation',
++        messages: [],
++      });
+       setConversations((prev) => [
+         {
+           id: newConv.id,
+@@ -271,6 +283,7 @@ function App() {
+   };
+ 
+   const handleSelectConversation = (id) => {
++    activeConversationIdRef.current = id;
+     setCurrentConversationId(id);
+   };
+ 
+@@ -287,6 +300,7 @@ function App() {
+       setConversations((prev) => prev.filter(c => c.id !== id));
+       // If we deleted the current conversation, clear it
+       if (id === currentConversationId) {
++        activeConversationIdRef.current = null;
+         setCurrentConversationId(null);
+         setCurrentConversation(null);
+       }
+@@ -311,6 +325,7 @@ function App() {
+     // Assign unique ID to this request to prevent race conditions
+     const currentRequestId = ++requestIdRef.current;
+     const activeConversationId = currentConversationId;
++    activeConversationIdRef.current = activeConversationId;
+ 
+     // Optimistically update conversation title in list and current state if it is a new/untitled conversation
+     const currentConvInList = conversations.find(c => c.id === activeConversationId);
+@@ -336,10 +351,22 @@ function App() {
+     try {
+       // Optimistically add user message to UI
+       const userMessage = { role: 'user', content };
+-      setCurrentConversation((prev) => ({
+-        ...prev,
+-        messages: [...prev.messages, userMessage],
+-      }));
++      setCurrentConversation((prev) => {
++        const target = prev && prev.id === activeConversationId ? prev : {
++          id: activeConversationId,
++          title: currentTitle || 'New Conversation',
++          messages: [],
++        };
++
++        return {
++          ...target,
++          messages: [...(target.messages || []), userMessage],
++        };
++      });
+@@ -365,10 +392,22 @@ function App() {
+ 
+       // Add the partial assistant message
+-      setCurrentConversation((prev) => ({
+-        ...prev,
+-        messages: [...prev.messages, assistantMessage],
+-      }));
++      setCurrentConversation((prev) => {
++        const target = prev && prev.id === activeConversationId ? prev : {
++          id: activeConversationId,
++          title: currentTitle || 'New Conversation',
++          messages: [userMessage],
++        };
++
++        return {
++          ...target,
++          messages: [...(target.messages || []), assistantMessage],
++        };
++      });
