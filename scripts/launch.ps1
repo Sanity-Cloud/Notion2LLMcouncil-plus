@@ -598,6 +598,11 @@ Update-RepoPatch `
     -PatchPath (Join-Path $RepoRoot "scripts\patches\llm-council-plus-first-message-title.patch") `
     -Name "LLM Council first message conversation titles"
 
+Update-RepoPatch `
+    -Root $CouncilRoot `
+    -PatchPath (Join-Path $RepoRoot "scripts\patches\llm-council-plus-new-chat-stream-race.patch") `
+    -Name "LLM Council new chat stream race guard"
+
 Write-Step "Preparing Services"
 Initialize-PythonRequirements -Root $NotionRoot -Label "Notion2API" -RequiredModules @("cloudscraper", "fastapi", "uvicorn", "dotenv", "slowapi", "websocket")
 Initialize-PythonRequirements -Root $CouncilRoot -Label "LLM Council" -RequiredModules @("fastapi", "uvicorn", "dotenv", "httpx", "pydantic", "ddgs", "yake", "mcp")
