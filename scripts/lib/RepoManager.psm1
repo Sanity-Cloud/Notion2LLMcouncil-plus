@@ -64,15 +64,15 @@ function Update-RepoPatch {
 
     Push-Location $Root
     try {
-        & git apply --check $PatchPath *> $null
+        cmd.exe /c "git apply --check `"$PatchPath`" 2>nul"
         if ($LASTEXITCODE -eq 0) {
             Write-Step "Applying patch: $Name"
-            & git apply $PatchPath
+            cmd.exe /c "git apply `"$PatchPath`""
             if ($LASTEXITCODE -ne 0) { throw "Failed to apply patch: $Name" }
             return
         }
 
-        & git apply --reverse --check $PatchPath *> $null
+        cmd.exe /c "git apply --reverse --check `"$PatchPath`" 2>nul"
         if ($LASTEXITCODE -eq 0) {
             Write-Step "Patch already applied: $Name"
             return
