@@ -118,6 +118,28 @@ function Test-PythonModules {
     return $false
 }
 
+function Get-PyprojectDependencies {
+    param([string]$Path)
+
+    if (-not (Test-Path $Path)) { return @() }
+
+    $content = Get-Content -Raw -Path $Path
+    $match = [regex]::Match($content, '(?ms)^dependencies\s*=\s*\[(?<deps>.*?)\]')
+    if (-not $match.Success) { return @() }
+
+    $deps = @()
+    foreach ($line in ($match.Groups['deps'].Value -split "`r?`n")) {
+        $clean = ($line -replace '#.*$', '').Trim().TrimEnd(',').Trim()
+        if (-not $clean) { continue }
+        $depMatch = [regex]::Match($clean, '^["''](?<dep>.*?)["'']$')
+        if ($depMatch.Success) {
+            $deps += $depMatch.Groups['dep'].Value
+        }
+    }
+
+    return $deps
+}
+
 function Initialize-PythonRequirements {
     param(
         [string]$Root,
@@ -150,7 +172,11 @@ function Initialize-PythonRequirements {
         $installLabel = "$Label Python requirements"
     } else {
         $dependencySource = $pyprojectPath
-        $installArgs = @("-m", "pip", "install", "--disable-pip-version-check", "-e", $Root)
+        $pyprojectDependencies = @(Get-PyprojectDependencies -Path $pyprojectPath)
+        if ($pyprojectDependencies.Count -eq 0) {
+            throw "$Label pyproject.toml does not contain a parseable dependencies list"
+        }
+        $installArgs = @("-m", "pip", "install", "--disable-pip-version-check") + $pyprojectDependencies
         $installLabel = "$Label Python project dependencies"
     }
 
