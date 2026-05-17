@@ -328,7 +328,6 @@ function Set-CouncilSettings {
     $exportUrl = "http://127.0.0.1:$CouncilBackendPort/api/settings/export"
     $importUrl = "http://127.0.0.1:$CouncilBackendPort/api/settings/import"
     $resetUrl = "http://127.0.0.1:$CouncilBackendPort/api/settings/reset"
-    $settingsUrl = "http://127.0.0.1:$CouncilBackendPort/api/settings"
     
     $headers = @{}
     if ($env:LLM_COUNCIL_ADMIN_TOKEN) {
@@ -567,7 +566,6 @@ if (-not ($BoundParameters -contains "CouncilBackendPort")) { $CouncilBackendPor
 if (-not ($BoundParameters -contains "CouncilFrontendPort")) { $CouncilFrontendPort = [int](Use-ConfigValue -Value (Get-ConfigProperty $Config @("council", "frontendPort")) -Fallback $CouncilFrontendPort) }
 
 $ProviderName = Use-ConfigValue -Value (Get-ConfigProperty $Config @("provider", "name")) -Fallback "Notion2API"
-$ProviderEnabledKey = Use-ConfigValue -Value (Get-ConfigProperty $Config @("provider", "enabledKey")) -Fallback "custom"
 $ProviderUrlPath = Use-ConfigValue -Value (Get-ConfigProperty $Config @("provider", "urlPath")) -Fallback "/v1"
 $NotionAppMode = Use-ConfigValue -Value (Get-ConfigProperty $Config @("notion", "appMode")) -Fallback "standard"
 $NotionAutoLogin = [bool](Use-ConfigValue -Value (Get-ConfigProperty $Config @("notion", "autoLogin")) -Fallback $true)
