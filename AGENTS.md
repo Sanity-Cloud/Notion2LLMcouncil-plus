@@ -439,8 +439,8 @@ Always run `sigmap ask` or `sigmap --query` before searching for files relevant 
 ## changes (last 5 commits — 1 second ago)
 ```
 electron\main.js                              +createNewChatInputReady  +openNewChat  +openNewChatWithClipboard  ~openChatWithClipboard
-.github\copilot-instructions.md               +getHotkeyConfigPath  +readHotkeys  +writeHotkeys  +requestJsonPost
-.github\gemini-context.md                     +getHotkeyConfigPath  +readHotkeys  +writeHotkeys  +requestJsonPost
+.github\copilot-instructions.md               +setStatus  +readForm  +writeForm  +formatRegistrations
+.github\gemini-context.md                     +setStatus  +readForm  +writeForm  +formatRegistrations
 ```
 
 ## .github
@@ -457,17 +457,17 @@ h3 .github\gemini-context.md
 h3 .github\workflows\release.yml
 h3 .github\workflows\validate.yml
 h2 electron
-h3 electron\lib\config.js
-h3 electron\diagnostics-renderer.js
-h3 electron\diagnostics.html
 h3 electron\hotkeys-renderer.js
 h3 electron\hotkeys.html
+h3 electron\lib\config.js
+h3 electron\main.js
+h3 electron\diagnostics-renderer.js
+h3 electron\diagnostics.html
 h3 electron\lib\diagnostics.js
 h3 electron\lib\integration-config.js
 h3 electron\lib\launcher.js
 h3 electron\lib\logger.js
 h3 electron\lib\utils.js
-h3 electron\main.js
 h3 electron\windows\diagnostics.js
 h3 electron\windows\hotkeys.js
 h3 electron\windows\main.js
@@ -485,17 +485,17 @@ h3 .github\gemini-context.md
 h3 .github\workflows\release.yml
 h3 .github\workflows\validate.yml
 h2 electron
-h3 electron\lib\config.js
-h3 electron\diagnostics-renderer.js
-h3 electron\diagnostics.html
 h3 electron\hotkeys-renderer.js
 h3 electron\hotkeys.html
+h3 electron\lib\config.js
+h3 electron\main.js
+h3 electron\diagnostics-renderer.js
+h3 electron\diagnostics.html
 h3 electron\lib\diagnostics.js
 h3 electron\lib\integration-config.js
 h3 electron\lib\launcher.js
 h3 electron\lib\logger.js
 h3 electron\lib\utils.js
-h3 electron\main.js
 h3 electron\windows\diagnostics.js
 h3 electron\windows\hotkeys.js
 h3 electron\windows\main.js
