@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
-const { getAppRoot } = require('./utils');
+const { app } = require('electron');
+const { ensureDir, getAppRoot, getRuntimeRoot, getUserDataRoot, isInsideAsar } = require('./utils');
+const { getLogsDir } = require('./logger');
 
 function readJsonFile(filePath) {
   try {
@@ -28,15 +30,34 @@ function getConfigValue(localConfig, defaultConfig, parts, fallback) {
   return fallback;
 }
 
-function resolveRepoPath(repoRoot, value) {
-  if (!value) return '';
-  return path.isAbsolute(value) ? value : path.resolve(repoRoot, value);
+function getDefaultConfigPath(repoRoot) {
+  return path.join(repoRoot, 'config', 'default.json');
+}
+
+function getLocalConfigPath(repoRoot) {
+  if (process.env.NOTION2COUNCIL_CONFIG) return process.env.NOTION2COUNCIL_CONFIG;
+  if (app.isPackaged || isInsideAsar(repoRoot)) {
+    return path.join(ensureDir(path.join(getUserDataRoot(), 'config')), 'local.json');
+  }
+  return path.join(repoRoot, 'config', 'local.json');
+}
+
+function resolveRuntimePath(repoRoot, value, fallbackRelative) {
+  const configured = value || fallbackRelative;
+  if (!configured) return '';
+
+  if (path.isAbsolute(configured)) return configured;
+
+  const repoResolved = path.resolve(repoRoot, configured);
+  if (!app.isPackaged && !isInsideAsar(repoResolved)) return repoResolved;
+
+  return path.resolve(getRuntimeRoot(), configured);
 }
 
 function getIntegrationConfig() {
   const repoRoot = getAppRoot();
-  const configPath = process.env.NOTION2COUNCIL_CONFIG || path.join(repoRoot, 'config', 'local.json');
-  const defaultConfig = readJsonFile(path.join(repoRoot, 'config', 'default.json'));
+  const configPath = getLocalConfigPath(repoRoot);
+  const defaultConfig = readJsonFile(getDefaultConfigPath(repoRoot));
   const localConfig = readJsonFile(configPath);
 
   const notionPort = Number(getConfigValue(localConfig, defaultConfig, ['notion', 'port'], 8000));
@@ -45,9 +66,9 @@ function getIntegrationConfig() {
   const providerUrlPath = getConfigValue(localConfig, defaultConfig, ['provider', 'urlPath'], '/v1');
   const providerEnabledKey = getConfigValue(localConfig, defaultConfig, ['provider', 'enabledKey'], 'custom');
   const providerName = getConfigValue(localConfig, defaultConfig, ['provider', 'name'], 'Notion2API');
-  const notionRoot = resolveRepoPath(repoRoot, getConfigValue(localConfig, defaultConfig, ['notion', 'localRoot'], 'vendor\\notion2api'));
-  const councilRoot = resolveRepoPath(repoRoot, getConfigValue(localConfig, defaultConfig, ['council', 'localRoot'], 'vendor\\llm-council-plus'));
-  const logsDir = path.join(repoRoot, 'logs');
+  const notionRoot = resolveRuntimePath(repoRoot, getConfigValue(localConfig, defaultConfig, ['notion', 'localRoot'], ''), 'vendor\\notion2api');
+  const councilRoot = resolveRuntimePath(repoRoot, getConfigValue(localConfig, defaultConfig, ['council', 'localRoot'], ''), 'vendor\\llm-council-plus');
+  const logsDir = getLogsDir();
   const notionBaseUrl = process.env.NOTION2API_URL || `http://127.0.0.1:${notionPort}`;
   const councilBackendUrl = process.env.NOTION2COUNCIL_API_URL || `http://127.0.0.1:${councilBackendPort}`;
   const councilUiUrl = process.env.NOTION2COUNCIL_UI_URL || `http://127.0.0.1:${councilFrontendPort}/`;
