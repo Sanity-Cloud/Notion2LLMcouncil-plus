@@ -5,7 +5,7 @@ const fs = require('fs');
 // Internal Modules
 const { appendLog } = require('./lib/logger');
 const { readHotkeys, writeHotkeys, defaultHotkeys, getHotkeyConfigPath } = require('./lib/config');
-const { waitForUrl } = require('./lib/utils');
+const { waitForUrl, waitForRuntimeState } = require('./lib/utils');
 const { startStack, stopStack } = require('./lib/launcher');
 const { getIntegrationConfig, getEditableLocalConfig, saveLocalIntegrationConfig } = require('./lib/integration-config');
 const { getDiagnosticsStatus } = require('./lib/diagnostics');
@@ -72,12 +72,22 @@ async function clearCouncilUiStorage() {
   if (!mainWindow) return;
 
   const config = getIntegrationConfig();
+  let originUrl = config.councilUiUrl;
+  try {
+    if (fs.existsSync(config.statePath)) {
+      const state = JSON.parse(fs.readFileSync(config.statePath, 'utf8'));
+      if (state && state.councilFrontend && state.councilFrontend.url) {
+        originUrl = state.councilFrontend.url;
+      }
+    }
+  } catch {}
+
   try {
     await mainWindow.webContents.session.clearStorageData({
-      origin: config.councilUiUrl,
+      origin: originUrl,
       storages: ['localstorage', 'indexdb', 'cookies']
     });
-    appendLog('Successfully cleared LLM Council UI storage (localstorage, indexdb, cookies)');
+    appendLog(`Successfully cleared LLM Council UI storage (localstorage, indexdb, cookies) for origin: ${originUrl}`);
   } catch (error) {
     appendLog(`Failed to clear LLM Council UI storage: ${error.message}`);
   }
@@ -225,12 +235,23 @@ app.whenReady().then(async () => {
 
   try {
     const config = getIntegrationConfig();
+    appendLog('Waiting for launcher-state.json to be populated by the PowerShell orchestrator...');
+    
+    // Wait for the state file to be fully written and populated with all 3 services
+    const state = await waitForRuntimeState(config.statePath, 90000);
+    
+    const activeNotionHealthUrl = `${state.notion.url}/health`;
+    const activeCouncilUiUrl = state.councilFrontend.url;
+    
+    appendLog(`Dynamic active ports resolved. Waiting for health checks on Notion2API (${activeNotionHealthUrl}) and Council UI (${activeCouncilUiUrl})`);
+
     // Wait for the UI to be ready before loading
-    await waitForUrl(config.notionHealthUrl, 90000, { expectedContent: 'ok' });
-    await waitForUrl(config.councilUiUrl, 90000, { expectedTitle: 'LLM Council' });
+    await waitForUrl(activeNotionHealthUrl, 90000, { expectedContent: 'ok' });
+    await waitForUrl(activeCouncilUiUrl, 90000, { expectedTitle: 'LLM Council' });
+    
     // Clear storage on provider drift has been disabled to prevent destruction of UI metadata.
     // UI state can still be reset manually via the "Reset LLM Council UI State" menu action.
-    await mainWindow.loadURL(config.councilUiUrl);
+    await mainWindow.loadURL(activeCouncilUiUrl);
   } catch (error) {
     appendLog(`Council UI failed to load: ${error.message}`);
     openDiagnostics(mainWindow);

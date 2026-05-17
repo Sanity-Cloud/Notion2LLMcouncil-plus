@@ -127,6 +127,37 @@ function waitForUrl(url, timeoutMs = 90000, options = {}) {
   });
 }
 
+function waitForRuntimeState(statePath, timeoutMs = 90000) {
+  const started = Date.now();
+  return new Promise((resolve, reject) => {
+    const tick = () => {
+      try {
+        if (fs.existsSync(statePath)) {
+          const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+          if (
+            state &&
+            state.notion && state.notion.url &&
+            state.councilBackend && state.councilBackend.url &&
+            state.councilFrontend && state.councilFrontend.url
+          ) {
+            return resolve(state);
+          }
+        }
+      } catch (err) {
+        // Ignore parsing/reading errors and wait for full write
+      }
+
+      if (Date.now() - started > timeoutMs) {
+        return reject(new Error('Timed out waiting for launcher-state.json to be populated'));
+      }
+
+      setTimeout(tick, 500);
+    };
+
+    tick();
+  });
+}
+
 module.exports = {
   ensureDir,
   getAppRoot,
@@ -134,5 +165,7 @@ module.exports = {
   getUserDataRoot,
   isInsideAsar,
   toUnpackedAsarPath,
-  waitForUrl
+  waitForUrl,
+  waitForRuntimeState
 };
+

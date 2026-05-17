@@ -200,6 +200,17 @@ function startStack({ noBrowser = true } = {}) {
   if (launcherProcess && !launcherProcess.killed) return launcherProcess;
 
   const integration = getIntegrationConfig();
+  
+  // Deleting any stale launcher-state.json so that we don't read stale ports on startup
+  try {
+    if (fs.existsSync(integration.statePath)) {
+      fs.unlinkSync(integration.statePath);
+      appendLog(`Deleted stale launcher-state.json at ${integration.statePath}`);
+    }
+  } catch (err) {
+    appendLog(`Failed to delete stale state file: ${err.message}`);
+  }
+
   if (!hasSavedNotionAccount(integration)) {
     const handled = runVisibleNotionLogin(integration, () => startStack({ noBrowser }));
     if (handled) return loginProcess;
