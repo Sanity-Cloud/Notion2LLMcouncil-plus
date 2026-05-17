@@ -30,11 +30,14 @@ index e3d4bb2..5601012 100644
      if (id.startsWith('groq:')) return PROVIDER_CONFIG.groq;
  
 diff --git a/frontend/src/components/Stage1.jsx b/frontend/src/components/Stage1.jsx
-index 8d87cd1..95e5781 100644
+index 8d87cd1..1cad19d 100644
 --- a/frontend/src/components/Stage1.jsx
 +++ b/frontend/src/components/Stage1.jsx
-@@ -76,7 +76,12 @@ export default function Stage1({ responses, startTime, endTime }) {
-               style={safeActiveTab === index ? { borderColor: visuals.color, color: visuals.color } : {}}
+@@ -73,10 +73,15 @@ export default function Stage1({ responses, startTime, endTime }) {
+               className={`tab ${safeActiveTab === index ? 'active' : ''} ${resp?.error ? 'tab-error' : ''}`}
+               onClick={() => setActiveTab(index)}
+-              style={safeActiveTab === index ? { borderColor: visuals.color, color: visuals.color } : {}}
++              style={safeActiveTab === index ? { borderColor: visuals.color, color: '#f8fafc' } : {}}
                title={resp?.model}
              >
 -              <span className="tab-icon" style={{ backgroundColor: safeActiveTab === index ? 'transparent' : 'rgba(255,255,255,0.1)' }}>
@@ -57,11 +60,14 @@ index 8d87cd1..95e5781 100644
                  {currentVisuals.name}
                </span>
 diff --git a/frontend/src/components/Stage2.jsx b/frontend/src/components/Stage2.jsx
-index a000334..091bb81 100644
+index a000334..42d0491 100644
 --- a/frontend/src/components/Stage2.jsx
 +++ b/frontend/src/components/Stage2.jsx
-@@ -93,7 +93,12 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
-                             style={safeActiveTab === index ? { borderColor: visuals.color, color: visuals.color } : {}}
+@@ -90,10 +90,15 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
+                             className={`tab ${safeActiveTab === index ? 'active' : ''} ${rank?.error ? 'tab-error' : ''}`}
+                             onClick={() => setActiveTab(index)}
+-                            style={safeActiveTab === index ? { borderColor: visuals.color, color: visuals.color } : {}}
++                            style={safeActiveTab === index ? { borderColor: visuals.color, color: '#f8fafc' } : {}}
                              title={rank?.model}
                          >
 -                            <span className="tab-icon" style={{ backgroundColor: safeActiveTab === index ? 'transparent' : 'rgba(255,255,255,0.1)' }}>
