@@ -1,8 +1,8 @@
 diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
-index d8b7df2..b9c0e2a 100644
+index d8b7df2..90616db 100644
 --- a/frontend/src/App.jsx
 +++ b/frontend/src/App.jsx
-@@ -241,11 +241,23 @@ function App() {
+@@ -255,12 +255,26 @@ function App() {
  
      if (existingEmpty) {
        // Reuse the existing empty conversation instead of creating a new one
@@ -29,7 +29,7 @@ index d8b7df2..b9c0e2a 100644
        setConversations((prev) => [
          {
            id: newConv.id,
-@@ -271,6 +283,7 @@ function App() {
+@@ -277,6 +291,7 @@ function App() {
    };
  
    const handleSelectConversation = (id) => {
@@ -37,7 +37,7 @@ index d8b7df2..b9c0e2a 100644
      setCurrentConversationId(id);
    };
  
-@@ -287,6 +300,7 @@ function App() {
+@@ -287,6 +302,7 @@ function App() {
        setConversations((prev) => prev.filter(c => c.id !== id));
        // If we deleted the current conversation, clear it
        if (id === currentConversationId) {
@@ -45,7 +45,7 @@ index d8b7df2..b9c0e2a 100644
          setCurrentConversationId(null);
          setCurrentConversation(null);
        }
-@@ -311,6 +325,7 @@ function App() {
+@@ -310,6 +326,7 @@ function App() {
      // Assign unique ID to this request to prevent race conditions
      const currentRequestId = ++requestIdRef.current;
      const activeConversationId = currentConversationId;
@@ -53,7 +53,7 @@ index d8b7df2..b9c0e2a 100644
  
      // Optimistically update conversation title in list and current state if it is a new/untitled conversation
      const currentConvInList = conversations.find(c => c.id === activeConversationId);
-@@ -336,10 +351,22 @@ function App() {
+@@ -333,10 +350,18 @@ function App() {
      try {
        // Optimistically add user message to UI
        const userMessage = { role: 'user', content };
@@ -73,7 +73,11 @@ index d8b7df2..b9c0e2a 100644
 +          messages: [...(target.messages || []), userMessage],
 +        };
 +      });
-@@ -365,10 +392,22 @@ function App() {
+ 
+       // Create a partial assistant message that will be updated progressively
+       const assistantMessage = {
+@@ -366,10 +391,18 @@ function App() {
+       };
  
        // Add the partial assistant message
 -      setCurrentConversation((prev) => ({
@@ -92,3 +96,6 @@ index d8b7df2..b9c0e2a 100644
 +          messages: [...(target.messages || []), assistantMessage],
 +        };
 +      });
+ 
+       // Send message with streaming
+       await api.sendMessageStream(
