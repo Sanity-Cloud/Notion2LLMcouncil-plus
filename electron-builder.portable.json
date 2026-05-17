@@ -20,6 +20,10 @@
     "build-setup-msi.bat",
     "README.md"
   ],
+  "asarUnpack": [
+    "scripts/**/*",
+    "config/**/*"
+  ],
   "extraMetadata": {
     "main": "electron/main.js"
   },
