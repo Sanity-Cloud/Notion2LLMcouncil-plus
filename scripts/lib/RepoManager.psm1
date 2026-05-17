@@ -8,11 +8,23 @@ function Initialize-Repo {
     if (Test-Path $Path) {
         if (Test-Path (Join-Path $Path ".git")) {
             if ($Branch) {
+                Write-Step "Refreshing $Path from origin/$Branch"
+                git -C $Path fetch origin $Branch
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Step "Could not fetch origin/$Branch for $Path; using existing checkout"
+                    return
+                }
+
                 $currentBranch = git -C $Path rev-parse --abbrev-ref HEAD
                 if ($currentBranch -ne $Branch) {
                     Write-Step "Updating $Path to branch $Branch"
-                    git -C $Path fetch origin
                     git -C $Path checkout $Branch
+                    if ($LASTEXITCODE -ne 0) { throw "Failed to checkout branch $Branch in $Path" }
+                }
+
+                git -C $Path pull --ff-only origin $Branch
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Step "Could not fast-forward $Path from origin/$Branch; using existing checkout"
                 }
             }
         }
