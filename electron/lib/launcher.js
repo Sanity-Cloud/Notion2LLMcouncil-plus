@@ -7,6 +7,7 @@ const { getIntegrationConfig } = require('./integration-config');
 const { dialog } = require('electron');
 
 let launcherProcess = null;
+let loginProcess = null;
 
 function resolvePowerShellPath() {
   const windir = process.env.SystemRoot || process.env.WINDIR || 'C:\\Windows';
@@ -32,6 +33,37 @@ function showError(title, message) {
   try {
     dialog.showErrorBox(title, message || 'Unknown error');
   } catch {}
+}
+
+function readEnvValue(filePath, name) {
+  try {
+    if (!fs.existsSync(filePath)) return '';
+    const prefix = `${name}=`;
+    const line = fs.readFileSync(filePath, 'utf8')
+      .split(/\r?\n/)
+      .find(item => item.trimStart().startsWith(prefix));
+    if (!line) return '';
+    return line.trim().slice(prefix.length).replace(/^["']|["']$/g, '');
+  } catch {
+    return '';
+  }
+}
+
+function hasSavedNotionAccount(integration) {
+  if (process.env.NOTION_ACCOUNTS) return true;
+
+  const accountsPath = path.join(integration.notionRoot, 'accounts.json');
+  try {
+    if (fs.existsSync(accountsPath)) {
+      const parsed = JSON.parse(fs.readFileSync(accountsPath, 'utf8'));
+      if (Array.isArray(parsed) && parsed.length > 0) return true;
+    }
+  } catch (error) {
+    appendLog(`accounts.json is present but invalid: ${error.message}`);
+  }
+
+  const envAccounts = readEnvValue(path.join(integration.notionRoot, '.env'), 'NOTION_ACCOUNTS');
+  return !!envAccounts;
 }
 
 function runPowerShell(scriptPath, args = []) {
@@ -86,6 +118,68 @@ function runPowerShell(scriptPath, args = []) {
   return child;
 }
 
+function runVisibleNotionLogin(integration, afterLogin) {
+  const loginScript = path.join(integration.notionRoot, 'login.py');
+  if (!fs.existsSync(loginScript)) {
+    appendLog(`Notion login helper not found yet: ${loginScript}`);
+    return false;
+  }
+
+  if (loginProcess && !loginProcess.killed) {
+    appendLog('Notion login helper is already running.');
+    return true;
+  }
+
+  const powerShellPath = resolvePowerShellPath();
+  const command = [
+    '$ErrorActionPreference = "Stop"',
+    `Set-Location -LiteralPath ${JSON.stringify(integration.notionRoot)}`,
+    'Write-Host "Notion2Council needs a Notion account profile before the local API can start."',
+    'Write-Host "A browser window will open. Sign in to Notion, then return here if prompted."',
+    '& python .\\login.py --timeout 300',
+    'if ($LASTEXITCODE -ne 0) { Write-Host ""; Write-Host "Notion login failed. Press Enter to close."; Read-Host; exit $LASTEXITCODE }',
+    'Write-Host ""',
+    'Write-Host "Notion login complete. Starting Notion2Council..."',
+    'Start-Sleep -Seconds 2',
+  ].join('; ');
+
+  appendLog(`Launching visible Notion login helper: ${loginScript}`);
+  try {
+    loginProcess = spawn(powerShellPath, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', command], {
+      cwd: integration.notionRoot,
+      windowsHide: false,
+      detached: false,
+      stdio: 'ignore',
+      env: {
+        ...process.env,
+        NOTION2COUNCIL_CONFIG: integration.configPath,
+        NOTION2COUNCIL_LOG_DIR: getLogsDir(),
+      },
+    });
+  } catch (error) {
+    showError('Failed to start Notion login', `${error.message}\nTried: ${powerShellPath}`);
+    return true;
+  }
+
+  loginProcess.on('exit', code => {
+    appendLog(`Notion login helper exited with code ${code}`);
+    loginProcess = null;
+    if (code === 0 && typeof afterLogin === 'function') {
+      afterLogin();
+    } else if (code !== 0) {
+      showError('Notion login failed', 'The Notion account profile was not created. Start Stack again to retry login.');
+    }
+  });
+
+  loginProcess.on('error', error => {
+    appendLog(`Notion login helper process error: ${error.message}`);
+    loginProcess = null;
+    showError('Notion login failed', error.message);
+  });
+
+  return true;
+}
+
 function getScriptPath(scriptName) {
   return path.join(getAppRoot(), 'scripts', scriptName);
 }
@@ -104,6 +198,13 @@ function getBaseLaunchArgs() {
 
 function startStack({ noBrowser = true } = {}) {
   if (launcherProcess && !launcherProcess.killed) return launcherProcess;
+
+  const integration = getIntegrationConfig();
+  if (!hasSavedNotionAccount(integration)) {
+    const handled = runVisibleNotionLogin(integration, () => startStack({ noBrowser }));
+    if (handled) return loginProcess;
+  }
+
   const args = getBaseLaunchArgs();
   if (noBrowser) args.push('-NoBrowser');
   launcherProcess = runPowerShell(getScriptPath('launch.ps1'), args);
