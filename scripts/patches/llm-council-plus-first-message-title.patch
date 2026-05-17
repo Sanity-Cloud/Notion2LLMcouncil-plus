@@ -1,0 +1,43 @@
+diff --git a/backend/storage.py b/backend/storage.py
+index cfcd17a..824e8e8 100644
+--- a/backend/storage.py
++++ b/backend/storage.py
+@@ -200,6 +200,23 @@ def list_conversations() -> List[Dict[str, Any]]:
+     return index
+ 
+ 
++def _derive_conversation_title(content: str) -> str:
++    """Create a stable fallback title from the first user message."""
++    if not content or not isinstance(content, str):
++        return "Untitled Conversation"
++
++    title = " ".join(content.strip().split())
++    if not title:
++        return "Untitled Conversation"
++
++    title = title.strip("\"'")
++
++    if len(title) > 50:
++        title = title[:47] + "..."
++
++    return title
++
++
+ def add_user_message(conversation_id: str, content: str, conversation: Optional[Dict[str, Any]] = None):
+     """Add a user message to a conversation.
+ 
+@@ -213,6 +230,14 @@ def add_user_message(conversation_id: str, content: str, conversation: Optional[
+     if conversation is None:
+         raise ValueError(f"Conversation {conversation_id} not found")
+ 
++    is_first_user_message = not any(
++        msg.get("role") == "user"
++        for msg in conversation.get("messages", [])
++    )
++
++    if is_first_user_message and conversation.get("title") in (None, "", "New Conversation", "Untitled Conversation"):
++        conversation["title"] = _derive_conversation_title(content)
++
+     conversation["messages"].append({
+         "role": "user",
+         "content": content
