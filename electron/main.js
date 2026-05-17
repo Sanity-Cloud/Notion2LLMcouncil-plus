@@ -18,10 +18,11 @@ let isQuitting = false;
 const initialConfig = getIntegrationConfig();
 const councilUiUrl = initialConfig.councilUiUrl;
 
-async function focusChatInput(text) {
+async function focusChatInput(text, submit = false) {
   const mainWindow = getMainWindow();
   if (!mainWindow) return;
   const safeText = JSON.stringify(text || '');
+  const shouldSubmit = JSON.stringify(!!submit);
   await mainWindow.webContents.executeJavaScript(`
     (() => {
       // Tightened selectors prioritizing specific chat input classes
@@ -55,8 +56,11 @@ async function focusChatInput(text) {
         input.dispatchEvent(new Event('input', { bubbles: true }));
         input.dispatchEvent(new Event('change', { bubbles: true }));
         
-        // For React/Vue apps, sometimes we need to trigger a keydown or similar
-        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        // Only auto-submit when explicitly requested. Clipboard-to-chat should populate, not send.
+        const doSubmit = ${shouldSubmit};
+        if (doSubmit) {
+          input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        }
       }
       return true;
     })();
