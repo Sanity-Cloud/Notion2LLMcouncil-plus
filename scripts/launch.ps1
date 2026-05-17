@@ -93,13 +93,28 @@ function Test-PythonModules {
     param([string]$Python, [string[]]$Modules)
     if (-not $Modules -or $Modules.Count -eq 0) { return $true }
 
-    $code = 'import importlib.util, sys; missing=[m for m in sys.argv[1:] if importlib.util.find_spec(m) is None]; print(",".join(missing)); sys.exit(1 if missing else 0)'
-    $output = & $Python -c $code @Modules 2>&1
-    if ($LASTEXITCODE -eq 0) { return $true }
+    $missing = @()
+    $checkCode = 'import importlib.util, os, sys; module=os.environ.get("N2C_PY_MODULE", ""); sys.exit(0 if module and importlib.util.find_spec(module) else 1)'
 
-    if ($output) {
-        Write-Step "Missing Python modules: $($output -join ' ')"
+    foreach ($module in $Modules) {
+        $oldValue = $env:N2C_PY_MODULE
+        $env:N2C_PY_MODULE = $module
+        try {
+            & $Python -c $checkCode *> $null
+            if ($LASTEXITCODE -ne 0) {
+                $missing += $module
+            }
+        } finally {
+            if ($null -eq $oldValue) {
+                Remove-Item Env:N2C_PY_MODULE -ErrorAction SilentlyContinue
+            } else {
+                $env:N2C_PY_MODULE = $oldValue
+            }
+        }
     }
+
+    if ($missing.Count -eq 0) { return $true }
+    Write-Step "Missing Python modules: $($missing -join ', ')"
     return $false
 }
 
