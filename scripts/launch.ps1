@@ -89,6 +89,62 @@ function New-ApiKey {
     return [Convert]::ToBase64String($bytes).TrimEnd("=").Replace("+", "-").Replace("/", "_")
 }
 
+function Test-PythonModules {
+    param([string]$Python, [string[]]$Modules)
+    if (-not $Modules -or $Modules.Count -eq 0) { return $true }
+
+    $code = 'import importlib.util, sys; missing=[m for m in sys.argv[1:] if importlib.util.find_spec(m) is None]; print(",".join(missing)); sys.exit(1 if missing else 0)'
+    $output = & $Python -c $code @Modules 2>&1
+    if ($LASTEXITCODE -eq 0) { return $true }
+
+    if ($output) {
+        Write-Step "Missing Python modules: $($output -join ' ')"
+    }
+    return $false
+}
+
+function Initialize-PythonRequirements {
+    param(
+        [string]$Root,
+        [string]$Label,
+        [string[]]$RequiredModules = @()
+    )
+
+    $requirementsPath = Join-Path $Root "requirements.txt"
+    if (-not (Test-Path $requirementsPath)) {
+        Write-Step "$Label requirements.txt not found; skipping Python dependency install"
+        return
+    }
+
+    $venvDir = Join-Path $Root ".venv"
+    $venvPython = Join-Path $venvDir "Scripts\python.exe"
+    if (-not (Test-Path $venvPython)) {
+        Write-Step "Creating $Label Python virtual environment"
+        & python -m venv $venvDir
+        if ($LASTEXITCODE -ne 0) { throw "Failed to create Python virtual environment for $Label" }
+    }
+
+    $python = Get-Python -Root $Root
+    $requirementsHash = (Get-FileHash -Path $requirementsPath -Algorithm SHA256).Hash
+    $markerPath = Join-Path $Root ".notion2council-requirements.sha256"
+    $markerHash = if (Test-Path $markerPath) { (Get-Content -Path $markerPath -Raw).Trim() } else { "" }
+    $modulesOk = Test-PythonModules -Python $python -Modules $RequiredModules
+
+    if ($modulesOk -and $markerHash -eq $requirementsHash) {
+        Write-Step "$Label Python requirements are current"
+        return
+    }
+
+    Write-Step "Installing $Label Python requirements"
+    & $python -m pip install --disable-pip-version-check -r $requirementsPath
+    if ($LASTEXITCODE -ne 0) { throw "Failed to install Python requirements for $Label" }
+
+    Set-Content -Path $markerPath -Value $requirementsHash -Encoding ASCII
+    if (-not (Test-PythonModules -Python $python -Modules $RequiredModules)) {
+        throw "$Label Python requirements installed, but one or more required modules are still unavailable"
+    }
+}
+
 function Initialize-NotionApiKey {
     $envPath = Join-Path $NotionRoot ".env"
     $existing = Get-EnvLineValue -Path $envPath -Name "API_KEY"
@@ -293,6 +349,8 @@ $CouncilRoot = (Resolve-Path $CouncilRoot).Path
 if ($Stop) { Stop-ManagedServices; exit 0 }
 
 Write-Step "Preparing Services"
+Initialize-PythonRequirements -Root $NotionRoot -Label "Notion2API" -RequiredModules @("cloudscraper", "fastapi", "uvicorn", "dotenv", "slowapi", "websocket")
+Initialize-PythonRequirements -Root $CouncilRoot -Label "LLM Council" -RequiredModules @("fastapi", "uvicorn")
 Initialize-NotionMode
 Initialize-NotionLogin
 $notionApiKey = Initialize-NotionApiKey
