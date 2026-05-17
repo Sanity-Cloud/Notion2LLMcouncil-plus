@@ -1,0 +1,20 @@
+diff --git a/frontend/src/components/CouncilGrid.jsx b/frontend/src/components/CouncilGrid.jsx
+index bb79dfd..9d33b6e 100644
+--- a/frontend/src/components/CouncilGrid.jsx
++++ b/frontend/src/components/CouncilGrid.jsx
+@@ -24,6 +24,7 @@ const PROVIDER_CONFIG = {
+     deepseek: { color: '#4e61e6', label: 'DeepSeek', logo: deepseekLogo },
+     openrouter: { color: '#7f5af0', label: 'OpenRouter', logo: openrouterLogo },
+     custom: { color: '#06b6d4', label: 'Custom', logo: customLogo },
++    kimi: { color: '#111827', label: 'Kimi', logo: null, icon: '月' },
+     default: { color: '#888888', label: 'Model', logo: null, icon: '🤖' }
+ };
+ 
+@@ -39,6 +40,7 @@ const getProviderInfo = (modelId) => {
+         if (subId.includes('gemini') || subId.includes('google')) return PROVIDER_CONFIG.google;
+         if (subId.includes('mistral') || subId.includes('mixtral')) return PROVIDER_CONFIG.mistral;
+         if (subId.includes('deepseek')) return PROVIDER_CONFIG.deepseek;
++        if (subId.includes('kimi') || subId.includes('moonshot')) return PROVIDER_CONFIG.kimi;
+         return PROVIDER_CONFIG.custom;
+     }
+     if (id.startsWith('ollama:')) return PROVIDER_CONFIG.ollama;
