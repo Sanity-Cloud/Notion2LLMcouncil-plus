@@ -100,11 +100,24 @@ function writeConfigForm(data) {
 async function refresh() {
   setStatus('Checking services...');
   try {
-    render(await api.status());
-    writeConfigForm(await api.getConfig());
-    setStatus('');
+    const [statusRes, configRes] = await Promise.allSettled([api.status(), api.getConfig()]);
+    const messages = [];
+
+    if (statusRes.status === 'fulfilled') {
+      render(statusRes.value);
+    } else {
+      messages.push(`Diagnostics status check error: ${statusRes.reason?.message || statusRes.reason}`);
+    }
+
+    if (configRes.status === 'fulfilled') {
+      writeConfigForm(configRes.value);
+    } else {
+      messages.push(`Config load error: ${configRes.reason?.message || configRes.reason}`);
+    }
+
+    setStatus(messages.join(' | '));
   } catch (error) {
-    setStatus(`Diagnostics failed: ${error.message}`);
+    setStatus(`Diagnostics error: ${error.message}`);
   }
 }
 
