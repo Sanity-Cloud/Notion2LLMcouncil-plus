@@ -1,0 +1,22 @@
+diff --git a/frontend/src/components/CouncilGrid.jsx b/frontend/src/components/CouncilGrid.jsx
+index e3d4bb2..bb79dfd 100644
+--- a/frontend/src/components/CouncilGrid.jsx
++++ b/frontend/src/components/CouncilGrid.jsx
+@@ -30,8 +30,15 @@ const getProviderInfo = (modelId) => {
+     if (!modelId) return PROVIDER_CONFIG.default;
+     const id = modelId.toLowerCase();
+ 
+-    // Check for provider prefixes FIRST (order matters!)
+-    if (id.startsWith('custom:')) return PROVIDER_CONFIG.custom;
++    if (id.startsWith('custom:')) {
++        const subId = id.substring(7);
++        if (subId.includes('gpt') || subId.includes('openai')) return PROVIDER_CONFIG.openai;
++        if (subId.includes('claude') || subId.includes('anthropic')) return PROVIDER_CONFIG.anthropic;
++        if (subId.includes('gemini') || subId.includes('google')) return PROVIDER_CONFIG.google;
++        if (subId.includes('mistral') || subId.includes('mixtral')) return PROVIDER_CONFIG.mistral;
++        if (subId.includes('deepseek')) return PROVIDER_CONFIG.deepseek;
++        return PROVIDER_CONFIG.custom;
++    }
+     if (id.startsWith('ollama:')) return PROVIDER_CONFIG.ollama;
+     if (id.startsWith('groq:')) return PROVIDER_CONFIG.groq;
+ 

@@ -72,6 +72,7 @@ function getIntegrationConfig() {
   const verifyProvider = getConfigValue(localConfig, defaultConfig, ['council', 'verifyProvider'], true);
   const askSmokeTest = getConfigValue(localConfig, defaultConfig, ['council', 'askSmokeTest'], true);
   const clearUiStorageOnProviderDrift = getConfigValue(localConfig, defaultConfig, ['council', 'clearUiStorageOnProviderDrift'], true);
+  const councilModels = getConfigValue(localConfig, defaultConfig, ['provider', 'councilModels'], ['custom:gpt-5.5']);
   const logsDir = getLogsDir();
   const notionBaseUrl = process.env.NOTION2API_URL || `http://127.0.0.1:${notionPort}`;
   const councilBackendUrl = process.env.NOTION2COUNCIL_API_URL || `http://127.0.0.1:${councilBackendPort}`;
@@ -103,6 +104,7 @@ function getIntegrationConfig() {
     askSmokeTest,
     clearUiStorageOnProviderDrift,
     providerUrlPath,
+    councilModels,
   };
 }
 

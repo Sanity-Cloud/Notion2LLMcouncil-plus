@@ -206,10 +206,10 @@ async function getDiagnosticsStatus() {
 
       let smokeTestOk = true;
       let smokeDetail = '';
-      if (enabled && urlMatches && config.council.askSmokeTest !== false) {
+      if (enabled && urlMatches && config.askSmokeTest !== false) {
         try {
-          const testModel = (config.provider.councilModels && config.provider.councilModels.length > 0)
-            ? config.provider.councilModels[0]
+          const testModel = (Array.isArray(config.councilModels) && config.councilModels.length > 0)
+            ? config.councilModels[0]
             : 'custom:gpt-5.5';
           const smokePayload = {
             content: 'Ping! Respond with exactly \'pong\' to verify connection.',

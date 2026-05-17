@@ -585,6 +585,11 @@ Initialize-Repo -Path $CouncilRoot -Url $CouncilRepoUrl -Branch $CouncilBranch
 $NotionRoot = (Resolve-Path $NotionRoot).Path
 $CouncilRoot = (Resolve-Path $CouncilRoot).Path
 
+Update-RepoPatch `
+    -Root $CouncilRoot `
+    -PatchPath (Join-Path $RepoRoot "scripts\patches\llm-council-plus-custom-model-icons.patch") `
+    -Name "LLM Council custom model brand icons"
+
 Write-Step "Preparing Services"
 Initialize-PythonRequirements -Root $NotionRoot -Label "Notion2API" -RequiredModules @("cloudscraper", "fastapi", "uvicorn", "dotenv", "slowapi", "websocket")
 Initialize-PythonRequirements -Root $CouncilRoot -Label "LLM Council" -RequiredModules @("fastapi", "uvicorn", "dotenv", "httpx", "pydantic", "ddgs", "yake", "mcp")

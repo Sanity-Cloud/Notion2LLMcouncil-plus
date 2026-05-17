@@ -53,4 +53,35 @@ function Get-Python {
     return "python"
 }
 
-Export-ModuleMember -Function Initialize-Repo, Get-Python
+function Update-RepoPatch {
+    param(
+        [string]$Root,
+        [string]$PatchPath,
+        [string]$Name
+    )
+
+    if (-not (Test-Path $PatchPath)) { return }
+
+    Push-Location $Root
+    try {
+        & git apply --check $PatchPath *> $null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Step "Applying patch: $Name"
+            & git apply $PatchPath
+            if ($LASTEXITCODE -ne 0) { throw "Failed to apply patch: $Name" }
+            return
+        }
+
+        & git apply --reverse --check $PatchPath *> $null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Step "Patch already applied: $Name"
+            return
+        }
+
+        throw "Patch cannot be applied cleanly: $Name"
+    } finally {
+        Pop-Location
+    }
+}
+
+Export-ModuleMember -Function Initialize-Repo, Get-Python, Update-RepoPatch
