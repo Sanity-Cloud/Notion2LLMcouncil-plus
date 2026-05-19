@@ -586,7 +586,8 @@ $CouncilRoot = (Resolve-Path $CouncilRoot).Path
 Update-RepoPatch `
     -Root $CouncilRoot `
     -PatchPath (Join-Path $RepoRoot "scripts\patches\llm-council-plus-custom-model-icons.patch") `
-    -Name "LLM Council custom model brand icons"
+    -Name "LLM Council custom model brand icons" `
+    -Optional
 
 Update-RepoPatch `
     -Root $CouncilRoot `

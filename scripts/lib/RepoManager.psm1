@@ -89,42 +89,51 @@ function Update-RepoPatch {
     param(
         [string]$Root,
         [string]$PatchPath,
-        [string]$Name
+        [string]$Name,
+        [switch]$Optional
     )
 
     if (-not (Test-Path $PatchPath)) { return }
 
     Push-Location $Root
     try {
-        cmd.exe /c "git apply --check `"$PatchPath`" 2>nul"
-        if ($LASTEXITCODE -eq 0) {
-            Write-Step "Applying patch: $Name"
-            cmd.exe /c "git apply `"$PatchPath`""
-            if ($LASTEXITCODE -ne 0) { throw "Failed to apply patch: $Name" }
-            return
-        }
-
-        cmd.exe /c "git apply --reverse --check `"$PatchPath`" 2>nul"
-        if ($LASTEXITCODE -eq 0) {
-            Write-Step "Patch already applied: $Name"
-            return
-        }
-
-        $targets = @(Get-PatchTargetPaths -PatchPath $PatchPath)
-        if ($targets.Count -gt 0) {
-            Write-Step "Patch state drift detected for $Name; resetting managed target file(s) and retrying"
-            Reset-PatchTargetPaths -Targets $targets -Name $Name
-
-            cmd.exe /c "git apply --check `"$PatchPath`" 2>nul"
+        try {
+            cmd.exe /c "git apply --check --ignore-whitespace `"$PatchPath`" 2>nul"
             if ($LASTEXITCODE -eq 0) {
-                Write-Step "Applying patch after reset: $Name"
-                cmd.exe /c "git apply `"$PatchPath`""
-                if ($LASTEXITCODE -ne 0) { throw "Failed to apply patch after reset: $Name" }
+                Write-Step "Applying patch: $Name"
+                cmd.exe /c "git apply --ignore-whitespace `"$PatchPath`""
+                if ($LASTEXITCODE -ne 0) { throw "Failed to apply patch: $Name" }
                 return
             }
-        }
 
-        throw "Patch cannot be applied cleanly: $Name"
+            cmd.exe /c "git apply --reverse --check --ignore-whitespace `"$PatchPath`" 2>nul"
+            if ($LASTEXITCODE -eq 0) {
+                Write-Step "Patch already applied: $Name"
+                return
+            }
+
+            $targets = @(Get-PatchTargetPaths -PatchPath $PatchPath)
+            if ($targets.Count -gt 0) {
+                Write-Step "Patch state drift detected for $Name; resetting managed target file(s) and retrying"
+                Reset-PatchTargetPaths -Targets $targets -Name $Name
+
+                cmd.exe /c "git apply --check --ignore-whitespace `"$PatchPath`" 2>nul"
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Step "Applying patch after reset: $Name"
+                    cmd.exe /c "git apply --ignore-whitespace `"$PatchPath`""
+                    if ($LASTEXITCODE -ne 0) { throw "Failed to apply patch after reset: $Name" }
+                    return
+                }
+            }
+
+            throw "Patch cannot be applied cleanly: $Name"
+        } catch {
+            if ($Optional) {
+                Write-Warning "Optional patch '$Name' failed: $($_.Exception.Message)"
+            } else {
+                throw
+            }
+        }
     } finally {
         Pop-Location
     }
