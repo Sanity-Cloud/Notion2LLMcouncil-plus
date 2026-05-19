@@ -30,11 +30,14 @@ index e3d4bb2..5601012 100644
      if (id.startsWith('groq:')) return PROVIDER_CONFIG.groq;
  
 diff --git a/frontend/src/components/Stage1.jsx b/frontend/src/components/Stage1.jsx
-index 8d87cd1..95e5781 100644
+index 8d87cd1..1cad19d 100644
 --- a/frontend/src/components/Stage1.jsx
 +++ b/frontend/src/components/Stage1.jsx
-@@ -76,7 +76,12 @@ export default function Stage1({ responses, startTime, endTime }) {
-               style={safeActiveTab === index ? { borderColor: visuals.color, color: visuals.color } : {}}
+@@ -73,10 +73,15 @@ export default function Stage1({ responses, startTime, endTime }) {
+               className={`tab ${safeActiveTab === index ? 'active' : ''} ${resp?.error ? 'tab-error' : ''}`}
+               onClick={() => setActiveTab(index)}
+-              style={safeActiveTab === index ? { borderColor: visuals.color, color: visuals.color } : {}}
++              style={safeActiveTab === index ? { borderColor: visuals.color, color: '#f8fafc' } : {}}
                title={resp?.model}
              >
 -              <span className="tab-icon" style={{ backgroundColor: safeActiveTab === index ? 'transparent' : 'rgba(255,255,255,0.1)' }}>
@@ -57,11 +60,14 @@ index 8d87cd1..95e5781 100644
                  {currentVisuals.name}
                </span>
 diff --git a/frontend/src/components/Stage2.jsx b/frontend/src/components/Stage2.jsx
-index a000334..091bb81 100644
+index a000334..d21b601 100644
 --- a/frontend/src/components/Stage2.jsx
 +++ b/frontend/src/components/Stage2.jsx
-@@ -93,7 +93,12 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
-                             style={safeActiveTab === index ? { borderColor: visuals.color, color: visuals.color } : {}}
+@@ -90,10 +90,15 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
+                             className={`tab ${safeActiveTab === index ? 'active' : ''} ${rank?.error ? 'tab-error' : ''}`}
+                             onClick={() => setActiveTab(index)}
+-                            style={safeActiveTab === index ? { borderColor: visuals.color, color: visuals.color } : {}}
++                            style={safeActiveTab === index ? { borderColor: visuals.color, color: '#f8fafc' } : {}}
                              title={rank?.model}
                          >
 -                            <span className="tab-icon" style={{ backgroundColor: safeActiveTab === index ? 'transparent' : 'rgba(255,255,255,0.1)' }}>
@@ -74,6 +80,15 @@ index a000334..091bb81 100644
                                  {visuals.icon}
                              </span>
                              <span className="tab-name">{shortName}</span>
+@@ -113,7 +118,7 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
+                             {currentVisuals.icon}
+                         </span>
+                         <div className="model-info">
+-                            <span className="model-name-large">{currentRanking.model || 'Unknown Model'}</span>
++                            <span className="model-name-large">{getShortModelName(currentRanking.model) || 'Unknown Model'}</span>
+                             <span className="model-provider-badge" style={{ borderColor: currentVisuals.color, color: currentVisuals.color }}>
+                                 {currentVisuals.name}
+                             </span>
 @@ -212,6 +217,7 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
                      <h4>🏆 Visual Leaderboard</h4>
                      <p className="stage-description">
@@ -96,7 +111,7 @@ index a3d3946..643da5a 100644
                              <span className="chairman-model">{shortName}</span>
                              <span className="chairman-provider-badge">{visuals.name}</span>
 diff --git a/frontend/src/utils/modelHelpers.js b/frontend/src/utils/modelHelpers.js
-index e289e91..8591b10 100644
+index e289e91..31ad3e9 100644
 --- a/frontend/src/utils/modelHelpers.js
 +++ b/frontend/src/utils/modelHelpers.js
 @@ -46,6 +46,11 @@ export const getModelVisuals = (modelId) => {
@@ -111,3 +126,78 @@ index e289e91..8591b10 100644
    // Local (fallback for models without provider prefix or slash)
    if (!id.includes('/') && !id.includes(':')) {
      return { name: 'Local', color: '#f1f5f9', short: 'Local', icon: '💻' };
+@@ -56,12 +61,79 @@ export const getModelVisuals = (modelId) => {
+ };
+ 
+ export const getShortModelName = (modelId) => {
+   if (!modelId) return 'Unknown';
++
++  const formatVersionSuffix = (value) => {
++    return value
++      .replace(/(\d(?:\.\d+)*)(pro|flash|turbo|mini|nano|opus|sonnet|haiku)\b/gi, '$1 $2')
++      .replace(/\b(pro|flash|turbo|mini|nano|opus|sonnet|haiku)(\d(?:\.\d+)*)\b/gi, '$1 $2');
++  };
++
++  const titleCaseWords = (value) =>
++    value
++      .split(' ')
++      .filter(Boolean)
++      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
++      .join(' ');
++
++  const cleanModelId = String(modelId)
++    .trim()
++    .replace(/^custom:/i, '')
++    .replace(/^ollama:/i, '')
++    .replace(/^groq:/i, '')
++    .replace(/^openai:/i, '')
++    .replace(/^anthropic:/i, '')
++    .replace(/^google:/i, '')
++    .replace(/^mistral:/i, '')
++    .replace(/^deepseek:/i, '');
++
+   // Handle "provider/model-name" format
+-  const parts = modelId.split('/');
+-  if (parts.length > 1) return parts[1];
+-  // Handle "provider:model-name" format
+-  const colParts = modelId.split(':');
+-  if (colParts.length > 1) return colParts[1];
+-  return modelId;
++  const rawName = cleanModelId.includes('/') ? cleanModelId.split('/').pop() : cleanModelId;
++  const id = rawName.toLowerCase();
++
++  if (id.startsWith('gpt-')) {
++    return rawName.replace(/^gpt-/i, 'GPT ').replace(/-/g, ' ');
++  }
++
++  if (id.startsWith('gemini-')) {
++    const suffix = formatVersionSuffix(rawName.replace(/^gemini-/i, '').replace(/-/g, ' '));
++    return `Gemini ${titleCaseWords(suffix)}`;
++  }
++
++  if (id.startsWith('claude-')) {
++    const suffix = formatVersionSuffix(rawName.replace(/^claude-/i, '').replace(/-/g, ' '));
++    const withoutFamilyVersion = suffix.replace(/^(\d+(?:\.\d+)?\s*)/i, '');
++    return titleCaseWords(withoutFamilyVersion);
++  }
++
++  if (id.startsWith('kimi-')) {
++    return rawName.replace(/^kimi-/i, 'Kimi ').replace(/-/g, ' ');
++  }
++
++  if (id.startsWith('moonshot-')) {
++    return rawName.replace(/^moonshot-/i, 'Kimi ').replace(/-/g, ' ');
++  }
++
++  if (id.startsWith('mistral-')) {
++    const suffix = formatVersionSuffix(rawName.replace(/^mistral-/i, '').replace(/-/g, ' '));
++    return `Mistral ${titleCaseWords(suffix)}`;
++  }
++
++  if (id.startsWith('deepseek-')) {
++    const suffix = formatVersionSuffix(rawName.replace(/^deepseek-/i, '').replace(/-/g, ' '));
++    return `DeepSeek ${titleCaseWords(suffix)}`;
++  }
++
++  return titleCaseWords(formatVersionSuffix(rawName.replace(/[-_]+/g, ' ')));
+ };
