@@ -590,11 +590,6 @@ Update-RepoPatch `
 
 Update-RepoPatch `
     -Root $CouncilRoot `
-    -PatchPath (Join-Path $RepoRoot "scripts\patches\llm-council-plus-custom-provider-startup.patch") `
-    -Name "LLM Council custom provider startup detection"
-
-Update-RepoPatch `
-    -Root $CouncilRoot `
     -PatchPath (Join-Path $RepoRoot "scripts\patches\llm-council-plus-first-message-title.patch") `
     -Name "LLM Council first message conversation titles"
 

@@ -33,7 +33,7 @@ diff --git a/frontend/src/components/Stage1.jsx b/frontend/src/components/Stage1
 index 8d87cd1..1cad19d 100644
 --- a/frontend/src/components/Stage1.jsx
 +++ b/frontend/src/components/Stage1.jsx
-@@ -73,10 +73,15 @@ export default function Stage1({ responses, startTime, endTime }) {
+@@ -77,9 +77,14 @@ export default function Stage1({ responses, startTime, endTime }) {
                className={`tab ${safeActiveTab === index ? 'active' : ''} ${resp?.error ? 'tab-error' : ''}`}
                onClick={() => setActiveTab(index)}
 -              style={safeActiveTab === index ? { borderColor: visuals.color, color: visuals.color } : {}}
@@ -63,7 +63,7 @@ diff --git a/frontend/src/components/Stage2.jsx b/frontend/src/components/Stage2
 index a000334..d21b601 100644
 --- a/frontend/src/components/Stage2.jsx
 +++ b/frontend/src/components/Stage2.jsx
-@@ -90,10 +90,15 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
+@@ -97,9 +97,14 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
                              className={`tab ${safeActiveTab === index ? 'active' : ''} ${rank?.error ? 'tab-error' : ''}`}
                              onClick={() => setActiveTab(index)}
 -                            style={safeActiveTab === index ? { borderColor: visuals.color, color: visuals.color } : {}}
@@ -80,7 +80,7 @@ index a000334..d21b601 100644
                                  {visuals.icon}
                              </span>
                              <span className="tab-name">{shortName}</span>
-@@ -113,7 +118,7 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
+@@ -116,7 +121,7 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
                              {currentVisuals.icon}
                          </span>
                          <div className="model-info">
@@ -89,7 +89,7 @@ index a000334..d21b601 100644
                              <span className="model-provider-badge" style={{ borderColor: currentVisuals.color, color: currentVisuals.color }}>
                                  {currentVisuals.name}
                              </span>
-@@ -212,6 +217,7 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
+@@ -204,6 +209,7 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
                      <h4>🏆 Visual Leaderboard</h4>
                      <p className="stage-description">
 -                        Combined results across all peer evaluations. Bar length corresponds to average rank value.
@@ -102,7 +102,7 @@ diff --git a/frontend/src/components/Stage3.jsx b/frontend/src/components/Stage3
 index a3d3946..643da5a 100644
 --- a/frontend/src/components/Stage3.jsx
 +++ b/frontend/src/components/Stage3.jsx
-@@ -46,6 +46,6 @@ export default function Stage3({ finalResponse, startTime, endTime }) {
+@@ -49,6 +49,6 @@ export default function Stage3({ finalResponse, startTime, endTime }) {
                          <div className="chairman-info">
                              <span className="chairman-role">
 -                                <span>👨‍⚖️</span> Chairman's Verdict
@@ -126,7 +126,7 @@ index e289e91..31ad3e9 100644
    // Local (fallback for models without provider prefix or slash)
    if (!id.includes('/') && !id.includes(':')) {
      return { name: 'Local', color: '#f1f5f9', short: 'Local', icon: '💻' };
-@@ -56,12 +61,79 @@ export const getModelVisuals = (modelId) => {
+@@ -56,12 +61,68 @@ export const getModelVisuals = (modelId) => {
  };
  
  export const getShortModelName = (modelId) => {
