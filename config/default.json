@@ -2,7 +2,7 @@
   "notion": {
     "localRoot": "vendor\\notion2api",
     "repoUrl": "https://github.com/Sanity-Cloud/notion2api.git",
-    "branch": "feat/login-cdp",
+    "branch": "main",
     "port": 8000,
     "appMode": "standard",
     "autoLogin": true,
