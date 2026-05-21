@@ -360,17 +360,18 @@ function createTray() {
 
 function refreshTrayMenu() {
   if (!tray) return;
+  const hotkeys = readHotkeys();
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'Show / Hide', click: toggleMainWindow },
-    { label: 'Open Chat', click: openChat },
-    { label: 'Open New Chat', click: openNewChat },
-    { label: 'Clipboard to Chat', click: openChatWithClipboard },
-    { label: 'Clipboard to New Chat', click: openNewChatWithClipboard },
+    { label: 'Show / Hide', accelerator: hotkeys.toggleWindow, click: toggleMainWindow },
+    { label: 'Open Chat', accelerator: hotkeys.openChat, click: openChat },
+    { label: 'Open New Chat', accelerator: hotkeys.openNewChat, click: openNewChat },
+    { label: 'Clipboard to Chat', accelerator: hotkeys.clipboardToChat, click: openChatWithClipboard },
+    { label: 'Clipboard to New Chat', accelerator: hotkeys.clipboardToNewChat, click: openNewChatWithClipboard },
     { type: 'separator' },
     { label: 'About Notion2Council', click: showAboutDialog },
     { type: 'separator' },
     { label: 'Diagnostics', click: () => openDiagnostics(getMainWindow()) },
-    { label: 'Hotkey Settings', click: () => openHotkeySettings(getMainWindow()) },
+    { label: 'Hotkey Settings', accelerator: hotkeys.openHotkeySettings, click: () => openHotkeySettings(getMainWindow()) },
     { label: 'Reset LLM Council UI State', click: async () => {
         await clearCouncilUiStorage();
         const mainWindow = getMainWindow();
@@ -390,20 +391,21 @@ function refreshTrayMenu() {
 }
 
 function setApplicationMenu() {
+  const hotkeys = readHotkeys();
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: 'Notion2Council', submenu: [
       { label: 'About Notion2Council', click: showAboutDialog },
       { type: 'separator' },
-      { label: 'Open Chat', click: openChat },
-      { label: 'Open New Chat', click: openNewChat },
-      { label: 'Clipboard to Chat', click: openChatWithClipboard },
-      { label: 'Clipboard to New Chat', click: openNewChatWithClipboard },
+      { label: 'Open Chat', accelerator: hotkeys.openChat, click: openChat },
+      { label: 'Open New Chat', accelerator: hotkeys.openNewChat, click: openNewChat },
+      { label: 'Clipboard to Chat', accelerator: hotkeys.clipboardToChat, click: openChatWithClipboard },
+      { label: 'Clipboard to New Chat', accelerator: hotkeys.clipboardToNewChat, click: openNewChatWithClipboard },
       { type: 'separator' },
       { label: 'Open Notion2API Browser', click: openNotion2ApiBrowser },
       { label: 'Open Notion2API Docs', click: openNotion2ApiDocsBrowser },
       { type: 'separator' },
       { label: 'Diagnostics', click: () => openDiagnostics(getMainWindow()) },
-      { label: 'Hotkey Settings', click: () => openHotkeySettings(getMainWindow()) },
+      { label: 'Hotkey Settings', accelerator: hotkeys.openHotkeySettings, click: () => openHotkeySettings(getMainWindow()) },
       { label: 'Reset LLM Council UI State', click: async () => {
           await clearCouncilUiStorage();
           const mainWindow = getMainWindow();
@@ -447,11 +449,15 @@ ipcMain.handle('hotkeys:get', () => ({ defaults: defaultHotkeys, current: readHo
 ipcMain.handle('hotkeys:save', (_event, hotkeys) => {
   writeHotkeys(hotkeys);
   const registrations = registerHotkeys();
+  setApplicationMenu();
+  refreshTrayMenu();
   return { ok: registrations.every(item => item.ok), registrations, current: readHotkeys() };
 });
 ipcMain.handle('hotkeys:reset', () => {
   writeHotkeys(defaultHotkeys);
   const registrations = registerHotkeys();
+  setApplicationMenu();
+  refreshTrayMenu();
   return { ok: registrations.every(item => item.ok), registrations, current: readHotkeys() };
 });
 ipcMain.handle('hotkeys:testClipboardToChat', async () => {
