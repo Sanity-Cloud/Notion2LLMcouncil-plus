@@ -1,4 +1,4 @@
-const { app, Menu, Tray, nativeImage, globalShortcut, clipboard, ipcMain, shell } = require('electron');
+const { app, Menu, Tray, nativeImage, globalShortcut, clipboard, ipcMain, shell, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -333,6 +333,22 @@ async function openNewChatWithClipboard() {
 }
 
 
+function showAboutDialog() {
+  const mainWindow = getMainWindow();
+  const iconPath = path.join(__dirname, 'icon.png');
+  const appIcon = fs.existsSync(iconPath) ? nativeImage.createFromPath(iconPath) : undefined;
+  
+  dialog.showMessageBox(mainWindow && mainWindow.isVisible() ? mainWindow : null, {
+    type: 'info',
+    title: 'About Notion2Council',
+    message: 'Notion2Council',
+    detail: `Version: ${app.getVersion()}\n\nDesktop shell and launcher menu for Notion2LLMcouncil Plus.\n\nAuthor: Sanity Cloud\n\nRuntime info:\n• Electron: ${process.versions.electron}\n• Node: ${process.versions.node}\n• Chrome: ${process.versions.chrome}`,
+    buttons: ['OK'],
+    defaultId: 0,
+    icon: appIcon
+  });
+}
+
 function createTray() {
   const iconPng = path.join(__dirname, 'icon.png');
   const icon = fs.existsSync(iconPng) ? nativeImage.createFromPath(iconPng) : nativeImage.createEmpty();
@@ -350,6 +366,8 @@ function refreshTrayMenu() {
     { label: 'Open New Chat', click: openNewChat },
     { label: 'Clipboard to Chat', click: openChatWithClipboard },
     { label: 'Clipboard to New Chat', click: openNewChatWithClipboard },
+    { type: 'separator' },
+    { label: 'About Notion2Council', click: showAboutDialog },
     { type: 'separator' },
     { label: 'Diagnostics', click: () => openDiagnostics(getMainWindow()) },
     { label: 'Hotkey Settings', click: () => openHotkeySettings(getMainWindow()) },
@@ -374,6 +392,8 @@ function refreshTrayMenu() {
 function setApplicationMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: 'Notion2Council', submenu: [
+      { label: 'About Notion2Council', click: showAboutDialog },
+      { type: 'separator' },
       { label: 'Open Chat', click: openChat },
       { label: 'Open New Chat', click: openNewChat },
       { label: 'Clipboard to Chat', click: openChatWithClipboard },
