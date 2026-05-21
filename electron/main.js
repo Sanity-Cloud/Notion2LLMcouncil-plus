@@ -150,13 +150,17 @@ async function getActiveRuntimeUrls(timeoutMs = 90000) {
   try {
     const state = await waitForRuntimeState(config.statePath, timeoutMs);
     return {
+      notionBaseUrl: state.notion.url,
       notionHealthUrl: `${state.notion.url}/health`,
+      notionDocsUrl: `${state.notion.url}/docs`,
       councilUiUrl: state.councilFrontend.url,
       councilBackendUrl: state.councilBackend.url,
     };
   } catch {
     return {
+      notionBaseUrl: config.notionBaseUrl,
       notionHealthUrl: config.notionHealthUrl,
+      notionDocsUrl: config.notionDocsUrl,
       councilUiUrl: config.councilUiUrl,
       councilBackendUrl: config.councilBackendUrl,
     };
@@ -184,6 +188,44 @@ async function waitForReadyRuntimeUrls() {
   await waitForUrl(urls.notionHealthUrl, 90000, { expectedContent: 'ok' });
   await waitForUrl(urls.councilUiUrl, 90000, { expectedTitle: 'LLM Council' });
   return urls;
+}
+
+async function waitForReadyNotionUrls() {
+  let urls = await getActiveRuntimeUrls(1000);
+
+  try {
+    await waitForUrl(urls.notionHealthUrl, 2500, { expectedContent: 'ok' });
+    return urls;
+  } catch {
+    startStack({ noBrowser: true });
+    urls = await getActiveRuntimeUrls(90000);
+    await waitForUrl(urls.notionHealthUrl, 90000, { expectedContent: 'ok' });
+    return urls;
+  }
+}
+
+async function openNotion2ApiBrowser() {
+  try {
+    const urls = await waitForReadyNotionUrls();
+    appendLog(`Opening Notion2API in browser: ${urls.notionBaseUrl}`);
+    return shell.openExternal(urls.notionBaseUrl);
+  } catch (error) {
+    appendLog(`Could not open Notion2API browser window: ${error.message}`);
+    const fallbackUrl = getIntegrationConfig().notionBaseUrl;
+    return shell.openExternal(fallbackUrl);
+  }
+}
+
+async function openNotion2ApiDocsBrowser() {
+  try {
+    const urls = await waitForReadyNotionUrls();
+    const docsUrl = process.env.NOTION2API_DOCS_URL || urls.notionDocsUrl;
+    appendLog(`Opening Notion2API docs in browser: ${docsUrl}`);
+    return shell.openExternal(docsUrl);
+  } catch (error) {
+    appendLog(`Could not open Notion2API docs browser window: ${error.message}`);
+    return shell.openExternal(process.env.NOTION2API_DOCS_URL || getIntegrationConfig().notionDocsUrl);
+  }
 }
 
 async function openChat() {
@@ -317,8 +359,8 @@ function refreshTrayMenu() {
         if (mainWindow) mainWindow.reload();
       }
     },
-    { label: 'Open Notion2API', click: () => { startStack({ noBrowser: true }); shell.openExternal(getIntegrationConfig().notionBaseUrl); } },
-    { label: 'Open Notion2API Docs', click: () => { startStack({ noBrowser: true }); shell.openExternal(process.env.NOTION2API_DOCS_URL || getIntegrationConfig().notionDocsUrl); } },
+    { label: 'Open Notion2API Browser', click: openNotion2ApiBrowser },
+    { label: 'Open Notion2API Docs', click: openNotion2ApiDocsBrowser },
     { label: 'Open App Logs', click: () => { shell.openPath(path.join(app.getPath('userData'), 'logs')); } },
     { label: 'Open Service Logs', click: () => { shell.openPath(getIntegrationConfig().logsDir); } },
     { type: 'separator' },
@@ -336,6 +378,10 @@ function setApplicationMenu() {
       { label: 'Open New Chat', click: openNewChat },
       { label: 'Clipboard to Chat', click: openChatWithClipboard },
       { label: 'Clipboard to New Chat', click: openNewChatWithClipboard },
+      { type: 'separator' },
+      { label: 'Open Notion2API Browser', click: openNotion2ApiBrowser },
+      { label: 'Open Notion2API Docs', click: openNotion2ApiDocsBrowser },
+      { type: 'separator' },
       { label: 'Diagnostics', click: () => openDiagnostics(getMainWindow()) },
       { label: 'Hotkey Settings', click: () => openHotkeySettings(getMainWindow()) },
       { label: 'Reset LLM Council UI State', click: async () => {
@@ -405,7 +451,8 @@ ipcMain.handle('diagnostics:openCouncil', async () => {
   const urls = await getActiveRuntimeUrls(1000);
   return shell.openExternal(urls.councilUiUrl);
 });
-ipcMain.handle('diagnostics:openDocs', () => shell.openExternal(process.env.NOTION2API_DOCS_URL || getIntegrationConfig().notionDocsUrl));
+ipcMain.handle('diagnostics:openNotion', openNotion2ApiBrowser);
+ipcMain.handle('diagnostics:openDocs', openNotion2ApiDocsBrowser);
 ipcMain.handle('diagnostics:openLogs', () => shell.openPath(getIntegrationConfig().logsDir));
 
 // App Lifecycle
