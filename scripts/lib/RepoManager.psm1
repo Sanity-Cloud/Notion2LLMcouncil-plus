@@ -18,7 +18,7 @@ function Initialize-Repo {
                 $currentBranch = git -C $Path rev-parse --abbrev-ref HEAD
                 if ($currentBranch -ne $Branch) {
                     Write-Step "Updating $Path to branch $Branch"
-                    git -C $Path checkout $Branch
+                    git -C $Path checkout -f $Branch
                     if ($LASTEXITCODE -ne 0) { throw "Failed to checkout branch $Branch in $Path" }
                 }
 
