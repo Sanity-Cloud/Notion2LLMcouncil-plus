@@ -6,7 +6,7 @@ param(
     [int]$CouncilBackendPort = 8001,
     [int]$CouncilFrontendPort = 5173,
     [string]$NotionRepoUrl = "https://github.com/Sanity-Cloud/notion2api.git",
-    [string]$NotionBranch = "feat/login-cdp",
+    [string]$NotionBranch = "main",
     [string]$CouncilRepoUrl = "https://github.com/jacob-bd/llm-council-plus.git",
     [string]$CouncilBranch = "main",
     [switch]$UseVendor,
@@ -220,7 +220,13 @@ function Initialize-NotionApiKey {
 }
 
 function Initialize-NotionMode {
-    Set-EnvLine -Path (Join-Path $NotionRoot ".env") -Name "APP_MODE" -Value $NotionAppMode
+    $envPath = Join-Path $NotionRoot ".env"
+    Set-EnvLine -Path $envPath -Name "APP_MODE" -Value $NotionAppMode
+    Set-EnvLine -Path $envPath -Name "NOTION_PERSIST_THREADS" -Value "false"
+    Set-EnvLine -Path $envPath -Name "NOTION_GENERATE_TITLES" -Value "false"
+    Set-EnvLine -Path $envPath -Name "NOTION_SAVE_THREAD_OPERATIONS" -Value "false"
+    Set-EnvLine -Path $envPath -Name "NOTION_SET_UNREAD_STATE" -Value "false"
+    Set-EnvLine -Path $envPath -Name "NOTION_DELETE_EPHEMERAL_THREADS" -Value "true"
 }
 
 function Test-NotionLogin {

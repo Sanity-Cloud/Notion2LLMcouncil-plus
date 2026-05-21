@@ -1,5 +1,5 @@
 diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
-index d8b7df2..eed2eb5 100644
+index d8b7df2..e0d79fd 100644
 --- a/frontend/src/App.jsx
 +++ b/frontend/src/App.jsx
 @@ -216,8 +216,10 @@ function App() {
@@ -145,3 +145,13 @@ index d8b7df2..eed2eb5 100644
  
        // Send message with streaming
        await api.sendMessageStream(
+@@ -681,6 +726,9 @@ function App() {
+             case 'complete':
+               // Stream complete, reload conversations list
+               loadConversations();
++              if (currentConversationId) {
++                loadConversation(currentConversationId);
++              }
+               setIsLoading(false);
+               break;
+ 
