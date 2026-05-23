@@ -1,0 +1,3 @@
+[submodule "vendor/notion2api"]
+	path = vendor/notion2api
+	url = https://github.com/Sanity-Cloud/notion2api.git
