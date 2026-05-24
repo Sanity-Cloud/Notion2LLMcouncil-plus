@@ -1,0 +1,568 @@
+diff --git a/backend/council.py b/backend/council.py
+index 7973a0b..4882169 100644
+--- a/backend/council.py
++++ b/backend/council.py
+@@ -45,9 +45,12 @@ def get_provider_for_model(model_id: str) -> Any:
+     return PROVIDERS["openrouter"]
+ 
+ 
+-async def query_model(model: str, messages: List[Dict[str, str]], timeout: float = 120.0, temperature: float = 0.7) -> Dict[str, Any]:
++async def query_model(model: str, messages: List[Dict[str, str]], timeout: float = 120.0, temperature: float = 0.7, attachments: "List[Dict[str, Any]] | None" = None) -> Dict[str, Any]:
+     """Dispatch query to appropriate provider."""
+     provider = get_provider_for_model(model)
++    if attachments and model.startswith("custom:"):
++        # Notion2API is configured as the custom OpenAI-compatible endpoint.
++        return await provider.query(model, messages, timeout, temperature, attachments=attachments)
+     return await provider.query(model, messages, timeout, temperature)
+ 
+ 
+@@ -81,7 +84,7 @@ async def query_models_parallel(models: List[str], messages: List[Dict[str, str]
+     return dict(results)
+ 
+ 
+-async def stage1_collect_responses(user_query: str, search_context: str = "", request: Any = None, models_override: "List[str] | None" = None, history: "List[Dict[str, str]] | None" = None) -> Any:
++async def stage1_collect_responses(user_query: str, search_context: str = "", request: Any = None, models_override: "List[str] | None" = None, history: "List[Dict[str, str]] | None" = None, attachments: "List[Dict[str, Any]] | None" = None) -> Any:
+     """
+     Stage 1: Collect individual responses from all council models.
+ 
+@@ -91,6 +94,7 @@ async def stage1_collect_responses(user_query: str, search_context: str = "", re
+         request: FastAPI request object for checking disconnects
+         models_override: Per-request model list (bypasses global config)
+         history: Prior conversation turns as [{role, content}, ...] for multi-turn
++        attachments: Inline file attachments to pass through to the Notion2API custom endpoint
+ 
+     Yields:
+         - First yield: total_models (int)
+@@ -130,7 +134,7 @@ async def stage1_collect_responses(user_query: str, search_context: str = "", re
+ 
+     async def _query_safe(m: str):
+         try:
+-            return m, await query_model(m, messages, temperature=council_temp)
++            return m, await query_model(m, messages, temperature=council_temp, attachments=attachments)
+         except Exception as e:
+             return m, {"error": True, "error_message": str(e)}
+ 
+diff --git a/backend/main.py b/backend/main.py
+index fd0402a..5dd99db 100644
+--- a/backend/main.py
++++ b/backend/main.py
+@@ -127,12 +127,14 @@ class SendMessageRequest(BaseModel):
+     execution_mode: ExecutionMode = "full"
+     council_models: Optional[List[str]] = None
+     chairman_model: Optional[str] = None
++    attachments: Optional[List[Dict[str, Any]]] = None
+ 
+ 
+ class AskRequest(BaseModel):
+     content: str
+     models: Optional[List[str]] = None
+     chairman_model: Optional[str] = None
++    attachments: Optional[List[Dict[str, Any]]] = None
+     web_search: bool = False
+     execution_mode: ExecutionMode = "chat_only"
+ 
+@@ -207,6 +209,19 @@ class PipelineResult:
+     aggregate_rankings: Any = None
+ 
+ 
++def _content_with_attachment_summary(content: str, attachments: Optional[List[Dict[str, Any]]] = None) -> str:
++    """Append a non-sensitive file list so persisted conversations show what was attached."""
++    files = []
++    for item in attachments or []:
++        if isinstance(item, dict):
++            name = str(item.get("name") or item.get("filename") or "attachment").strip() or "attachment"
++            content_type = str(item.get("content_type") or item.get("mime_type") or "").strip()
++            files.append(f"- {name}" + (f" ({content_type})" if content_type else ""))
++    if not files:
++        return content
++    return f"{content}\n\nAttached files:\n" + "\n".join(files)
++
++
+ async def _run_council_pipeline(
+     content: str,
+     execution_mode: str,
+@@ -216,11 +231,12 @@ async def _run_council_pipeline(
+     chairman_override: Optional[str] = None,
+     request: Optional[Request] = None,
+     history: Optional[List[Dict[str, str]]] = None,
++    attachments: Optional[List[Dict[str, Any]]] = None,
+ ) -> PipelineResult:
+     """Shared orchestration for stage1 → stage2 → stage3 (non-streaming)."""
+     result = PipelineResult()
+ 
+-    async for item in stage1_collect_responses(content, search_context, request=request, models_override=models_override, history=history):
++    async for item in stage1_collect_responses(content, search_context, request=request, models_override=models_override, history=history, attachments=attachments):
+         if isinstance(item, int):
+             continue
+         result.stage1.append(item)
+@@ -319,6 +335,7 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
+     if conversation is None:
+         raise HTTPException(status_code=404, detail="Conversation not found")
+ 
++    content_for_prompt = _content_with_attachment_summary(body.content, body.attachments)
+     history = _build_chat_history(conversation)
+     # Check if this is the first message
+     is_first_message = len(conversation["messages"]) == 0
+@@ -332,7 +349,7 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
+             label_to_model = {}
+             aggregate_rankings = {}
+             
+-            storage.add_user_message(conversation_id, body.content, conversation=conversation)
++            storage.add_user_message(conversation_id, content_for_prompt, conversation=conversation)
+ 
+             # Start title generation in parallel (don't await yet)
+             title_task = None
+@@ -378,7 +395,7 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
+             
+             total_models = 0
+             
+-            async for item in stage1_collect_responses(body.content, search_context, request, models_override=body.council_models, history=history):
++            async for item in stage1_collect_responses(content_for_prompt, search_context, request, models_override=body.council_models, history=history, attachments=body.attachments):
+                 if isinstance(item, int):
+                     total_models = item
+                     print(f"DEBUG: Sending stage1_init with total={total_models}")
+@@ -405,7 +422,7 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
+                 await asyncio.sleep(0.05)
+                 
+                 # Iterate over the async generator
+-                async for item in stage2_collect_rankings(body.content, stage1_results, search_context, request):
++                async for item in stage2_collect_rankings(content_for_prompt, stage1_results, search_context, request):
+                     # First item is the label mapping
+                     if isinstance(item, dict) and not item.get('model'):
+                         label_to_model = item
+@@ -435,7 +452,7 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
+                     print("Client disconnected before Stage 3")
+                     raise asyncio.CancelledError("Client disconnected")
+ 
+-                stage3_result = await stage3_synthesize_final(body.content, stage1_results, stage2_results, search_context, chairman_override=body.chairman_model)
++                stage3_result = await stage3_synthesize_final(content_for_prompt, stage1_results, stage2_results, search_context, chairman_override=body.chairman_model)
+                 yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
+ 
+             # Wait for title generation if it was started
+@@ -510,19 +527,20 @@ async def send_message_sync(conversation_id: str, body: SendMessageRequest):
+     if conversation is None:
+         raise HTTPException(status_code=404, detail="Conversation not found")
+ 
++    content_for_prompt = _content_with_attachment_summary(body.content, body.attachments)
+     history = _build_chat_history(conversation)
+-    storage.add_user_message(conversation_id, body.content, conversation=conversation)
++    storage.add_user_message(conversation_id, content_for_prompt, conversation=conversation)
+ 
+     search_context = ""
+     search_query = ""
+     if body.web_search:
+         settings = get_settings()
+-        search_context, search_query, _ = await _fetch_search_context(body.content, settings)
++        search_context, search_query, _ = await _fetch_search_context(content_for_prompt, settings)
+ 
+     result = await _run_council_pipeline(
+-        body.content, body.execution_mode, search_context,
++        content_for_prompt, body.execution_mode, search_context,
+         models_override=body.council_models, chairman_override=body.chairman_model,
+-        history=history,
++        history=history, attachments=body.attachments,
+     )
+ 
+     metadata = {"execution_mode": body.execution_mode}
+@@ -561,13 +579,14 @@ async def ask_oneshot(body: AskRequest):
+     if not models:
+         raise HTTPException(status_code=400, detail="At least one model is required")
+ 
++    content_for_prompt = _content_with_attachment_summary(body.content, body.attachments)
+     search_context = ""
+     if body.web_search:
+-        search_context, _, _ = await _fetch_search_context(body.content, settings)
++        search_context, _, _ = await _fetch_search_context(content_for_prompt, settings)
+ 
+     result = await _run_council_pipeline(
+-        body.content, body.execution_mode, search_context,
+-        models_override=models, chairman_override=body.chairman_model
++        content_for_prompt, body.execution_mode, search_context,
++        models_override=models, chairman_override=body.chairman_model, attachments=body.attachments
+     )
+ 
+     if body.execution_mode == "chat_only" and len(result.stage1) == 1:
+diff --git a/backend/providers/custom_openai.py b/backend/providers/custom_openai.py
+index 893689b..1a19ef9 100644
+--- a/backend/providers/custom_openai.py
++++ b/backend/providers/custom_openai.py
+@@ -17,7 +17,12 @@ class CustomOpenAIProvider(LLMProvider):
+         api_key = settings.custom_endpoint_api_key or ""
+         return name, url, api_key
+ 
+-    async def query(self, model_id: str, messages: List[Dict[str, str]], timeout: float = 120.0, temperature: float = 0.7) -> Dict[str, Any]:
++    def _supports_attachments(self, name: str, base_url: str) -> bool:
++        """Attachments are only sent to Notion2API-compatible custom endpoints."""
++        marker = f"{name} {base_url}".lower()
++        return "notion" in marker or "127.0.0.1:8000" in marker or "localhost:8000" in marker
++
++    async def query(self, model_id: str, messages: List[Dict[str, str]], timeout: float = 120.0, temperature: float = 0.7, attachments: List[Dict[str, Any]] | None = None) -> Dict[str, Any]:
+         name, base_url, api_key = self._get_config()
+ 
+         if not base_url:
+@@ -35,15 +40,19 @@ class CustomOpenAIProvider(LLMProvider):
+             if api_key:
+                 headers["Authorization"] = f"Bearer {api_key}"
+ 
++            payload = {
++                "model": model,
++                "messages": messages,
++                "temperature": temperature,
++            }
++            if attachments and self._supports_attachments(name, base_url):
++                payload["attachments"] = attachments
++
+             async with httpx.AsyncClient(timeout=timeout) as client:
+                 response = await client.post(
+                     f"{base_url}/chat/completions",
+                     headers=headers,
+-                    json={
+-                        "model": model,
+-                        "messages": messages,
+-                        "temperature": temperature
+-                    }
++                    json=payload
+                 )
+ 
+                 if response.status_code != 200:
+diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
+index e0d79fd..3907b32 100644
+--- a/frontend/src/App.jsx
++++ b/frontend/src/App.jsx
+@@ -23,6 +23,11 @@ const deriveConversationTitle = (content) => {
+   return title;
+ };
+ 
++const isNotion2ApiSettings = (settings = {}) => {
++  const marker = `${settings.custom_endpoint_name || ''} ${settings.custom_endpoint_url || ''}`.toLowerCase();
++  return settings.enabled_providers?.custom === true && (marker.includes('notion') || marker.includes('127.0.0.1:8000') || marker.includes('localhost:8000'));
++};
++
+ function App() {
+   const [conversations, setConversations] = useState([]);
+   const [currentConversationId, setCurrentConversationId] = useState(null);
+@@ -40,6 +45,7 @@ function App() {
+   const [chairmanModel, setChairmanModel] = useState(null);
+   const [searchProvider, setSearchProvider] = useState('duckduckgo');
+   const [executionMode, setExecutionMode] = useState(DEFAULT_EXECUTION_MODE);
++  const [notion2ApiAttachmentsEnabled, setNotion2ApiAttachmentsEnabled] = useState(false);
+   const [sidebarOpen, setSidebarOpen] = useState(false);
+   const abortControllerRef = useRef(null);
+   const requestIdRef = useRef(0);
+@@ -59,6 +65,7 @@ function App() {
+       // Load execution mode preference
+       setExecutionMode(settings.execution_mode || DEFAULT_EXECUTION_MODE);
+       setSearchProvider(settings.search_provider || 'duckduckgo');
++      setNotion2ApiAttachmentsEnabled(isNotion2ApiSettings(settings));
+ 
+       const hasCustomEndpoint =
+         settings.enabled_providers?.custom === true &&
+@@ -130,6 +137,7 @@ function App() {
+       setCouncilModels(models);
+       setChairmanModel(chairman);
+       setSearchProvider(settings.search_provider || 'duckduckgo');
++      setNotion2ApiAttachmentsEnabled(isNotion2ApiSettings(settings));
+ 
+       const hasCouncilMembers = models.some(m => m && m.trim() !== '');
+       const hasChairman = chairman && chairman.trim() !== '';
+@@ -332,7 +340,7 @@ function App() {
+     }
+   };
+ 
+-  const handleSendMessage = async (content, webSearch) => {
++  const handleSendMessage = async (content, webSearch, attachments = []) => {
+     if (!currentConversationId) return;
+ 
+     // Assign unique ID to this request to prevent race conditions
+@@ -361,7 +369,7 @@ function App() {
+     setIsLoading(true);
+     try {
+       // Optimistically add user message to UI
+-      const userMessage = { role: 'user', content };
++      const userMessage = { role: 'user', content, attachments: attachments.map(({ name, content_type }) => ({ name, content_type })) };
+       setCurrentConversation((prev) => {
+         const target = prev && prev.id === activeConversationId ? prev : {
+           id: activeConversationId,
+@@ -419,7 +427,7 @@ function App() {
+       // Send message with streaming
+       await api.sendMessageStream(
+         activeConversationId,
+-        { content, webSearch, executionMode },
++        { content, webSearch, executionMode, attachments },
+         (eventType, event) => {
+           const isActiveConversation = activeConversationIdRef.current === activeConversationId;
+           if (!isActiveConversation && !['title_complete', 'complete', 'error'].includes(eventType)) {
+@@ -839,6 +847,7 @@ function App() {
+         onSendMessage={handleSendMessage}
+         onAbort={handleAbort}
+         isLoading={isLoading}
++        attachmentsEnabled={notion2ApiAttachmentsEnabled}
+         councilConfigured={councilConfigured}
+         councilModels={councilModels}
+         chairmanModel={chairmanModel}
+diff --git a/frontend/src/api.js b/frontend/src/api.js
+index af99a5e..78274ab 100644
+--- a/frontend/src/api.js
++++ b/frontend/src/api.js
+@@ -330,7 +330,7 @@ export const api = {
+    * @returns {Promise<void>}
+    */
+   async sendMessageStream(conversationId, options, onEvent, signal) {
+-    const { content, webSearch = false, executionMode = 'full' } = options;
++    const { content, webSearch = false, executionMode = 'full', attachments = [] } = options;
+     const response = await fetch(
+       `${API_BASE}/api/conversations/${conversationId}/message/stream?_t=${Date.now()}`,
+       {
+@@ -339,7 +339,7 @@ export const api = {
+           'Content-Type': 'application/json',
+           'Cache-Control': 'no-cache',
+         },
+-        body: JSON.stringify({ content, web_search: webSearch, execution_mode: executionMode }),
++        body: JSON.stringify({ content, web_search: webSearch, execution_mode: executionMode, attachments }),
+         signal,
+         cache: 'no-store',
+       }
+diff --git a/frontend/src/components/ChatInterface.css b/frontend/src/components/ChatInterface.css
+index 879e77b..28ae399 100644
+--- a/frontend/src/components/ChatInterface.css
++++ b/frontend/src/components/ChatInterface.css
+@@ -683,4 +683,81 @@
+     width: 40px;
+     height: 40px;
+   }
++}
++
++.attach-button {
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  width: 36px;
++  height: 36px;
++  border-radius: 50%;
++  cursor: pointer;
++  background: rgba(59, 130, 246, 0.14);
++  border: 1px solid rgba(59, 130, 246, 0.28);
++  color: var(--text-primary);
++  margin-bottom: 6px;
++  transition: all 0.2s;
++}
++
++.attach-button:hover:not(:disabled) {
++  background: rgba(59, 130, 246, 0.24);
++  box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
++}
++
++.attach-button:disabled {
++  opacity: 0.45;
++  cursor: not-allowed;
++}
++
++.attachment-file-input {
++  display: none;
++}
++
++.attachment-tray,
++.message-attachments {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 8px;
++}
++
++.attachment-tray {
++  margin-top: -2px;
++}
++
++.message-attachments {
++  margin-top: 12px;
++}
++
++.attachment-chip,
++.attachment-pill {
++  display: inline-flex;
++  align-items: center;
++  gap: 6px;
++  border: 1px solid rgba(59, 130, 246, 0.25);
++  border-radius: 999px;
++  background: rgba(59, 130, 246, 0.12);
++  color: var(--text-secondary);
++  font-size: 12px;
++  padding: 5px 9px;
++}
++
++.attachment-chip.error {
++  border-color: rgba(239, 68, 68, 0.4);
++  background: rgba(239, 68, 68, 0.12);
++  color: #fca5a5;
++}
++
++.attachment-chip button {
++  border: none;
++  background: transparent;
++  color: inherit;
++  cursor: pointer;
++  font-size: 14px;
++  line-height: 1;
++  padding: 0 2px;
++}
++
++.attachment-error {
++  color: #fca5a5;
+ }
+\ No newline at end of file
+diff --git a/frontend/src/components/ChatInterface.jsx b/frontend/src/components/ChatInterface.jsx
+index 3879816..7650740 100644
+--- a/frontend/src/components/ChatInterface.jsx
++++ b/frontend/src/components/ChatInterface.jsx
+@@ -15,6 +15,7 @@ export default function ChatInterface({
+     onSendMessage,
+     onAbort,
+     isLoading,
++    attachmentsEnabled = false,
+     councilConfigured,
+     onOpenSettings,
+     councilModels = [],
+@@ -25,6 +26,8 @@ export default function ChatInterface({
+ }) {
+     const [input, setInput] = useState('');
+     const [webSearch, setWebSearch] = useState(false);
++    const [attachments, setAttachments] = useState([]);
++    const fileInputRef = useRef(null);
+     const messagesEndRef = useRef(null);
+     const messagesContainerRef = useRef(null);
+ 
+@@ -47,11 +50,54 @@ export default function ChatInterface({
+         }
+     }, [conversation]);
+ 
++    const readFileAsAttachment = (file) => new Promise((resolve, reject) => {
++        const reader = new FileReader();
++        reader.onload = () => resolve({
++            name: file.name,
++            content_type: file.type || 'application/octet-stream',
++            file_data: reader.result,
++        });
++        reader.onerror = () => reject(reader.error || new Error(`Could not read ${file.name}`));
++        reader.readAsDataURL(file);
++    });
++
++    const handleAttachFiles = async (event) => {
++        const files = Array.from(event.target.files || []);
++        event.target.value = '';
++        if (!files.length) return;
++
++        const remaining = Math.max(0, 5 - attachments.length);
++        const selected = files.slice(0, remaining);
++        const maxBytes = 20 * 1024 * 1024;
++        const allowed = new Set(['application/pdf', 'text/csv', 'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/heic']);
++
++        const next = [];
++        for (const file of selected) {
++            const type = file.type || 'application/octet-stream';
++            if (file.size > maxBytes || !allowed.has(type)) {
++                next.push({
++                    name: file.name,
++                    content_type: type,
++                    error: file.size > maxBytes ? 'File is over 20 MB' : `Unsupported type: ${type}`,
++                });
++                continue;
++            }
++            next.push(await readFileAsAttachment(file));
++        }
++        setAttachments(prev => [...prev, ...next]);
++    };
++
++    const removeAttachment = (index) => {
++        setAttachments(prev => prev.filter((_, i) => i !== index));
++    };
++
+     const handleSubmit = (e) => {
+         e.preventDefault();
+-        if (input.trim() && !isLoading) {
+-            onSendMessage(input, webSearch);
++        const validAttachments = attachments.filter(item => !item.error);
++        if ((input.trim() || validAttachments.length) && !isLoading) {
++            onSendMessage(input.trim() || 'Please analyze the attached file(s).', webSearch, validAttachments);
+             setInput('');
++            setAttachments([]);
+         }
+     };
+ 
+@@ -107,9 +153,20 @@ export default function ChatInterface({
+ 
+                             <div className="message-content">
+                                 {msg.role === 'user' ? (
+-                                    <div className="markdown-content">
+-                                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+-                                    </div>
++                                    <>
++                                        <div className="markdown-content">
++                                            <ReactMarkdown>{msg.content}</ReactMarkdown>
++                                        </div>
++                                        {msg.attachments?.length > 0 && (
++                                            <div className="message-attachments">
++                                                {msg.attachments.map((file, fileIndex) => (
++                                                    <span className="attachment-pill" key={`${file.name}-${fileIndex}`}>
++                                                        📎 {file.name}
++                                                    </span>
++                                                ))}
++                                            </div>
++                                        )}
++                                    </>
+                                 ) : (
+                                     <>
+                                         {/* Search Loading */}
+@@ -247,6 +304,28 @@ export default function ChatInterface({
+                                 {webSearch && <span className="search-label">Search On</span>}
+                             </label>
+ 
++                            {attachmentsEnabled && (
++                                <>
++                                    <button
++                                        type="button"
++                                        className="attach-button"
++                                        onClick={() => fileInputRef.current?.click()}
++                                        disabled={isLoading || attachments.length >= 5}
++                                        title="Attach files for Notion2API"
++                                    >
++                                        📎
++                                    </button>
++                                    <input
++                                        ref={fileInputRef}
++                                        className="attachment-file-input"
++                                        type="file"
++                                        multiple
++                                        accept=".pdf,.csv,image/png,image/jpeg,image/gif,image/webp,image/heic"
++                                        onChange={handleAttachFiles}
++                                    />
++                                </>
++                            )}
++
+                             <textarea
+                                 className="message-input"
+                                 placeholder={isLoading ? "Consulting..." : "Ask the Council..."}
+@@ -263,12 +342,24 @@ export default function ChatInterface({
+                                     ⏹
+                                 </button>
+                             ) : (
+-                                <button type="submit" className="send-button" disabled={!input.trim()}>
++                                <button type="submit" className="send-button" disabled={!input.trim() && !attachments.some(item => !item.error)}>
+                                     ➤
+                                 </button>
+                             )}
+                         </div>
+ 
++                        {attachments.length > 0 && (
++                            <div className="attachment-tray">
++                                {attachments.map((file, index) => (
++                                    <span className={`attachment-chip ${file.error ? 'error' : ''}`} key={`${file.name}-${index}`}>
++                                        📎 {file.name}
++                                        {file.error && <span className="attachment-error"> — {file.error}</span>}
++                                        <button type="button" onClick={() => removeAttachment(index)} aria-label={`Remove ${file.name}`}>×</button>
++                                    </span>
++                                ))}
++                            </div>
++                        )}
++
+                         <div className="input-row-bottom">
+                             <ExecutionModeToggle
+                                 value={executionMode}

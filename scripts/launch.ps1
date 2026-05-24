@@ -570,7 +570,6 @@ if (-not ($BoundParameters -contains "CouncilRoot")) { $CouncilRoot = Use-Config
 if (-not ($BoundParameters -contains "NotionPort")) { $NotionPort = [int](Use-ConfigValue -Value (Get-ConfigProperty $Config @("notion", "port")) -Fallback $NotionPort) }
 if (-not ($BoundParameters -contains "CouncilBackendPort")) { $CouncilBackendPort = [int](Use-ConfigValue -Value (Get-ConfigProperty $Config @("council", "backendPort")) -Fallback $CouncilBackendPort) }
 if (-not ($BoundParameters -contains "CouncilFrontendPort")) { $CouncilFrontendPort = [int](Use-ConfigValue -Value (Get-ConfigProperty $Config @("council", "frontendPort")) -Fallback $CouncilFrontendPort) }
-
 $ProviderName = Use-ConfigValue -Value (Get-ConfigProperty $Config @("provider", "name")) -Fallback "Notion2API"
 $ProviderUrlPath = Use-ConfigValue -Value (Get-ConfigProperty $Config @("provider", "urlPath")) -Fallback "/v1"
 $NotionAppMode = Use-ConfigValue -Value (Get-ConfigProperty $Config @("notion", "appMode")) -Fallback "standard"
@@ -582,6 +581,10 @@ $ConfiguredChairmanModel = Use-ConfigValue -Value (Get-ConfigProperty $Config @(
 $ConfiguredCouncilMemberFilters = Get-ConfigProperty $Config @("provider", "councilMemberFilters")
 $ConfiguredChairmanFilter       = Use-ConfigValue -Value (Get-ConfigProperty $Config @("provider", "chairmanFilter"))       -Fallback "remote"
 $ConfiguredSearchQueryFilter    = Use-ConfigValue -Value (Get-ConfigProperty $Config @("provider", "searchQueryFilter"))    -Fallback "remote"
+if (-not ($BoundParameters -contains "NotionBranch")) { $NotionBranch = Use-ConfigValue -Value (Get-ConfigProperty $Config @("notion", "branch")) -Fallback $NotionBranch }
+if (-not ($BoundParameters -contains "NotionRepoUrl")) { $NotionRepoUrl = Use-ConfigValue -Value (Get-ConfigProperty $Config @("notion", "repoUrl")) -Fallback $NotionRepoUrl }
+if (-not ($BoundParameters -contains "CouncilBranch")) { $CouncilBranch = Use-ConfigValue -Value (Get-ConfigProperty $Config @("council", "branch")) -Fallback $CouncilBranch }
+if (-not ($BoundParameters -contains "CouncilRepoUrl")) { $CouncilRepoUrl = Use-ConfigValue -Value (Get-ConfigProperty $Config @("council", "repoUrl")) -Fallback $CouncilRepoUrl }
 
 if ($UseVendor) { $NotionRoot = Join-Path $VendorRoot "notion2api"; $CouncilRoot = Join-Path $VendorRoot "llm-council-plus" }
 Initialize-Repo -Path $NotionRoot -Url $NotionRepoUrl -Branch $NotionBranch
@@ -589,21 +592,7 @@ Initialize-Repo -Path $CouncilRoot -Url $CouncilRepoUrl -Branch $CouncilBranch
 $NotionRoot = (Resolve-Path $NotionRoot).Path
 $CouncilRoot = (Resolve-Path $CouncilRoot).Path
 
-Update-RepoPatch `
-    -Root $CouncilRoot `
-    -PatchPath (Join-Path $RepoRoot "scripts\patches\llm-council-plus-custom-model-icons.patch") `
-    -Name "LLM Council custom model brand icons" `
-    -Optional
-
-Update-RepoPatch `
-    -Root $CouncilRoot `
-    -PatchPath (Join-Path $RepoRoot "scripts\patches\llm-council-plus-first-message-title.patch") `
-    -Name "LLM Council first message conversation titles"
-
-Update-RepoPatch `
-    -Root $CouncilRoot `
-    -PatchPath (Join-Path $RepoRoot "scripts\patches\llm-council-plus-new-chat-stream-race.patch") `
-    -Name "LLM Council new chat stream race guard"
+Apply-SubmodulePatches -CouncilRoot $CouncilRoot -RepoRoot $RepoRoot
 
 Write-Step "Preparing Services"
 Initialize-PythonRequirements -Root $NotionRoot -Label "Notion2API" -RequiredModules @("cloudscraper", "fastapi", "uvicorn", "dotenv", "slowapi", "websocket")

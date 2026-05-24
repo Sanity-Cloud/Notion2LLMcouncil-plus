@@ -85,6 +85,25 @@ function Reset-PatchTargetPaths {
     }
 }
 
+function Invoke-RepoPatchPostHooks {
+    param(
+        [string]$Root,
+        [string]$PatchPath,
+        [string]$Name
+    )
+
+    $leaf = Split-Path $PatchPath -Leaf
+    if ($leaf -ne "llm-council-plus-new-chat-stream-race.patch") { return }
+
+    $uploadPatch = Join-Path (Split-Path $PatchPath -Parent) "llm-council-plus-notion2api-file-uploads.patch"
+    if (-not (Test-Path $uploadPatch)) { return }
+
+    Update-RepoPatch `
+        -Root $Root `
+        -PatchPath $uploadPatch `
+        -Name "LLM Council Notion2API file uploads"
+}
+
 function Update-RepoPatch {
     param(
         [string]$Root,
@@ -103,12 +122,14 @@ function Update-RepoPatch {
                 Write-Step "Applying patch: $Name"
                 cmd.exe /c "git apply --ignore-whitespace `"$PatchPath`""
                 if ($LASTEXITCODE -ne 0) { throw "Failed to apply patch: $Name" }
+                Invoke-RepoPatchPostHooks -Root $Root -PatchPath $PatchPath -Name $Name
                 return
             }
 
             cmd.exe /c "git apply --reverse --check --ignore-whitespace `"$PatchPath`" 2>nul"
             if ($LASTEXITCODE -eq 0) {
                 Write-Step "Patch already applied: $Name"
+                Invoke-RepoPatchPostHooks -Root $Root -PatchPath $PatchPath -Name $Name
                 return
             }
 
@@ -122,6 +143,7 @@ function Update-RepoPatch {
                     Write-Step "Applying patch after reset: $Name"
                     cmd.exe /c "git apply --ignore-whitespace `"$PatchPath`""
                     if ($LASTEXITCODE -ne 0) { throw "Failed to apply patch after reset: $Name" }
+                    Invoke-RepoPatchPostHooks -Root $Root -PatchPath $PatchPath -Name $Name
                     return
                 }
             }
@@ -139,4 +161,79 @@ function Update-RepoPatch {
     }
 }
 
-Export-ModuleMember -Function Initialize-Repo, Get-Python, Update-RepoPatch
+function Apply-SubmodulePatches {
+    param(
+        [string]$CouncilRoot,
+        [string]$RepoRoot
+    )
+
+    $PatchFiles = @(
+        (Join-Path $RepoRoot "scripts\patches\llm-council-plus-custom-model-icons.patch"),
+        (Join-Path $RepoRoot "scripts\patches\llm-council-plus-first-message-title.patch"),
+        (Join-Path $RepoRoot "scripts\patches\llm-council-plus-new-chat-stream-race.patch"),
+        (Join-Path $RepoRoot "scripts\patches\llm-council-plus-notion2api-file-uploads.patch")
+    )
+
+    # 1. Get submodule commit
+    $SubmoduleCommit = ""
+    try {
+        $SubmoduleCommit = (git -C $CouncilRoot rev-parse HEAD 2>$null).Trim()
+    } catch {
+        # Fallback if git fails
+    }
+
+    # 2. Get hash of all patch files that exist
+    $PatchHashes = ""
+    foreach ($file in $PatchFiles) {
+        if (Test-Path $file) {
+            $hash = (Get-FileHash -Path $file -Algorithm SHA256).Hash
+            $fileName = Split-Path $file -Leaf
+            $PatchHashes += "$fileName=$hash`n"
+        }
+    }
+
+    $ExpectedState = "SubmoduleCommit=$SubmoduleCommit`n$PatchHashes"
+
+    $MarkerFile = Join-Path $CouncilRoot ".patches-applied"
+    $CurrentState = ""
+    if (Test-Path $MarkerFile) {
+        $CurrentState = Get-Content -Raw -Path $MarkerFile
+    }
+
+    if ($CurrentState -eq $ExpectedState) {
+        Write-Step "LLM Council patches already applied (matching marker file found)"
+        return
+    }
+
+    Write-Step "Submodule patches not applied or dirty; resetting and applying all patches"
+    Push-Location $CouncilRoot
+    try {
+        cmd.exe /c "git checkout -- ."
+        cmd.exe /c "git clean -fd"
+    } finally {
+        Pop-Location
+    }
+
+    # Now apply the patches in strict order
+    Update-RepoPatch `
+        -Root $CouncilRoot `
+        -PatchPath (Join-Path $RepoRoot "scripts\patches\llm-council-plus-custom-model-icons.patch") `
+        -Name "LLM Council custom model brand icons" `
+        -Optional
+
+    Update-RepoPatch `
+        -Root $CouncilRoot `
+        -PatchPath (Join-Path $RepoRoot "scripts\patches\llm-council-plus-first-message-title.patch") `
+        -Name "LLM Council first message conversation titles"
+
+    Update-RepoPatch `
+        -Root $CouncilRoot `
+        -PatchPath (Join-Path $RepoRoot "scripts\patches\llm-council-plus-new-chat-stream-race.patch") `
+        -Name "LLM Council new chat stream race guard"
+
+    # Write marker file if we got here successfully
+    Set-Content -Path $MarkerFile -Value $ExpectedState -NoNewline
+    Write-Step "Patches successfully applied and marker file written"
+}
+
+Export-ModuleMember -Function Initialize-Repo, Get-Python, Update-RepoPatch, Apply-SubmodulePatches

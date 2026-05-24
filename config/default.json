@@ -2,7 +2,7 @@
   "notion": {
     "localRoot": "vendor\\notion2api",
     "repoUrl": "https://github.com/Sanity-Cloud/notion2api.git",
-    "branch": "main",
+    "branch": "feat/chat-history-resume-fork",
     "port": 8000,
     "appMode": "standard",
     "autoLogin": true,
