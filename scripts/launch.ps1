@@ -183,7 +183,7 @@ function Initialize-PythonRequirements {
         $installLabel = "$Label Python project dependencies"
     }
 
-    $requirementsHash = (Get-FileHash -Path $dependencySource -Algorithm SHA256).Hash
+    $requirementsHash = Get-Sha256Hash -Path $dependencySource
     $markerPath = Join-Path $Root ".notion2council-requirements.sha256"
     $markerHash = if (Test-Path $markerPath) { (Get-Content -Path $markerPath -Raw).Trim() } else { "" }
     $modulesOk = Test-PythonModules -Python $python -Modules $RequiredModules

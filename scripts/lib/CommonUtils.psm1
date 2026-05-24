@@ -22,4 +22,22 @@ function ConvertTo-StringArray
     return @($Value | ForEach-Object { [string]$_ })
 }
 
-Export-ModuleMember -Function Write-Step, Read-JsonFile, ConvertTo-StringArray
+function Get-Sha256Hash
+{
+    param([string]$Path)
+    $stream = [System.IO.File]::OpenRead($Path)
+    try {
+        $sha256 = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            $hashBytes = $sha256.ComputeHash($stream)
+        } finally {
+            $sha256.Dispose()
+        }
+    } finally {
+        $stream.Dispose()
+    }
+
+    return ([System.BitConverter]::ToString($hashBytes) -replace '-', '').ToLowerInvariant()
+}
+
+Export-ModuleMember -Function Write-Step, Read-JsonFile, ConvertTo-StringArray, Get-Sha256Hash

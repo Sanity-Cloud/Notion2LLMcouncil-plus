@@ -1,3 +1,8 @@
+$commonUtilsPath = Join-Path $PSScriptRoot "CommonUtils.psm1"
+if (Test-Path $commonUtilsPath) {
+    Import-Module $commonUtilsPath -Force
+}
+
 function Initialize-Repo {
     param(
         [string]$Path,
@@ -222,7 +227,7 @@ function Apply-SubmodulePatches {
     $PatchHashes = ""
     foreach ($file in $PatchFiles) {
         if (Test-Path $file) {
-            $hash = (Get-FileHash -Path $file -Algorithm SHA256).Hash
+            $hash = Get-Sha256Hash -Path $file
             $fileName = Split-Path $file -Leaf
             $PatchHashes += "$fileName=$hash`n"
         }
