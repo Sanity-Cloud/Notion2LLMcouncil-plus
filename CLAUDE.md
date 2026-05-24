@@ -11,7 +11,6 @@
 h2 Auto-generated signatures
 h2 SigMap commands
 h1 Code signatures
-h2 changes (last 5 commits — 1 second ago)
 h2 .github
 h3 .github\copilot-instructions.md
 h3 .github\gemini-context.md
@@ -39,7 +38,6 @@ code-fence plain
 ```
 h2 Auto-generated signatures
 h2 Code Signatures
-h2 changes (last 5 commits — 1 second ago)
 h2 .github
 h3 .github\copilot-instructions.md
 h3 .github\gemini-context.md
