@@ -3,7 +3,7 @@
 ## Auto-generated signatures
 <!-- Updated by gen-context.js -->
 You are a coding assistant with complete knowledge of this codebase.
-The following code signatures were extracted by SigMap v6.5.1 on 2026-05-24T13:17:12.656Z.
+The following code signatures were extracted by SigMap v6.5.1 on 2026-05-24T13:17:24.582Z.
 
 These signatures represent every public function, class, and type in the project.
 Refer to them when answering questions about code structure, APIs, and implementation.
@@ -18,57 +18,54 @@ Before answering questions about specific code areas, suggest running `sigmap as
 h2 Auto-generated signatures
 h2 SigMap commands
 h1 Code signatures
-h2 deps
 h2 .github
-h3 .github\gemini-context.md
 h3 .github\copilot-instructions.md
-h2 scratch
-h3 scratch\llm-council-plus-temp\backend\providers\openai.py
-h3 scratch\llm-council-plus-temp\backend\test_tinyfish.py
-h3 scratch\llm-council-plus-temp\backend\tests\test_settings_backup.py
-h3 scratch\llm-council-plus-temp\docker-compose.yml
-h3 scratch\llm-council-plus-temp\docker-entrypoint.sh
-h1 Fix data directory ownership so appuser can write settings/conversations.
-h3 scratch\llm-council-plus-temp\docs\DOCKER.md
-h3 scratch\llm-council-plus-temp\docs\QUICKSTART.md
-h3 scratch\llm-council-plus-temp\docs\mcp\EXAMPLES.md
-h3 scratch\llm-council-plus-temp\docs\mcp\CHOOSING-TRANSPORT.md
-h3 scratch\llm-council-plus-temp\docs\archive\GEMINI-2025-11-27.md
-h3 scratch\llm-council-plus-temp\docs\mcp\TOOLS.md
-h3 scratch\llm-council-plus-temp\docs\mcp\SETUP-REMOTE.md
-h3 scratch\llm-council-plus-temp\docs\mcp\SETUP-LOCAL.md
-h3 scratch\llm-council-plus-temp\docs\mcp\README.md
-h3 scratch\llm-council-plus-temp\frontend\README.md
-h3 scratch\llm-council-plus-temp\frontend\index.html
+h3 .github\gemini-context.md
+h3 .github\workflows\release.yml
+h3 .github\workflows\validate.yml
+h2 electron
+h3 electron\diagnostics-renderer.js
+h3 electron\diagnostics.html
+h3 electron\hotkeys-renderer.js
+h3 electron\hotkeys.html
+h3 electron\lib\config.js
+h3 electron\lib\diagnostics.js
+h3 electron\lib\integration-config.js
+h3 electron\lib\launcher.js
+h3 electron\lib\logger.js
+h3 electron\lib\utils.js
+h3 electron\main.js
+h3 electron\windows\diagnostics.js
+h3 electron\windows\hotkeys.js
+h3 electron\windows\main.js
+code-fence plain
 ```
 
 ### .github\gemini-context.md
 ```
 h2 Auto-generated signatures
 h2 Code Signatures
-h2 deps
 h2 .github
-h3 .github\gemini-context.md
 h3 .github\copilot-instructions.md
-h2 scratch
-h3 scratch\llm-council-plus-temp\backend\providers\openai.py
-h3 scratch\llm-council-plus-temp\backend\test_tinyfish.py
-h3 scratch\llm-council-plus-temp\backend\tests\test_settings_backup.py
-h3 scratch\llm-council-plus-temp\docker-compose.yml
-h3 scratch\llm-council-plus-temp\docker-entrypoint.sh
-h1 Fix data directory ownership so appuser can write settings/conversations.
-h3 scratch\llm-council-plus-temp\docs\DOCKER.md
-h3 scratch\llm-council-plus-temp\docs\QUICKSTART.md
-h3 scratch\llm-council-plus-temp\docs\mcp\EXAMPLES.md
-h3 scratch\llm-council-plus-temp\docs\mcp\CHOOSING-TRANSPORT.md
-h3 scratch\llm-council-plus-temp\docs\archive\GEMINI-2025-11-27.md
-h3 scratch\llm-council-plus-temp\docs\mcp\TOOLS.md
-h3 scratch\llm-council-plus-temp\docs\mcp\SETUP-REMOTE.md
-h3 scratch\llm-council-plus-temp\docs\mcp\SETUP-LOCAL.md
-h3 scratch\llm-council-plus-temp\docs\mcp\README.md
-h3 scratch\llm-council-plus-temp\frontend\README.md
-h3 scratch\llm-council-plus-temp\frontend\index.html
-h3 scratch\llm-council-plus-temp\frontend\src\App.css
+h3 .github\gemini-context.md
+h3 .github\workflows\release.yml
+h3 .github\workflows\validate.yml
+h2 electron
+h3 electron\diagnostics-renderer.js
+h3 electron\diagnostics.html
+h3 electron\hotkeys-renderer.js
+h3 electron\hotkeys.html
+h3 electron\lib\config.js
+h3 electron\lib\diagnostics.js
+h3 electron\lib\integration-config.js
+h3 electron\lib\launcher.js
+h3 electron\lib\logger.js
+h3 electron\lib\utils.js
+h3 electron\main.js
+h3 electron\windows\diagnostics.js
+h3 electron\windows\hotkeys.js
+h3 electron\windows\main.js
+code-fence plain
 ```
 
 ### .github\workflows\release.yml
