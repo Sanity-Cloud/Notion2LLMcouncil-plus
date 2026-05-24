@@ -92,16 +92,28 @@ function Invoke-RepoPatchPostHooks {
         [string]$Name
     )
 
+    $patchDir = Split-Path $PatchPath -Parent
     $leaf = Split-Path $PatchPath -Leaf
-    if ($leaf -ne "llm-council-plus-new-chat-stream-race.patch") { return }
 
-    $uploadPatch = Join-Path (Split-Path $PatchPath -Parent) "llm-council-plus-notion2api-file-uploads.patch"
-    if (-not (Test-Path $uploadPatch)) { return }
+    if ($leaf -eq "llm-council-plus-new-chat-stream-race.patch") {
+        $uploadPatch = Join-Path $patchDir "llm-council-plus-notion2api-file-uploads.patch"
+        if (Test-Path $uploadPatch) {
+            Update-RepoPatch `
+                -Root $Root `
+                -PatchPath $uploadPatch `
+                -Name "LLM Council Notion2API file uploads"
+        }
+    }
 
-    Update-RepoPatch `
-        -Root $Root `
-        -PatchPath $uploadPatch `
-        -Name "LLM Council Notion2API file uploads"
+    if ($leaf -eq "llm-council-plus-notion2api-file-uploads.patch") {
+        $rateLimitPatch = Join-Path $patchDir "llm-council-plus-notion2api-upload-rate-limit.patch"
+        if (Test-Path $rateLimitPatch) {
+            Update-RepoPatch `
+                -Root $Root `
+                -PatchPath $rateLimitPatch `
+                -Name "LLM Council Notion2API upload rate-limit guard"
+        }
+    }
 }
 
 function Update-RepoPatch {
@@ -171,7 +183,8 @@ function Apply-SubmodulePatches {
         (Join-Path $RepoRoot "scripts\patches\llm-council-plus-custom-model-icons.patch"),
         (Join-Path $RepoRoot "scripts\patches\llm-council-plus-first-message-title.patch"),
         (Join-Path $RepoRoot "scripts\patches\llm-council-plus-new-chat-stream-race.patch"),
-        (Join-Path $RepoRoot "scripts\patches\llm-council-plus-notion2api-file-uploads.patch")
+        (Join-Path $RepoRoot "scripts\patches\llm-council-plus-notion2api-file-uploads.patch"),
+        (Join-Path $RepoRoot "scripts\patches\llm-council-plus-notion2api-upload-rate-limit.patch")
     )
 
     # 1. Get submodule commit
@@ -214,7 +227,9 @@ function Apply-SubmodulePatches {
         Pop-Location
     }
 
-    # Now apply the patches in strict order
+    # Now apply the patches in strict order. The race patch post-hook applies
+    # the upload patch, and the upload patch post-hook applies the upload
+    # rate-limit guard.
     Update-RepoPatch `
         -Root $CouncilRoot `
         -PatchPath (Join-Path $RepoRoot "scripts\patches\llm-council-plus-custom-model-icons.patch") `
