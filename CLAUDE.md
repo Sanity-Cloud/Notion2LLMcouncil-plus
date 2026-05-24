@@ -4,6 +4,12 @@
 <!-- Updated by gen-context.js -->
 # Code signatures
 
+## changes (last 5 commits — 1 second ago)
+```
+.github\copilot-instructions.md               +focusChatInput  +ensureChatInputReady  +clearCouncilUiStorage  +getActiveRuntimeUrls
+.github\gemini-context.md                     +focusChatInput  +ensureChatInputReady  +clearCouncilUiStorage  +getActiveRuntimeUrls
+```
+
 ## .github
 
 ### .github\copilot-instructions.md
@@ -11,14 +17,12 @@
 h2 Auto-generated signatures
 h2 SigMap commands
 h1 Code signatures
-h2 changes (last 5 commits — 1 second ago)
 h2 .github
 h3 .github\copilot-instructions.md
 h3 .github\gemini-context.md
 h3 .github\workflows\release.yml
 h3 .github\workflows\validate.yml
 h2 electron
-h3 electron\main.js
 h3 electron\diagnostics-renderer.js
 h3 electron\diagnostics.html
 h3 electron\hotkeys-renderer.js
@@ -29,6 +33,7 @@ h3 electron\lib\integration-config.js
 h3 electron\lib\launcher.js
 h3 electron\lib\logger.js
 h3 electron\lib\utils.js
+h3 electron\main.js
 h3 electron\windows\diagnostics.js
 h3 electron\windows\hotkeys.js
 h3 electron\windows\main.js
@@ -39,14 +44,12 @@ code-fence plain
 ```
 h2 Auto-generated signatures
 h2 Code Signatures
-h2 changes (last 5 commits — 1 second ago)
 h2 .github
 h3 .github\copilot-instructions.md
 h3 .github\gemini-context.md
 h3 .github\workflows\release.yml
 h3 .github\workflows\validate.yml
 h2 electron
-h3 electron\main.js
 h3 electron\diagnostics-renderer.js
 h3 electron\diagnostics.html
 h3 electron\hotkeys-renderer.js
@@ -57,6 +60,7 @@ h3 electron\lib\integration-config.js
 h3 electron\lib\launcher.js
 h3 electron\lib\logger.js
 h3 electron\lib\utils.js
+h3 electron\main.js
 h3 electron\windows\diagnostics.js
 h3 electron\windows\hotkeys.js
 h3 electron\windows\main.js
