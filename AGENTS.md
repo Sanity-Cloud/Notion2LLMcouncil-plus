@@ -436,12 +436,6 @@ Do not change the distribution strategy without updating `README.md`, `DEVELOPME
 | To query by topic | `sigmap --query "<topic>"` |
 
 Always run `sigmap ask` or `sigmap --query` before searching for files relevant to a task.
-## changes (last 5 commits — 1 second ago)
-```
-.github\copilot-instructions.md               +focusChatInput  +ensureChatInputReady  +clearCouncilUiStorage  +getActiveRuntimeUrls
-.github\gemini-context.md                     +focusChatInput  +ensureChatInputReady  +clearCouncilUiStorage  +getActiveRuntimeUrls
-```
-
 ## .github
 
 ### .github\copilot-instructions.md

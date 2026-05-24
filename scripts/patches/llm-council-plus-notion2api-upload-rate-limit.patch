@@ -1,5 +1,5 @@
 diff --git a/backend/council.py b/backend/council.py
-index 4882169..9cfc8dd 100644
+index 7973a0b..9d0b29c 100644
 --- a/backend/council.py
 +++ b/backend/council.py
 @@ -3,6 +3,7 @@
@@ -10,7 +10,7 @@ index 4882169..9cfc8dd 100644
  from . import openrouter
  from . import ollama_client
  from .config import get_council_models, get_chairman_model
-@@ -34,6 +35,25 @@ PROVIDERS = {
+@@ -34,6 +35,31 @@ PROVIDERS = {
      "custom": CustomOpenAIProvider(),
  }
  
@@ -20,11 +20,17 @@ index 4882169..9cfc8dd 100644
 +
 +def _attachment_delay_seconds() -> float:
 +    """Delay between attachment-bearing Notion2API calls to avoid file-import 429s."""
-+    raw = os.getenv("LLM_COUNCIL_ATTACHMENT_DELAY_SECONDS", "12")
++    try:
++        settings = get_settings()
++        if hasattr(settings, "attachment_delay_seconds"):
++            return max(0.0, float(settings.attachment_delay_seconds))
++    except Exception:
++        pass
++    raw = os.getenv("LLM_COUNCIL_ATTACHMENT_DELAY_SECONDS", "20")
 +    try:
 +        return max(0.0, float(raw))
 +    except (TypeError, ValueError):
-+        return 12.0
++        return 20.0
 +
 +
 +async def _maybe_pause_after_attachment_call() -> None:
@@ -36,11 +42,16 @@ index 4882169..9cfc8dd 100644
  def get_provider_for_model(model_id: str) -> Any:
      """Determine the provider for a given model ID."""
      if ":" in model_id:
-@@ -50,7 +70,13 @@ async def query_model(model: str, messages: List[Dict[str, str]], timeout: float
+@@ -45,9 +71,18 @@ def get_provider_for_model(model_id: str) -> Any:
+     return PROVIDERS["openrouter"]
+ 
+ 
+-async def query_model(model: str, messages: List[Dict[str, str]], timeout: float = 120.0, temperature: float = 0.7) -> Dict[str, Any]:
++async def query_model(model: str, messages: List[Dict[str, str]], timeout: float = 120.0, temperature: float = 0.7, attachments: "List[Dict[str, Any]] | None" = None) -> Dict[str, Any]:
+     """Dispatch query to appropriate provider."""
      provider = get_provider_for_model(model)
-     if attachments and model.startswith("custom:"):
-         # Notion2API is configured as the custom OpenAI-compatible endpoint.
--        return await provider.query(model, messages, timeout, temperature, attachments=attachments)
++    if attachments and model.startswith("custom:"):
++        # Notion2API is configured as the custom OpenAI-compatible endpoint.
 +        # File uploads hit Notion's file-import rate limits when all council
 +        # members fan out in parallel. Serialize attachment-bearing calls while
 +        # preserving normal parallelism for text-only council turns.
@@ -51,8 +62,186 @@ index 4882169..9cfc8dd 100644
      return await provider.query(model, messages, timeout, temperature)
  
  
+@@ -81,7 +116,7 @@ async def query_models_parallel(models: List[str], messages: List[Dict[str, str]
+     return dict(results)
+ 
+ 
+-async def stage1_collect_responses(user_query: str, search_context: str = "", request: Any = None, models_override: "List[str] | None" = None, history: "List[Dict[str, str]] | None" = None) -> Any:
++async def stage1_collect_responses(user_query: str, search_context: str = "", request: Any = None, models_override: "List[str] | None" = None, history: "List[Dict[str, str]] | None" = None, attachments: "List[Dict[str, Any]] | None" = None) -> Any:
+     """
+     Stage 1: Collect individual responses from all council models.
+ 
+@@ -91,6 +126,7 @@ async def stage1_collect_responses(user_query: str, search_context: str = "", re
+         request: FastAPI request object for checking disconnects
+         models_override: Per-request model list (bypasses global config)
+         history: Prior conversation turns as [{role, content}, ...] for multi-turn
++        attachments: Inline file attachments to pass through to the Notion2API custom endpoint
+ 
+     Yields:
+         - First yield: total_models (int)
+@@ -130,7 +166,7 @@ async def stage1_collect_responses(user_query: str, search_context: str = "", re
+ 
+     async def _query_safe(m: str):
+         try:
+-            return m, await query_model(m, messages, temperature=council_temp)
++            return m, await query_model(m, messages, temperature=council_temp, attachments=attachments)
+         except Exception as e:
+             return m, {"error": True, "error_message": str(e)}
+ 
+@@ -163,7 +199,10 @@ async def stage1_collect_responses(user_query: str, search_context: str = "", re
+                                 "model": model,
+                                 "response": None,
+                                 "error": response.get('error'),
+-                                "error_message": response.get('error_message', 'Unknown error')
++                                "error_message": response.get('error_message', 'Unknown error'),
++                                "rate_limited": response.get('rate_limited', False),
++                                "debug_timeline": response.get('debug_timeline'),
++                                "total_elapsed_seconds": response.get('total_elapsed_seconds')
+                             }
+                         else:
+                             # Successful response - ensure content is always a string
+diff --git a/backend/main.py b/backend/main.py
+index fd0402a..5dd99db 100644
+--- a/backend/main.py
++++ b/backend/main.py
+@@ -127,12 +127,14 @@ class SendMessageRequest(BaseModel):
+     execution_mode: ExecutionMode = "full"
+     council_models: Optional[List[str]] = None
+     chairman_model: Optional[str] = None
++    attachments: Optional[List[Dict[str, Any]]] = None
+ 
+ 
+ class AskRequest(BaseModel):
+     content: str
+     models: Optional[List[str]] = None
+     chairman_model: Optional[str] = None
++    attachments: Optional[List[Dict[str, Any]]] = None
+     web_search: bool = False
+     execution_mode: ExecutionMode = "chat_only"
+ 
+@@ -207,6 +209,19 @@ class PipelineResult:
+     aggregate_rankings: Any = None
+ 
+ 
++def _content_with_attachment_summary(content: str, attachments: Optional[List[Dict[str, Any]]] = None) -> str:
++    """Append a non-sensitive file list so persisted conversations show what was attached."""
++    files = []
++    for item in attachments or []:
++        if isinstance(item, dict):
++            name = str(item.get("name") or item.get("filename") or "attachment").strip() or "attachment"
++            content_type = str(item.get("content_type") or item.get("mime_type") or "").strip()
++            files.append(f"- {name}" + (f" ({content_type})" if content_type else ""))
++    if not files:
++        return content
++    return f"{content}\n\nAttached files:\n" + "\n".join(files)
++
++
+ async def _run_council_pipeline(
+     content: str,
+     execution_mode: str,
+@@ -216,11 +231,12 @@ async def _run_council_pipeline(
+     chairman_override: Optional[str] = None,
+     request: Optional[Request] = None,
+     history: Optional[List[Dict[str, str]]] = None,
++    attachments: Optional[List[Dict[str, Any]]] = None,
+ ) -> PipelineResult:
+     """Shared orchestration for stage1 → stage2 → stage3 (non-streaming)."""
+     result = PipelineResult()
+ 
+-    async for item in stage1_collect_responses(content, search_context, request=request, models_override=models_override, history=history):
++    async for item in stage1_collect_responses(content, search_context, request=request, models_override=models_override, history=history, attachments=attachments):
+         if isinstance(item, int):
+             continue
+         result.stage1.append(item)
+@@ -319,6 +335,7 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
+     if conversation is None:
+         raise HTTPException(status_code=404, detail="Conversation not found")
+ 
++    content_for_prompt = _content_with_attachment_summary(body.content, body.attachments)
+     history = _build_chat_history(conversation)
+     # Check if this is the first message
+     is_first_message = len(conversation["messages"]) == 0
+@@ -332,7 +349,7 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
+             label_to_model = {}
+             aggregate_rankings = {}
+             
+-            storage.add_user_message(conversation_id, body.content, conversation=conversation)
++            storage.add_user_message(conversation_id, content_for_prompt, conversation=conversation)
+ 
+             # Start title generation in parallel (don't await yet)
+             title_task = None
+@@ -378,7 +395,7 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
+             
+             total_models = 0
+             
+-            async for item in stage1_collect_responses(body.content, search_context, request, models_override=body.council_models, history=history):
++            async for item in stage1_collect_responses(content_for_prompt, search_context, request, models_override=body.council_models, history=history, attachments=body.attachments):
+                 if isinstance(item, int):
+                     total_models = item
+                     print(f"DEBUG: Sending stage1_init with total={total_models}")
+@@ -405,7 +422,7 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
+                 await asyncio.sleep(0.05)
+                 
+                 # Iterate over the async generator
+-                async for item in stage2_collect_rankings(body.content, stage1_results, search_context, request):
++                async for item in stage2_collect_rankings(content_for_prompt, stage1_results, search_context, request):
+                     # First item is the label mapping
+                     if isinstance(item, dict) and not item.get('model'):
+                         label_to_model = item
+@@ -435,7 +452,7 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
+                     print("Client disconnected before Stage 3")
+                     raise asyncio.CancelledError("Client disconnected")
+ 
+-                stage3_result = await stage3_synthesize_final(body.content, stage1_results, stage2_results, search_context, chairman_override=body.chairman_model)
++                stage3_result = await stage3_synthesize_final(content_for_prompt, stage1_results, stage2_results, search_context, chairman_override=body.chairman_model)
+                 yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
+ 
+             # Wait for title generation if it was started
+@@ -510,19 +527,20 @@ async def send_message_sync(conversation_id: str, body: SendMessageRequest):
+     if conversation is None:
+         raise HTTPException(status_code=404, detail="Conversation not found")
+ 
++    content_for_prompt = _content_with_attachment_summary(body.content, body.attachments)
+     history = _build_chat_history(conversation)
+-    storage.add_user_message(conversation_id, body.content, conversation=conversation)
++    storage.add_user_message(conversation_id, content_for_prompt, conversation=conversation)
+ 
+     search_context = ""
+     search_query = ""
+     if body.web_search:
+         settings = get_settings()
+-        search_context, search_query, _ = await _fetch_search_context(body.content, settings)
++        search_context, search_query, _ = await _fetch_search_context(content_for_prompt, settings)
+ 
+     result = await _run_council_pipeline(
+-        body.content, body.execution_mode, search_context,
++        content_for_prompt, body.execution_mode, search_context,
+         models_override=body.council_models, chairman_override=body.chairman_model,
+-        history=history,
++        history=history, attachments=body.attachments,
+     )
+ 
+     metadata = {"execution_mode": body.execution_mode}
+@@ -561,13 +579,14 @@ async def ask_oneshot(body: AskRequest):
+     if not models:
+         raise HTTPException(status_code=400, detail="At least one model is required")
+ 
++    content_for_prompt = _content_with_attachment_summary(body.content, body.attachments)
+     search_context = ""
+     if body.web_search:
+-        search_context, _, _ = await _fetch_search_context(body.content, settings)
++        search_context, _, _ = await _fetch_search_context(content_for_prompt, settings)
+ 
+     result = await _run_council_pipeline(
+-        body.content, body.execution_mode, search_context,
+-        models_override=models, chairman_override=body.chairman_model
++        content_for_prompt, body.execution_mode, search_context,
++        models_override=models, chairman_override=body.chairman_model, attachments=body.attachments
+     )
+ 
+     if body.execution_mode == "chat_only" and len(result.stage1) == 1:
 diff --git a/backend/providers/custom_openai.py b/backend/providers/custom_openai.py
-index 1a19ef9..b19a636 100644
+index 893689b..ec5b8b3 100644
 --- a/backend/providers/custom_openai.py
 +++ b/backend/providers/custom_openai.py
 @@ -1,5 +1,7 @@
@@ -63,19 +252,32 @@ index 1a19ef9..b19a636 100644
  import httpx
  from typing import List, Dict, Any
  from .base import LLMProvider
-@@ -22,6 +24,23 @@ class CustomOpenAIProvider(LLMProvider):
-         marker = f"{name} {base_url}".lower()
-         return "notion" in marker or "127.0.0.1:8000" in marker or "localhost:8000" in marker
+@@ -17,7 +19,36 @@ class CustomOpenAIProvider(LLMProvider):
+         api_key = settings.custom_endpoint_api_key or ""
+         return name, url, api_key
  
+-    async def query(self, model_id: str, messages: List[Dict[str, str]], timeout: float = 120.0, temperature: float = 0.7) -> Dict[str, Any]:
++    def _supports_attachments(self, name: str, base_url: str) -> bool:
++        """Attachments are only sent to Notion2API-compatible custom endpoints."""
++        marker = f"{name} {base_url}".lower()
++        return "notion" in marker or "127.0.0.1:8000" in marker or "localhost:8000" in marker
++
 +    def _attachment_retry_config(self) -> tuple[int, float]:
++        settings = get_settings()
 +        try:
-+            attempts = max(1, int(os.getenv("LLM_COUNCIL_ATTACHMENT_MAX_ATTEMPTS", "3")))
++            if hasattr(settings, "attachment_max_attempts"):
++                attempts = max(1, int(settings.attachment_max_attempts))
++            else:
++                attempts = max(1, int(os.getenv("LLM_COUNCIL_ATTACHMENT_MAX_ATTEMPTS", "3")))
 +        except (TypeError, ValueError):
 +            attempts = 3
 +        try:
-+            delay = max(0.0, float(os.getenv("LLM_COUNCIL_ATTACHMENT_RETRY_DELAY_SECONDS", "25")))
++            if hasattr(settings, "attachment_retry_delay_seconds"):
++                delay = max(0.0, float(settings.attachment_retry_delay_seconds))
++            else:
++                delay = max(0.0, float(os.getenv("LLM_COUNCIL_ATTACHMENT_RETRY_DELAY_SECONDS", "35")))
 +        except (TypeError, ValueError):
-+            delay = 25.0
++            delay = 35.0
 +        return attempts, delay
 +
 +    def _is_attachment_rate_limit(self, status_code: int, response_text: str) -> bool:
@@ -84,13 +286,37 @@ index 1a19ef9..b19a636 100644
 +            "notion_429" in marker or "rate_limit" in marker or "rate limit" in marker or "fileimporterror" in marker
 +        )
 +
-     async def query(self, model_id: str, messages: List[Dict[str, str]], timeout: float = 120.0, temperature: float = 0.7, attachments: List[Dict[str, Any]] | None = None) -> Dict[str, Any]:
++    async def query(self, model_id: str, messages: List[Dict[str, str]], timeout: float = 120.0, temperature: float = 0.7, attachments: List[Dict[str, Any]] | None = None) -> Dict[str, Any]:
          name, base_url, api_key = self._get_config()
  
-@@ -48,12 +67,29 @@ class CustomOpenAIProvider(LLMProvider):
-             if attachments and self._supports_attachments(name, base_url):
-                 payload["attachments"] = attachments
+         if not base_url:
+@@ -31,25 +62,85 @@ class CustomOpenAIProvider(LLMProvider):
+             base_url = base_url[:-1]
  
+         try:
++            settings = get_settings()
+             headers = {"Content-Type": "application/json"}
+             if api_key:
+                 headers["Authorization"] = f"Bearer {api_key}"
+ 
++            # Pass the custom poll configuration in request headers if supported
++            poll_interval = getattr(settings, "attachment_poll_interval_seconds", 2.0)
++            poll_timeout = getattr(settings, "attachment_poll_timeout_seconds", 60.0)
++            headers["X-Notion-Poll-Interval"] = str(poll_interval)
++            headers["X-Notion-Poll-Timeout"] = str(poll_timeout)
++
++            payload = {
++                "model": model,
++                "messages": messages,
++                "temperature": temperature,
++            }
++            if attachments and self._supports_attachments(name, base_url):
++                payload["attachments"] = attachments
++
++            import time
++            start_time = time.time()
++            attempts_info = []
++
 +            max_attempts, retry_delay = (1, 0.0)
 +            if payload.get("attachments"):
 +                max_attempts, retry_delay = self._attachment_retry_config()
@@ -99,26 +325,1517 @@ index 1a19ef9..b19a636 100644
 -                response = await client.post(
 -                    f"{base_url}/chat/completions",
 -                    headers=headers,
--                    json=payload
+-                    json={
+-                        "model": model,
+-                        "messages": messages,
+-                        "temperature": temperature
+-                    }
 -                )
 +                response = None
 +                for attempt in range(max_attempts):
-+                    response = await client.post(
-+                        f"{base_url}/chat/completions",
-+                        headers=headers,
-+                        json=payload
-+                    )
++                    attempt_start = time.time()
++                    attempt_idx = attempt + 1
++                    status_code = 0
++                    response_text = ""
++                    try:
++                        response = await client.post(
++                            f"{base_url}/chat/completions",
++                            headers=headers,
++                            json=payload
++                        )
++                        status_code = response.status_code
++                        response_text = response.text
++                    except Exception as e:
++                        response_text = str(e)
 +
-+                    if response.status_code == 200:
++                    attempt_duration = time.time() - attempt_start
++                    elapsed_total = time.time() - start_time
++                    
++                    attempts_info.append({
++                        "attempt": attempt_idx,
++                        "start_offset": f"{attempt_start - start_time:.2f}s",
++                        "duration": f"{attempt_duration:.2f}s",
++                        "status": status_code,
++                        "is_rate_limit": self._is_attachment_rate_limit(status_code, response_text) if status_code else False,
++                        "error_excerpt": response_text[:120] if response_text else "No response body"
++                    })
+ 
+-                if response.status_code != 200:
++                    if status_code == 200:
 +                        break
 +
-+                    if not self._is_attachment_rate_limit(response.status_code, response.text):
++                    if not self._is_attachment_rate_limit(status_code, response_text):
 +                        break
 +
 +                    if attempt >= max_attempts - 1:
 +                        break
 +
-+                    await asyncio.sleep(retry_delay * (attempt + 1))
- 
-                 if response.status_code != 200:
++                    sleep_time = retry_delay * attempt_idx
++                    await asyncio.sleep(sleep_time)
++
++                if response is None or response.status_code != 200:
++                    status_str = f"status: {response.status_code}" if response else "no response"
++                    err_msg = f"{name} API error ({status_str}) after {len(attempts_info)} attempts due to Notion Rate Limit."
++                    
                      return {
+                         "error": True,
+-                        "error_message": f"{name} API error: {response.status_code} - {response.text}"
++                        "error_message": err_msg,
++                        "rate_limited": True,
++                        "debug_timeline": attempts_info,
++                        "total_elapsed_seconds": f"{time.time() - start_time:.2f}s"
+                     }
+ 
+                 data = response.json()
+@@ -59,6 +150,7 @@ class CustomOpenAIProvider(LLMProvider):
+         except Exception as e:
+             return {"error": True, "error_message": str(e)}
+ 
++
+     async def get_models(self) -> List[Dict[str, Any]]:
+         name, base_url, api_key = self._get_config()
+ 
+diff --git a/backend/settings.py b/backend/settings.py
+index e86508d..d4e557c 100644
+--- a/backend/settings.py
++++ b/backend/settings.py
+@@ -125,6 +125,14 @@ class Settings(BaseModel):
+     # Execution Mode
+     execution_mode: str = "full"  # Default execution mode: 'chat_only', 'chat_ranking', 'full'
+ 
++    # Notion2API Rate Limiting & Throttling
++    attachment_delay_seconds: float = 20.0
++    attachment_max_attempts: int = 3
++    attachment_retry_delay_seconds: float = 35.0
++    attachment_poll_interval_seconds: float = 2.0
++    attachment_poll_timeout_seconds: float = 60.0
++
++
+ 
+ _settings_cache: Settings | None = None
+ _settings_mtime: float = 0.0
+diff --git a/backend/storage.py b/backend/storage.py
+index cfcd17a..1b3048e 100644
+--- a/backend/storage.py
++++ b/backend/storage.py
+@@ -60,6 +60,19 @@ def rebuild_index() -> List[Dict[str, Any]]:
+             try:
+                 with open(path, 'r') as f:
+                     data = json.load(f)
++                    # Auto-repair title if missing/default and there is a first user message
++                    if data.get("title") in (None, "", "New Conversation", "Untitled Conversation"):
++                        first_content = ""
++                        for msg in data.get("messages", []):
++                            if msg.get("role") == "user" and msg.get("content"):
++                                first_content = msg.get("content")
++                                break
++                        if first_content:
++                            data["title"] = _derive_conversation_title(first_content)
++                            # Save back to file
++                            with open(path, 'w') as out_f:
++                                json.dump(data, out_f, indent=2)
++
+                     index.append({
+                         "id": data["id"],
+                         "created_at": data["created_at"],
+@@ -197,9 +210,51 @@ def list_conversations() -> List[Dict[str, Any]]:
+     if index is None:
+         return rebuild_index()
+         
++    # Check if we have any entries with default/stale titles that actually have messages
++    # If we do, we can repair them by loading the conversation file, deriving the title, and saving it.
++    repaired_any = False
++    for entry in index:
++        if entry.get("title") in (None, "", "New Conversation", "Untitled Conversation") and entry.get("message_count", 0) > 0:
++            # Load conversation
++            conv = get_conversation(entry["id"])
++            if conv:
++                # Find first user message
++                first_content = ""
++                for msg in conv.get("messages", []):
++                    if msg.get("role") == "user" and msg.get("content"):
++                        first_content = msg.get("content")
++                        break
++                if first_content:
++                    new_title = _derive_conversation_title(first_content)
++                    conv["title"] = new_title
++                    # Save conversation to file (this also updates the entry in index and saves index)
++                    save_conversation(conv)
++                    repaired_any = True
++
++    if repaired_any:
++        # Reload index after repairs are written
++        index = _load_index() or []
++
+     return index
+ 
+ 
++def _derive_conversation_title(content: str) -> str:
++    """Create a stable fallback title from the first user message."""
++    if not content or not isinstance(content, str):
++        return "Untitled Conversation"
++
++    title = " ".join(content.strip().split())
++    if not title:
++        return "Untitled Conversation"
++
++    title = title.strip("\"'")
++
++    if len(title) > 50:
++        title = title[:47] + "..."
++
++    return title
++
++
+ def add_user_message(conversation_id: str, content: str, conversation: Optional[Dict[str, Any]] = None):
+     """Add a user message to a conversation.
+ 
+@@ -213,6 +268,14 @@ def add_user_message(conversation_id: str, content: str, conversation: Optional[
+     if conversation is None:
+         raise ValueError(f"Conversation {conversation_id} not found")
+ 
++    is_first_user_message = not any(
++        msg.get("role") == "user"
++        for msg in conversation.get("messages", [])
++    )
++
++    if is_first_user_message and conversation.get("title") in (None, "", "New Conversation", "Untitled Conversation"):
++        conversation["title"] = _derive_conversation_title(content)
++
+     conversation["messages"].append({
+         "role": "user",
+         "content": content
+diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
+index 657b4c3..3907b32 100644
+--- a/frontend/src/App.jsx
++++ b/frontend/src/App.jsx
+@@ -6,6 +6,28 @@ import { api, DEFAULT_EXECUTION_MODE } from './api';
+ import './App.css';
+ import './components/StageCopyButtons.css';
+ 
++const isDefaultConversationTitle = (title) =>
++  !title || title === 'New Conversation' || title === 'Untitled Conversation';
++
++const deriveConversationTitle = (content) => {
++  if (!content || typeof content !== 'string') return 'Untitled Conversation';
++
++  let title = content.trim().replace(/\s+/g, ' ');
++  if (!title) return 'Untitled Conversation';
++
++  title = title.replace(/^["']+|["']+$/g, '');
++
++  if (title.length > 50) {
++    title = `${title.substring(0, 47)}...`;
++  }
++  return title;
++};
++
++const isNotion2ApiSettings = (settings = {}) => {
++  const marker = `${settings.custom_endpoint_name || ''} ${settings.custom_endpoint_url || ''}`.toLowerCase();
++  return settings.enabled_providers?.custom === true && (marker.includes('notion') || marker.includes('127.0.0.1:8000') || marker.includes('localhost:8000'));
++};
++
+ function App() {
+   const [conversations, setConversations] = useState([]);
+   const [currentConversationId, setCurrentConversationId] = useState(null);
+@@ -23,10 +45,12 @@ function App() {
+   const [chairmanModel, setChairmanModel] = useState(null);
+   const [searchProvider, setSearchProvider] = useState('duckduckgo');
+   const [executionMode, setExecutionMode] = useState(DEFAULT_EXECUTION_MODE);
++  const [notion2ApiAttachmentsEnabled, setNotion2ApiAttachmentsEnabled] = useState(false);
+   const [sidebarOpen, setSidebarOpen] = useState(false);
+   const abortControllerRef = useRef(null);
+   const requestIdRef = useRef(0);
+   const isInitialMount = useRef(true);
++  const activeConversationIdRef = useRef(null);
+ 
+   // Check initial configuration on mount
+   useEffect(() => {
+@@ -41,6 +65,12 @@ function App() {
+       // Load execution mode preference
+       setExecutionMode(settings.execution_mode || DEFAULT_EXECUTION_MODE);
+       setSearchProvider(settings.search_provider || 'duckduckgo');
++      setNotion2ApiAttachmentsEnabled(isNotion2ApiSettings(settings));
++
++      const hasCustomEndpoint =
++        settings.enabled_providers?.custom === true &&
++        !!settings.custom_endpoint_url &&
++        !!(settings.custom_endpoint_api_key_set || settings.custom_endpoint_api_key);
+ 
+       const hasApiKey = settings.openrouter_api_key_set ||
+         settings.groq_api_key_set ||
+@@ -48,7 +78,8 @@ function App() {
+         settings.anthropic_api_key_set ||
+         settings.google_api_key_set ||
+         settings.mistral_api_key_set ||
+-        settings.deepseek_api_key_set;
++        settings.deepseek_api_key_set ||
++        hasCustomEndpoint;
+ 
+       // 2. Test Ollama Connection
+       // We do this regardless to update the status indicator
+@@ -106,6 +137,7 @@ function App() {
+       setCouncilModels(models);
+       setChairmanModel(chairman);
+       setSearchProvider(settings.search_provider || 'duckduckgo');
++      setNotion2ApiAttachmentsEnabled(isNotion2ApiSettings(settings));
+ 
+       const hasCouncilMembers = models.some(m => m && m.trim() !== '');
+       const hasChairman = chairman && chairman.trim() !== '';
+@@ -125,6 +157,10 @@ function App() {
+     loadConversations();
+   }, []);
+ 
++  useEffect(() => {
++    activeConversationIdRef.current = currentConversationId;
++  }, [currentConversationId]);
++
+   // Auto-save execution mode preference when changed
+   useEffect(() => {
+     // Skip saving on initial mount
+@@ -187,7 +223,31 @@ function App() {
+   const loadConversations = async (retryCount = 0) => {
+     try {
+       const convs = await api.listConversations();
+-      setConversations(convs);
++      
++      setConversations((prev) => {
++        const remoteIds = new Set(convs.map((conv) => conv.id));
++
++        const mergedRemote = convs.map((conv) => {
++          const local = prev.find((item) => item.id === conv.id);
++
++          if (
++            local &&
++            isDefaultConversationTitle(conv.title) &&
++            !isDefaultConversationTitle(local.title)
++          ) {
++            return { ...conv, title: local.title, isOptimistic: false };
++          }
++
++          return { ...conv, isOptimistic: false };
++        });
++
++        const localOnly = prev.filter((local) =>
++          !remoteIds.has(local.id) &&
++          (local.id === currentConversationId || local.isOptimistic === true)
++        );
++
++        return [...localOnly, ...mergedRemote];
++      });
+     } catch (error) {
+       console.error('Failed to load conversations:', error);
+       // Retry up to 3 times with increasing delays (1s, 2s, 3s)
+@@ -212,15 +272,37 @@ function App() {
+ 
+     if (existingEmpty) {
+       // Reuse the existing empty conversation instead of creating a new one
++      activeConversationIdRef.current = existingEmpty.id;
++      setCurrentConversation({
++        id: existingEmpty.id,
++        created_at: existingEmpty.created_at,
++        title: existingEmpty.title || 'New Conversation',
++        messages: [],
++        isOptimistic: existingEmpty.isOptimistic === true,
++      });
+       setCurrentConversationId(existingEmpty.id);
+       return;
+     }
+ 
+     try {
+       const newConv = await api.createConversation();
+-      setConversations([
+-        { id: newConv.id, created_at: newConv.created_at, message_count: 0 },
+-        ...conversations,
++      activeConversationIdRef.current = newConv.id;
++      setCurrentConversation({
++        id: newConv.id,
++        created_at: newConv.created_at,
++        title: newConv.title || 'New Conversation',
++        messages: [],
++        isOptimistic: true,
++      });
++      setConversations((prev) => [
++        {
++          id: newConv.id,
++          created_at: newConv.created_at,
++          title: newConv.title || 'New Conversation',
++          message_count: 0,
++          isOptimistic: true,
++        },
++        ...prev.filter((conv) => conv.id !== newConv.id),
+       ]);
+       setCurrentConversationId(newConv.id);
+     } catch (error) {
+@@ -229,6 +311,7 @@ function App() {
+   };
+ 
+   const handleSelectConversation = (id) => {
++    activeConversationIdRef.current = id;
+     setCurrentConversationId(id);
+   };
+ 
+@@ -236,9 +319,10 @@ function App() {
+     try {
+       await api.deleteConversation(id);
+       // Remove from local state
+-      setConversations(conversations.filter(c => c.id !== id));
++      setConversations((prev) => prev.filter(c => c.id !== id));
+       // If we deleted the current conversation, clear it
+       if (id === currentConversationId) {
++        activeConversationIdRef.current = null;
+         setCurrentConversationId(null);
+         setCurrentConversation(null);
+       }
+@@ -256,11 +340,28 @@ function App() {
+     }
+   };
+ 
+-  const handleSendMessage = async (content, webSearch) => {
++  const handleSendMessage = async (content, webSearch, attachments = []) => {
+     if (!currentConversationId) return;
+ 
+     // Assign unique ID to this request to prevent race conditions
+     const currentRequestId = ++requestIdRef.current;
++    const activeConversationId = currentConversationId;
++    activeConversationIdRef.current = activeConversationId;
++
++    // Optimistically update conversation title in list and current state if it is a new/untitled conversation
++    const currentConvInList = conversations.find(c => c.id === activeConversationId);
++    const currentTitle = currentConvInList?.title || currentConversation?.title;
++    const hasNoTitle = isDefaultConversationTitle(currentTitle);
++
++    if (hasNoTitle) {
++      const optimisticTitle = deriveConversationTitle(content);
++      setConversations(prev => prev.map(c =>
++        c.id === activeConversationId ? { ...c, title: optimisticTitle } : c
++      ));
++      setCurrentConversation(prev =>
++        prev && prev.id === activeConversationId ? { ...prev, title: optimisticTitle } : prev
++      );
++    }
+ 
+     // Create new AbortController for this request
+     abortControllerRef.current = new AbortController();
+@@ -268,11 +369,19 @@ function App() {
+     setIsLoading(true);
+     try {
+       // Optimistically add user message to UI
+-      const userMessage = { role: 'user', content };
+-      setCurrentConversation((prev) => ({
+-        ...prev,
+-        messages: [...prev.messages, userMessage],
+-      }));
++      const userMessage = { role: 'user', content, attachments: attachments.map(({ name, content_type }) => ({ name, content_type })) };
++      setCurrentConversation((prev) => {
++        const target = prev && prev.id === activeConversationId ? prev : {
++          id: activeConversationId,
++          title: currentTitle || 'New Conversation',
++          messages: [],
++        };
++
++        return {
++          ...target,
++          messages: [...(target.messages || []), userMessage],
++        };
++      });
+ 
+       // Create a partial assistant message that will be updated progressively
+       const assistantMessage = {
+@@ -302,16 +411,29 @@ function App() {
+       };
+ 
+       // Add the partial assistant message
+-      setCurrentConversation((prev) => ({
+-        ...prev,
+-        messages: [...prev.messages, assistantMessage],
+-      }));
++      setCurrentConversation((prev) => {
++        const target = prev && prev.id === activeConversationId ? prev : {
++          id: activeConversationId,
++          title: currentTitle || 'New Conversation',
++          messages: [userMessage],
++        };
++
++        return {
++          ...target,
++          messages: [...(target.messages || []), assistantMessage],
++        };
++      });
+ 
+       // Send message with streaming
+       await api.sendMessageStream(
+-        currentConversationId,
+-        { content, webSearch, executionMode },
++        activeConversationId,
++        { content, webSearch, executionMode, attachments },
+         (eventType, event) => {
++          const isActiveConversation = activeConversationIdRef.current === activeConversationId;
++          if (!isActiveConversation && !['title_complete', 'complete', 'error'].includes(eventType)) {
++            return;
++          }
++
+           switch (eventType) {
+             case 'search_start':
+               setCurrentConversation((prev) => {
+@@ -597,6 +719,14 @@ function App() {
+               break;
+ 
+             case 'title_complete':
++              // Update with final generated title optimistically
++              if (event.data && event.data.title) {
++                const finalTitle = event.data.title;
++                setConversations(prev => prev.map(c =>
++                  c.id === activeConversationId ? { ...c, title: finalTitle } : c
++                ));
++                setCurrentConversation(prev => prev && prev.id === activeConversationId ? { ...prev, title: finalTitle } : prev);
++              }
+               // Reload conversations to get updated title
+               loadConversations();
+               break;
+@@ -604,6 +734,9 @@ function App() {
+             case 'complete':
+               // Stream complete, reload conversations list
+               loadConversations();
++              if (currentConversationId) {
++                loadConversation(currentConversationId);
++              }
+               setIsLoading(false);
+               break;
+ 
+@@ -622,7 +755,7 @@ function App() {
+         console.log('Request aborted');
+         // Mark the assistant message as aborted and stop timers
+         setCurrentConversation((prev) => {
+-          if (!prev || prev.messages.length < 2) return prev;
++          if (!prev || prev.id !== activeConversationId || prev.messages.length < 2) return prev;
+           const messages = [...prev.messages];
+           const lastMsg = messages[messages.length - 1];
+           if (lastMsg.role === 'assistant') {
+@@ -651,10 +784,13 @@ function App() {
+       }
+       console.error('Failed to send message:', error);
+       // Remove optimistic messages on error
+-      setCurrentConversation((prev) => ({
+-        ...prev,
+-        messages: prev.messages.slice(0, -2),
+-      }));
++      setCurrentConversation((prev) => {
++        if (!prev || prev.id !== activeConversationId) return prev;
++        return {
++          ...prev,
++          messages: prev.messages.slice(0, -2),
++        };
++      });
+       setIsLoading(false);
+     } finally {
+       // Only clear the controller if this is still the current request
+@@ -711,6 +847,7 @@ function App() {
+         onSendMessage={handleSendMessage}
+         onAbort={handleAbort}
+         isLoading={isLoading}
++        attachmentsEnabled={notion2ApiAttachmentsEnabled}
+         councilConfigured={councilConfigured}
+         councilModels={councilModels}
+         chairmanModel={chairmanModel}
+diff --git a/frontend/src/api.js b/frontend/src/api.js
+index af99a5e..78274ab 100644
+--- a/frontend/src/api.js
++++ b/frontend/src/api.js
+@@ -330,7 +330,7 @@ export const api = {
+    * @returns {Promise<void>}
+    */
+   async sendMessageStream(conversationId, options, onEvent, signal) {
+-    const { content, webSearch = false, executionMode = 'full' } = options;
++    const { content, webSearch = false, executionMode = 'full', attachments = [] } = options;
+     const response = await fetch(
+       `${API_BASE}/api/conversations/${conversationId}/message/stream?_t=${Date.now()}`,
+       {
+@@ -339,7 +339,7 @@ export const api = {
+           'Content-Type': 'application/json',
+           'Cache-Control': 'no-cache',
+         },
+-        body: JSON.stringify({ content, web_search: webSearch, execution_mode: executionMode }),
++        body: JSON.stringify({ content, web_search: webSearch, execution_mode: executionMode, attachments }),
+         signal,
+         cache: 'no-store',
+       }
+diff --git a/frontend/src/components/ChatInterface.css b/frontend/src/components/ChatInterface.css
+index 879e77b..28ae399 100644
+--- a/frontend/src/components/ChatInterface.css
++++ b/frontend/src/components/ChatInterface.css
+@@ -683,4 +683,81 @@
+     width: 40px;
+     height: 40px;
+   }
++}
++
++.attach-button {
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  width: 36px;
++  height: 36px;
++  border-radius: 50%;
++  cursor: pointer;
++  background: rgba(59, 130, 246, 0.14);
++  border: 1px solid rgba(59, 130, 246, 0.28);
++  color: var(--text-primary);
++  margin-bottom: 6px;
++  transition: all 0.2s;
++}
++
++.attach-button:hover:not(:disabled) {
++  background: rgba(59, 130, 246, 0.24);
++  box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
++}
++
++.attach-button:disabled {
++  opacity: 0.45;
++  cursor: not-allowed;
++}
++
++.attachment-file-input {
++  display: none;
++}
++
++.attachment-tray,
++.message-attachments {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 8px;
++}
++
++.attachment-tray {
++  margin-top: -2px;
++}
++
++.message-attachments {
++  margin-top: 12px;
++}
++
++.attachment-chip,
++.attachment-pill {
++  display: inline-flex;
++  align-items: center;
++  gap: 6px;
++  border: 1px solid rgba(59, 130, 246, 0.25);
++  border-radius: 999px;
++  background: rgba(59, 130, 246, 0.12);
++  color: var(--text-secondary);
++  font-size: 12px;
++  padding: 5px 9px;
++}
++
++.attachment-chip.error {
++  border-color: rgba(239, 68, 68, 0.4);
++  background: rgba(239, 68, 68, 0.12);
++  color: #fca5a5;
++}
++
++.attachment-chip button {
++  border: none;
++  background: transparent;
++  color: inherit;
++  cursor: pointer;
++  font-size: 14px;
++  line-height: 1;
++  padding: 0 2px;
++}
++
++.attachment-error {
++  color: #fca5a5;
+ }
+\ No newline at end of file
+diff --git a/frontend/src/components/ChatInterface.jsx b/frontend/src/components/ChatInterface.jsx
+index 3c1eb65..7650740 100644
+--- a/frontend/src/components/ChatInterface.jsx
++++ b/frontend/src/components/ChatInterface.jsx
+@@ -15,6 +15,7 @@ export default function ChatInterface({
+     onSendMessage,
+     onAbort,
+     isLoading,
++    attachmentsEnabled = false,
+     councilConfigured,
+     onOpenSettings,
+     councilModels = [],
+@@ -25,6 +26,8 @@ export default function ChatInterface({
+ }) {
+     const [input, setInput] = useState('');
+     const [webSearch, setWebSearch] = useState(false);
++    const [attachments, setAttachments] = useState([]);
++    const fileInputRef = useRef(null);
+     const messagesEndRef = useRef(null);
+     const messagesContainerRef = useRef(null);
+ 
+@@ -47,11 +50,54 @@ export default function ChatInterface({
+         }
+     }, [conversation]);
+ 
++    const readFileAsAttachment = (file) => new Promise((resolve, reject) => {
++        const reader = new FileReader();
++        reader.onload = () => resolve({
++            name: file.name,
++            content_type: file.type || 'application/octet-stream',
++            file_data: reader.result,
++        });
++        reader.onerror = () => reject(reader.error || new Error(`Could not read ${file.name}`));
++        reader.readAsDataURL(file);
++    });
++
++    const handleAttachFiles = async (event) => {
++        const files = Array.from(event.target.files || []);
++        event.target.value = '';
++        if (!files.length) return;
++
++        const remaining = Math.max(0, 5 - attachments.length);
++        const selected = files.slice(0, remaining);
++        const maxBytes = 20 * 1024 * 1024;
++        const allowed = new Set(['application/pdf', 'text/csv', 'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/heic']);
++
++        const next = [];
++        for (const file of selected) {
++            const type = file.type || 'application/octet-stream';
++            if (file.size > maxBytes || !allowed.has(type)) {
++                next.push({
++                    name: file.name,
++                    content_type: type,
++                    error: file.size > maxBytes ? 'File is over 20 MB' : `Unsupported type: ${type}`,
++                });
++                continue;
++            }
++            next.push(await readFileAsAttachment(file));
++        }
++        setAttachments(prev => [...prev, ...next]);
++    };
++
++    const removeAttachment = (index) => {
++        setAttachments(prev => prev.filter((_, i) => i !== index));
++    };
++
+     const handleSubmit = (e) => {
+         e.preventDefault();
+-        if (input.trim() && !isLoading) {
+-            onSendMessage(input, webSearch);
++        const validAttachments = attachments.filter(item => !item.error);
++        if ((input.trim() || validAttachments.length) && !isLoading) {
++            onSendMessage(input.trim() || 'Please analyze the attached file(s).', webSearch, validAttachments);
+             setInput('');
++            setAttachments([]);
+         }
+     };
+ 
+@@ -107,9 +153,20 @@ export default function ChatInterface({
+ 
+                             <div className="message-content">
+                                 {msg.role === 'user' ? (
+-                                    <div className="markdown-content">
+-                                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+-                                    </div>
++                                    <>
++                                        <div className="markdown-content">
++                                            <ReactMarkdown>{msg.content}</ReactMarkdown>
++                                        </div>
++                                        {msg.attachments?.length > 0 && (
++                                            <div className="message-attachments">
++                                                {msg.attachments.map((file, fileIndex) => (
++                                                    <span className="attachment-pill" key={`${file.name}-${fileIndex}`}>
++                                                        📎 {file.name}
++                                                    </span>
++                                                ))}
++                                            </div>
++                                        )}
++                                    </>
+                                 ) : (
+                                     <>
+                                         {/* Search Loading */}
+@@ -137,7 +194,7 @@ export default function ChatInterface({
+                                         )}
+ 
+                                         {/* Stage 1: Council Grid Visualization */}
+-                                        {(msg.loading?.stage1 || (msg.stage1 && !msg.stage2)) && (
++                                        {(msg.loading?.stage1 || msg.stage1) && (
+                                             <div className="stage-container">
+                                                 <div className="stage-header">
+                                                     <h3>Stage 1: Council Deliberation</h3>
+@@ -162,7 +219,7 @@ export default function ChatInterface({
+                                         )}
+ 
+                                         {/* Stage 1 Results (Accordion/List - kept for detail view) */}
+-                                        {(msg.loading?.stage1 || (msg.stage1 && !msg.stage2)) ? (
++                                        {(msg.loading?.stage1 || msg.stage1) ? (
+                                             msg.loading?.stage1 && !msg.stage1 ? (
+                                                 <Stage1Skeleton />
+                                             ) : msg.stage1 && (
+@@ -247,6 +304,28 @@ export default function ChatInterface({
+                                 {webSearch && <span className="search-label">Search On</span>}
+                             </label>
+ 
++                            {attachmentsEnabled && (
++                                <>
++                                    <button
++                                        type="button"
++                                        className="attach-button"
++                                        onClick={() => fileInputRef.current?.click()}
++                                        disabled={isLoading || attachments.length >= 5}
++                                        title="Attach files for Notion2API"
++                                    >
++                                        📎
++                                    </button>
++                                    <input
++                                        ref={fileInputRef}
++                                        className="attachment-file-input"
++                                        type="file"
++                                        multiple
++                                        accept=".pdf,.csv,image/png,image/jpeg,image/gif,image/webp,image/heic"
++                                        onChange={handleAttachFiles}
++                                    />
++                                </>
++                            )}
++
+                             <textarea
+                                 className="message-input"
+                                 placeholder={isLoading ? "Consulting..." : "Ask the Council..."}
+@@ -263,12 +342,24 @@ export default function ChatInterface({
+                                     ⏹
+                                 </button>
+                             ) : (
+-                                <button type="submit" className="send-button" disabled={!input.trim()}>
++                                <button type="submit" className="send-button" disabled={!input.trim() && !attachments.some(item => !item.error)}>
+                                     ➤
+                                 </button>
+                             )}
+                         </div>
+ 
++                        {attachments.length > 0 && (
++                            <div className="attachment-tray">
++                                {attachments.map((file, index) => (
++                                    <span className={`attachment-chip ${file.error ? 'error' : ''}`} key={`${file.name}-${index}`}>
++                                        📎 {file.name}
++                                        {file.error && <span className="attachment-error"> — {file.error}</span>}
++                                        <button type="button" onClick={() => removeAttachment(index)} aria-label={`Remove ${file.name}`}>×</button>
++                                    </span>
++                                ))}
++                            </div>
++                        )}
++
+                         <div className="input-row-bottom">
+                             <ExecutionModeToggle
+                                 value={executionMode}
+diff --git a/frontend/src/components/CouncilGrid.jsx b/frontend/src/components/CouncilGrid.jsx
+index e3d4bb2..5601012 100644
+--- a/frontend/src/components/CouncilGrid.jsx
++++ b/frontend/src/components/CouncilGrid.jsx
+@@ -23,6 +23,7 @@ const PROVIDER_CONFIG = {
+     deepseek: { color: '#4e61e6', label: 'DeepSeek', logo: deepseekLogo },
+     openrouter: { color: '#7f5af0', label: 'OpenRouter', logo: openrouterLogo },
+     custom: { color: '#06b6d4', label: 'Custom', logo: customLogo },
++    kimi: { color: '#111827', label: 'Kimi', logo: null, icon: '月' },
+     default: { color: '#888888', label: 'Model', logo: null, icon: '🤖' }
+ };
+ 
+@@ -30,8 +31,16 @@ const getProviderInfo = (modelId) => {
+     if (!modelId) return PROVIDER_CONFIG.default;
+     const id = modelId.toLowerCase();
+ 
+-    // Check for provider prefixes FIRST (order matters!)
+-    if (id.startsWith('custom:')) return PROVIDER_CONFIG.custom;
++    if (id.startsWith('custom:')) {
++        const subId = id.substring(7);
++        if (subId.includes('gpt') || subId.includes('openai')) return PROVIDER_CONFIG.openai;
++        if (subId.includes('claude') || subId.includes('anthropic')) return PROVIDER_CONFIG.anthropic;
++        if (subId.includes('gemini') || subId.includes('google')) return PROVIDER_CONFIG.google;
++        if (subId.includes('mistral') || subId.includes('mixtral')) return PROVIDER_CONFIG.mistral;
++        if (subId.includes('deepseek')) return PROVIDER_CONFIG.deepseek;
++        if (subId.includes('kimi') || subId.includes('moonshot')) return PROVIDER_CONFIG.kimi;
++        return PROVIDER_CONFIG.custom;
++    }
+     if (id.startsWith('ollama:')) return PROVIDER_CONFIG.ollama;
+     if (id.startsWith('groq:')) return PROVIDER_CONFIG.groq;
+ 
+diff --git a/frontend/src/components/Settings.jsx b/frontend/src/components/Settings.jsx
+index 8d88dc8..b780e1f 100644
+--- a/frontend/src/components/Settings.jsx
++++ b/frontend/src/components/Settings.jsx
+@@ -100,6 +100,13 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
+   const [chairmanTemperature, setChairmanTemperature] = useState(0.4);
+   const [stage2Temperature, setStage2Temperature] = useState(0.3);
+ 
++  // Notion2API Rate Limit Throttling State
++  const [attachmentDelaySeconds, setAttachmentDelaySeconds] = useState(20.0);
++  const [attachmentMaxAttempts, setAttachmentMaxAttempts] = useState(3);
++  const [attachmentRetryDelaySeconds, setAttachmentRetryDelaySeconds] = useState(35.0);
++  const [attachmentPollIntervalSeconds, setAttachmentPollIntervalSeconds] = useState(2.0);
++  const [attachmentPollTimeoutSeconds, setAttachmentPollTimeoutSeconds] = useState(60.0);
++
+   // System Prompts State
+   const [prompts, setPrompts] = useState({
+     stage1_prompt: '',
+@@ -157,6 +164,13 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
+       if (chairmanTemperature !== (settings.chairman_temperature ?? 0.4)) return true;
+       if (stage2Temperature !== (settings.stage2_temperature ?? 0.3)) return true;
+ 
++      // Rate limit parameters
++      if (attachmentDelaySeconds !== (settings.attachment_delay_seconds ?? 20.0)) return true;
++      if (attachmentMaxAttempts !== (settings.attachment_max_attempts ?? 3)) return true;
++      if (attachmentRetryDelaySeconds !== (settings.attachment_retry_delay_seconds ?? 35.0)) return true;
++      if (attachmentPollIntervalSeconds !== (settings.attachment_poll_interval_seconds ?? 2.0)) return true;
++      if (attachmentPollTimeoutSeconds !== (settings.attachment_poll_timeout_seconds ?? 60.0)) return true;
++
+       // Remote/Local filters
+       if (JSON.stringify(councilMemberFilters) !== JSON.stringify(settings.council_member_filters || {})) return true;
+       if (chairmanFilter !== (settings.chairman_filter || 'remote')) return true;
+@@ -188,7 +202,12 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
+     stage2Temperature,
+     councilMemberFilters,
+     chairmanFilter,
+-    prompts
++    prompts,
++    attachmentDelaySeconds,
++    attachmentMaxAttempts,
++    attachmentRetryDelaySeconds,
++    attachmentPollIntervalSeconds,
++    attachmentPollTimeoutSeconds
+   ]);
+ 
+   // Helper to determine if filters need to switch based on availability
+@@ -372,6 +391,12 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
+       setChairmanTemperature(data.chairman_temperature ?? 0.4);
+       setStage2Temperature(data.stage2_temperature ?? 0.3);
+ 
++      setAttachmentDelaySeconds(data.attachment_delay_seconds ?? 20.0);
++      setAttachmentMaxAttempts(data.attachment_max_attempts ?? 3);
++      setAttachmentRetryDelaySeconds(data.attachment_retry_delay_seconds ?? 35.0);
++      setAttachmentPollIntervalSeconds(data.attachment_poll_interval_seconds ?? 2.0);
++      setAttachmentPollTimeoutSeconds(data.attachment_poll_timeout_seconds ?? 60.0);
++
+       // Initialize refs for auto-save tracking (prevents auto-save on initial load)
+       prevCouncilModelsRef.current = loadedCouncilModels;
+       prevChairmanModelRef.current = loadedChairmanModel;
+@@ -1006,6 +1031,12 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
+       setShowFreeOnly(false);
+       setOllamaBaseUrl('http://localhost:11434');
+ 
++      setAttachmentDelaySeconds(20.0);
++      setAttachmentMaxAttempts(3);
++      setAttachmentRetryDelaySeconds(35.0);
++      setAttachmentPollIntervalSeconds(2.0);
++      setAttachmentPollTimeoutSeconds(60.0);
++
+       // 4. Reset Prompts to System Defaults (keep these useful)
+       const defaults = await api.getDefaultSettings();
+       setPrompts({
+@@ -1038,6 +1069,11 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
+         chairman_temperature: 0.4,
+         stage2_temperature: 0.3,
+         search_query_model: '',
++        attachment_delay_seconds: 20.0,
++        attachment_max_attempts: 3,
++        attachment_retry_delay_seconds: 35.0,
++        attachment_poll_interval_seconds: 2.0,
++        attachment_poll_timeout_seconds: 60.0,
+         council_member_filters: { 0: 'remote', 1: 'remote' },
+         chairman_filter: 'remote',
+         search_query_filter: 'remote',
+@@ -1125,6 +1161,13 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
+       chairman_temperature: chairmanTemperature,
+       stage2_temperature: stage2Temperature,
+ 
++      // Notion2API Rate limits
++      attachment_delay_seconds: attachmentDelaySeconds,
++      attachment_max_attempts: attachmentMaxAttempts,
++      attachment_retry_delay_seconds: attachmentRetryDelaySeconds,
++      attachment_poll_interval_seconds: attachmentPollIntervalSeconds,
++      attachment_poll_timeout_seconds: attachmentPollTimeoutSeconds,
++
+       // Filters
+       council_member_filters: councilMemberFilters,
+       chairman_filter: chairmanFilter,
+@@ -1179,6 +1222,13 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
+         if (config.chairman_temperature !== undefined) setChairmanTemperature(config.chairman_temperature);
+         if (config.stage2_temperature !== undefined) setStage2Temperature(config.stage2_temperature);
+ 
++        // Apply Rate limits
++        if (config.attachment_delay_seconds !== undefined) setAttachmentDelaySeconds(config.attachment_delay_seconds);
++        if (config.attachment_max_attempts !== undefined) setAttachmentMaxAttempts(config.attachment_max_attempts);
++        if (config.attachment_retry_delay_seconds !== undefined) setAttachmentRetryDelaySeconds(config.attachment_retry_delay_seconds);
++        if (config.attachment_poll_interval_seconds !== undefined) setAttachmentPollIntervalSeconds(config.attachment_poll_interval_seconds);
++        if (config.attachment_poll_timeout_seconds !== undefined) setAttachmentPollTimeoutSeconds(config.attachment_poll_timeout_seconds);
++
+         // Apply Filters
+         if (config.council_member_filters) setCouncilMemberFilters(config.council_member_filters);
+         if (config.chairman_filter) setChairmanFilter(config.chairman_filter);
+@@ -1272,6 +1322,11 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
+         council_temperature: councilTemperature,
+         chairman_temperature: chairmanTemperature,
+         stage2_temperature: stage2Temperature,
++        attachment_delay_seconds: attachmentDelaySeconds,
++        attachment_max_attempts: attachmentMaxAttempts,
++        attachment_retry_delay_seconds: attachmentRetryDelaySeconds,
++        attachment_poll_interval_seconds: attachmentPollIntervalSeconds,
++        attachment_poll_timeout_seconds: attachmentPollTimeoutSeconds,
+ 
+         // Remote/Local filters for each selection
+         council_member_filters: councilMemberFilters,
+@@ -1473,6 +1528,12 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
+             >
+               Search Providers
+             </button>
++            <button
++              className={`sidebar-nav-item ${activeSection === 'throttling' ? 'active' : ''}`}
++              onClick={() => setActiveSection('throttling')}
++            >
++              Upload Throttling
++            </button>
+             <button
+               className={`sidebar-nav-item ${activeSection === 'import_export' ? 'active' : ''}`}
+               onClick={() => setActiveSection('import_export')}
+@@ -1631,6 +1692,116 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
+               />
+             )}
+ 
++            {/* Notion2API Rate Limiting & Throttling Section */}
++            {activeSection === 'throttling' && (
++              <section className="settings-section">
++                <h3>Notion2API Upload Throttling</h3>
++                <p className="section-description">
++                  Configure delays and retry behaviors to mitigate upstream Notion rate limits (HTTP 429 / 503) during parallel file-bearing council queries.
++                </p>
++
++                <div className="subsection">
++                  <h4>Concurrency & Delay Settings</h4>
++                  
++                  <div className="form-group">
++                    <label htmlFor="attachment_delay_seconds">
++                      Serial Call Delay (seconds)
++                      <span className="help-text">Delay introduced between consecutive model runs when attachments are sent, ensuring parallel requests don't hit Notion's file-import pipeline concurrently.</span>
++                    </label>
++                    <div className="input-wrapper range-input-wrapper">
++                      <input
++                        type="range"
++                        id="attachment_delay_seconds"
++                        min="0"
++                        max="60"
++                        step="1"
++                        value={attachmentDelaySeconds}
++                        onChange={(e) => setAttachmentDelaySeconds(parseFloat(e.target.value))}
++                      />
++                      <span className="range-value">{attachmentDelaySeconds}s</span>
++                    </div>
++                  </div>
++                </div>
++
++                <div className="subsection">
++                  <h4>Upstream Retries (Notion 429 / 503 Backoff)</h4>
++                  
++                  <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
++                    <div className="form-group">
++                      <label htmlFor="attachment_max_attempts">
++                        Max Retry Attempts
++                        <span className="help-text">Number of times to retry a model's completion request if it fails with a rate limit error.</span>
++                      </label>
++                      <input
++                        type="number"
++                        id="attachment_max_attempts"
++                        min="1"
++                        max="10"
++                        value={attachmentMaxAttempts}
++                        onChange={(e) => setAttachmentMaxAttempts(parseInt(e.target.value) || 1)}
++                      />
++                    </div>
++
++                    <div className="form-group">
++                      <label htmlFor="attachment_retry_delay_seconds">
++                        Base Retry Backoff (seconds)
++                        <span className="help-text">Initial sleep duration before retrying. Succeeding retries backoff linearly (delay * attempt).</span>
++                      </label>
++                      <input
++                        type="number"
++                        id="attachment_retry_delay_seconds"
++                        min="1"
++                        max="120"
++                        value={attachmentRetryDelaySeconds}
++                        onChange={(e) => setAttachmentRetryDelaySeconds(parseFloat(e.target.value) || 5)}
++                      />
++                    </div>
++                  </div>
++                </div>
++
++                <div className="subsection">
++                  <h4>Notion Task Polling (Task Status Checks)</h4>
++                  <p className="subsection-description" style={{ marginBottom: '14px', fontSize: '12px', color: 'var(--text-secondary)' }}>
++                    When uploading files, Notion2API polls a status task to verify the document is ready. Customizing these options balances upload speed vs Notion API request density.
++                  </p>
++                  
++                  <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
++                    <div className="form-group">
++                      <label htmlFor="attachment_poll_interval_seconds">
++                        Poll Interval (seconds)
++                        <span className="help-text">Time to sleep between task status check requests. Increasing this reduces upstream calls.</span>
++                      </label>
++                      <input
++                        type="number"
++                        id="attachment_poll_interval_seconds"
++                        min="0.5"
++                        max="10"
++                        step="0.5"
++                        value={attachmentPollIntervalSeconds}
++                        onChange={(e) => setAttachmentPollIntervalSeconds(parseFloat(e.target.value) || 1.0)}
++                      />
++                    </div>
++
++                    <div className="form-group">
++                      <label htmlFor="attachment_poll_timeout_seconds">
++                        Poll Timeout (seconds)
++                        <span className="help-text">Max time to poll for document conversion before aborting.</span>
++                      </label>
++                      <input
++                        type="number"
++                        id="attachment_poll_timeout_seconds"
++                        min="10"
++                        max="300"
++                        step="5"
++                        value={attachmentPollTimeoutSeconds}
++                        onChange={(e) => setAttachmentPollTimeoutSeconds(parseFloat(e.target.value) || 30.0)}
++                      />
++                    </div>
++                  </div>
++                </div>
++              </section>
++            )}
++
+             {/* IMPORT & EXPORT (New Section) */}
+             {activeSection === 'import_export' && (
+               <section className="settings-section">
+diff --git a/frontend/src/components/Stage1.css b/frontend/src/components/Stage1.css
+index ab5d764..c7d30f9 100644
+--- a/frontend/src/components/Stage1.css
++++ b/frontend/src/components/Stage1.css
+@@ -249,3 +249,167 @@
+     word-break: break-word;
+   }
+ }
++
++/* Rate Limit Debug Timeline */
++.rate-limit-debug-container {
++  margin-top: 16px;
++  background: rgba(30, 41, 59, 0.4);
++  border: 1px solid var(--border-glass);
++  border-radius: 12px;
++  overflow: hidden;
++}
++
++.rate-limit-debug-toggle {
++  width: 100%;
++  padding: 14px 16px;
++  background: none;
++  border: none;
++  color: var(--text-primary);
++  display: flex;
++  align-items: center;
++  gap: 10px;
++  cursor: pointer;
++  text-align: left;
++  font-family: var(--font-ui);
++  font-size: 13px;
++  font-weight: 600;
++  transition: background 0.2s;
++}
++
++.rate-limit-debug-toggle:hover {
++  background: rgba(255, 255, 255, 0.03);
++}
++
++.toggle-icon {
++  font-size: 10px;
++  color: var(--text-secondary);
++}
++
++.toggle-title {
++  flex-grow: 1;
++}
++
++.toggle-duration {
++  font-size: 11px;
++  color: var(--accent-primary);
++  background: rgba(59, 130, 246, 0.1);
++  padding: 2px 8px;
++  border-radius: 12px;
++}
++
++.rate-limit-debug-content {
++  padding: 16px;
++  border-top: 1px solid var(--border-glass);
++  background: rgba(15, 23, 42, 0.3);
++}
++
++.rate-limit-timeline {
++  display: flex;
++  flex-direction: column;
++  gap: 16px;
++  position: relative;
++  padding-left: 12px;
++}
++
++.rate-limit-timeline::before {
++  content: '';
++  position: absolute;
++  left: 21px;
++  top: 10px;
++  bottom: 10px;
++  width: 2px;
++  background: var(--border-glass);
++}
++
++.timeline-item {
++  display: flex;
++  gap: 16px;
++  position: relative;
++  z-index: 1;
++}
++
++.timeline-badge {
++  width: 20px;
++  height: 20px;
++  border-radius: 50%;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  font-size: 11px;
++  font-weight: bold;
++  color: white;
++  border: 2px solid var(--bg-card);
++  box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
++}
++
++.item-success .timeline-badge {
++  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
++}
++
++.timeline-info {
++  flex-grow: 1;
++  background: rgba(255, 255, 255, 0.02);
++  border: 1px solid var(--border-glass);
++  border-radius: 8px;
++  padding: 10px 12px;
++}
++
++.timeline-header-row {
++  display: flex;
++  flex-wrap: wrap;
++  align-items: center;
++  gap: 12px;
++  margin-bottom: 6px;
++  font-size: 12px;
++}
++
++.timeline-attempt {
++  font-weight: 700;
++  color: var(--text-primary);
++}
++
++.timeline-offset, .timeline-duration {
++  color: var(--text-secondary);
++}
++
++.timeline-status {
++  margin-left: auto;
++  font-weight: 600;
++  padding: 1px 6px;
++  border-radius: 4px;
++}
++
++.status-err {
++  background: rgba(239, 68, 68, 0.1);
++  color: #ef4444;
++}
++
++.status-ok {
++  background: rgba(16, 185, 129, 0.1);
++  color: #10b981;
++}
++
++.timeline-excerpt {
++  font-family: var(--font-code);
++  font-size: 11px;
++  color: var(--text-secondary);
++  word-break: break-all;
++  white-space: pre-wrap;
++  background: rgba(0, 0, 0, 0.2);
++  padding: 6px 8px;
++  border-radius: 4px;
++}
++
++.rate-limit-footer {
++  margin-top: 14px;
++  padding-top: 12px;
++  border-top: 1px dashed var(--border-glass);
++}
++
++.footer-tip {
++  font-size: 12px;
++  color: var(--text-secondary);
++  line-height: 1.5;
++  display: block;
++}
++
+diff --git a/frontend/src/components/Stage1.jsx b/frontend/src/components/Stage1.jsx
+index 8d87cd1..3579741 100644
+--- a/frontend/src/components/Stage1.jsx
++++ b/frontend/src/components/Stage1.jsx
+@@ -76,10 +76,15 @@ export default function Stage1({ responses, startTime, endTime }) {
+               key={index}
+               className={`tab ${safeActiveTab === index ? 'active' : ''} ${resp?.error ? 'tab-error' : ''}`}
+               onClick={() => setActiveTab(index)}
+-              style={safeActiveTab === index ? { borderColor: visuals.color, color: visuals.color } : {}}
++              style={safeActiveTab === index ? { borderColor: visuals.color, color: '#f8fafc' } : {}}
+               title={resp?.model}
+             >
+-              <span className="tab-icon" style={{ backgroundColor: safeActiveTab === index ? 'transparent' : 'rgba(255,255,255,0.1)' }}>
++              <span
++                className="tab-icon"
++                style={{
++                  backgroundColor: safeActiveTab === index ? visuals.color : 'rgba(255,255,255,0.1)',
++                  color: safeActiveTab === index ? '#ffffff' : undefined
++                }}>
+                 {visuals.icon}
+               </span>
+               <span className="tab-name">{shortName}</span>
+@@ -96,7 +101,7 @@ export default function Stage1({ responses, startTime, endTime }) {
+               {currentVisuals.icon}
+             </span>
+             <div className="model-info">
+-              <span className="model-name-large">{currentResponse.model || 'Unknown Model'}</span>
++              <span className="model-name-large">{getShortModelName(currentResponse.model) || 'Unknown Model'}</span>
+               <span className="model-provider-badge" style={{ borderColor: currentVisuals.color, color: currentVisuals.color }}>
+                 {currentVisuals.name}
+               </span>
+@@ -133,12 +138,20 @@ export default function Stage1({ responses, startTime, endTime }) {
+         </div>
+ 
+         {hasError ? (
+-          <div className="response-error">
+-            <div className="error-icon">⚠️</div>
+-            <div className="error-details">
+-              <div className="error-title">Model Failed to Respond</div>
+-              <div className="error-message">{currentResponse?.error_message || 'Unknown error'}</div>
++          <div className="response-error-container">
++            <div className="response-error">
++              <div className="error-icon">⚠️</div>
++              <div className="error-details">
++                <div className="error-title">Model Failed to Respond</div>
++                <div className="error-message">{currentResponse?.error_message || 'Unknown error'}</div>
++              </div>
+             </div>
++            {currentResponse?.rate_limited && currentResponse?.debug_timeline && (
++              <RateLimitDebugTimeline 
++                timeline={currentResponse.debug_timeline} 
++                totalElapsed={currentResponse.total_elapsed_seconds}
++              />
++            )}
+           </div>
+         ) : (
+           <div className="response-text markdown-content">
+@@ -198,10 +211,55 @@ export function Stage1Skeleton() {
+           <Skeleton variant="text" width="95%" />
+           <Skeleton variant="text" width="90%" />
+           <br />
+-          <Skeleton variant="text" width="100%" />
+-          <Skeleton variant="text" width="85%" />
+-        </div>
++            <Skeleton variant="text" width="100%" />
++            <Skeleton variant="text" width="85%" />
++          </div>
++        )}
+       </div>
+     </div>
+   );
+ }
++
++function RateLimitDebugTimeline({ timeline, totalElapsed }) {
++  const [isOpen, setIsOpen] = useState(false);
++
++  return (
++    <div className="rate-limit-debug-container glass-panel" style={{ marginTop: '16px' }}>
++      <button className="rate-limit-debug-toggle" onClick={() => setIsOpen(!isOpen)}>
++        <span className="toggle-icon">{isOpen ? '▼' : '▶'}</span>
++        <span className="toggle-title">View Upstream Notion Rate Limit Diagnostics</span>
++        {totalElapsed && <span className="toggle-duration">Elapsed: {totalElapsed}</span>}
++      </button>
++      
++      {isOpen && (
++        <div className="rate-limit-debug-content">
++          <div className="rate-limit-timeline">
++            {timeline.map((item, index) => (
++              <div key={index} className={`timeline-item ${item.is_rate_limit ? 'item-rate-limit' : 'item-success'}`}>
++                <div className="timeline-badge" style={{ backgroundColor: item.status === 200 ? '#10b981' : '#ef4444' }}>
++                  {item.status === 200 ? '✓' : item.status || '!'}
++                </div>
++                <div className="timeline-info">
++                  <div className="timeline-header-row">
++                    <span className="timeline-attempt">Attempt #{item.attempt}</span>
++                    <span className="timeline-offset">Offset: +{item.start_offset}</span>
++                    <span className="timeline-duration">Duration: {item.duration}</span>
++                    <span className={`timeline-status ${item.status === 200 ? 'status-ok' : 'status-err'}`}>
++                      HTTP {item.status || 'Connection Error'}
++                    </span>
++                  </div>
++                  <div className="timeline-excerpt">
++                    {item.error_excerpt}
++                  </div>
++                </div>
++              </div>
++            ))}
++          </div>
++          <div className="rate-limit-footer">
++            <span className="footer-tip">💡 Tip: Parallel Stage 1 file-uploads and hyper-aggressive document conversion status polling trigger Notion rate limits. Try increasing the <strong>Serial Call Delay</strong> or <strong>Base Retry Backoff</strong> in the Settings modal under the <strong>Upload Throttling</strong> tab.</span>
++          </div>
++        </div>
++      )}
++    </div>
++  );
++}
+diff --git a/frontend/src/components/Stage2.jsx b/frontend/src/components/Stage2.jsx
+index a000334..5debb06 100644
+--- a/frontend/src/components/Stage2.jsx
++++ b/frontend/src/components/Stage2.jsx
+@@ -96,10 +96,15 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
+                             key={index}
+                             className={`tab ${safeActiveTab === index ? 'active' : ''} ${rank?.error ? 'tab-error' : ''}`}
+                             onClick={() => setActiveTab(index)}
+-                            style={safeActiveTab === index ? { borderColor: visuals.color, color: visuals.color } : {}}
++                            style={safeActiveTab === index ? { borderColor: visuals.color, color: '#f8fafc' } : {}}
+                             title={rank?.model}
+                         >
+-                            <span className="tab-icon" style={{ backgroundColor: safeActiveTab === index ? 'transparent' : 'rgba(255,255,255,0.1)' }}>
++                            <span
++                                className="tab-icon"
++                                style={{
++                                    backgroundColor: safeActiveTab === index ? visuals.color : 'rgba(255,255,255,0.1)',
++                                    color: safeActiveTab === index ? '#ffffff' : undefined
++                                }}>
+                                 {visuals.icon}
+                             </span>
+                             <span className="tab-name">{shortName}</span>
+@@ -116,7 +121,7 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
+                             {currentVisuals.icon}
+                         </span>
+                         <div className="model-info">
+-                            <span className="model-name-large">{currentRanking.model || 'Unknown Model'}</span>
++                            <span className="model-name-large">{getShortModelName(currentRanking.model) || 'Unknown Model'}</span>
+                             <span className="model-provider-badge" style={{ borderColor: currentVisuals.color, color: currentVisuals.color }}>
+                                 {currentVisuals.name}
+                             </span>
+@@ -203,7 +208,8 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
+                 <div className="aggregate-rankings">
+                     <h4>🏆 Visual Leaderboard</h4>
+                     <p className="stage-description">
+-                        Combined results across all peer evaluations. Bar length corresponds to average rank value.
++                        Combined results across all peer evaluations. Lower average rank is better; #1 is the top-ranked response.
++                        Bar length shows the numeric average rank, so shorter is better.
+                     </p>
+                     <div className="aggregate-list">
+                         {aggregateRankings.map((agg, index) => {
+diff --git a/frontend/src/components/Stage3.jsx b/frontend/src/components/Stage3.jsx
+index a3d3946..15ceee1 100644
+--- a/frontend/src/components/Stage3.jsx
++++ b/frontend/src/components/Stage3.jsx
+@@ -48,7 +48,7 @@ export default function Stage3({ finalResponse, startTime, endTime }) {
+                         </span>
+                         <div className="chairman-info">
+                             <span className="chairman-role">
+-                                <span>👨‍⚖️</span> Chairman's Verdict
++                                <span>👨‍⚖️</span> Chairman / Synthesizer
+                             </span>
+                             <span className="chairman-model">{shortName}</span>
+                             <span className="chairman-provider-badge">{visuals.name}</span>
+diff --git a/frontend/src/utils/modelHelpers.js b/frontend/src/utils/modelHelpers.js
+index e289e91..b6ad162 100644
+--- a/frontend/src/utils/modelHelpers.js
++++ b/frontend/src/utils/modelHelpers.js
+@@ -46,6 +46,11 @@ export const getModelVisuals = (modelId) => {
+     return { name: 'DeepSeek', color: '#4e80ee', short: 'DeepSeek', icon: '🐋' };
+   }
+ 
++  // Kimi / Moonshot
++  if (id.includes('kimi') || id.includes('moonshot')) {
++    return { name: 'Kimi', color: '#111827', short: 'Kimi', icon: '月' };
++  }
++
+   // Local (fallback for models without provider prefix or slash)
+   if (!id.includes('/') && !id.includes(':')) {
+     return { name: 'Local', color: '#f1f5f9', short: 'Local', icon: '💻' };
+@@ -57,11 +62,67 @@ export const getModelVisuals = (modelId) => {
+ 
+ export const getShortModelName = (modelId) => {
+   if (!modelId) return 'Unknown';
++
++  const formatVersionSuffix = (value) => {
++    return value
++      .replace(/(\d(?:\.\d+)*)(pro|flash|turbo|mini|nano|opus|sonnet|haiku)\b/gi, '$1 $2')
++      .replace(/\b(pro|flash|turbo|mini|nano|opus|sonnet|haiku)(\d(?:\.\d+)*)\b/gi, '$1 $2');
++  };
++
++  const titleCaseWords = (value) =>
++    value
++      .split(' ')
++      .filter(Boolean)
++      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
++      .join(' ');
++
++  const cleanModelId = String(modelId)
++    .trim()
++    .replace(/^custom:/i, '')
++    .replace(/^ollama:/i, '')
++    .replace(/^groq:/i, '')
++    .replace(/^openai:/i, '')
++    .replace(/^anthropic:/i, '')
++    .replace(/^google:/i, '')
++    .replace(/^mistral:/i, '')
++    .replace(/^deepseek:/i, '');
++
+   // Handle "provider/model-name" format
+-  const parts = modelId.split('/');
+-  if (parts.length > 1) return parts[1];
+-  // Handle "provider:model-name" format
+-  const colParts = modelId.split(':');
+-  if (colParts.length > 1) return colParts[1];
+-  return modelId;
++  const rawName = cleanModelId.includes('/') ? cleanModelId.split('/').pop() : cleanModelId;
++  const id = rawName.toLowerCase();
++
++  if (id.startsWith('gpt-')) {
++    return rawName.replace(/^gpt-/i, 'GPT ').replace(/-/g, ' ');
++  }
++
++  if (id.startsWith('gemini-')) {
++    const suffix = formatVersionSuffix(rawName.replace(/^gemini-/i, '').replace(/-/g, ' '));
++    return `Gemini ${titleCaseWords(suffix)}`;
++  }
++
++  if (id.startsWith('claude-')) {
++    const suffix = formatVersionSuffix(rawName.replace(/^claude-/i, '').replace(/-/g, ' '));
++    const withoutFamilyVersion = suffix.replace(/^(\d+(?:\.\d+)?\s*)/i, '');
++    return titleCaseWords(withoutFamilyVersion);
++  }
++
++  if (id.startsWith('kimi-')) {
++    return rawName.replace(/^kimi-/i, 'Kimi ').replace(/-/g, ' ');
++  }
++
++  if (id.startsWith('moonshot-')) {
++    return rawName.replace(/^moonshot-/i, 'Kimi ').replace(/-/g, ' ');
++  }
++
++  if (id.startsWith('mistral-')) {
++    const suffix = formatVersionSuffix(rawName.replace(/^mistral-/i, '').replace(/-/g, ' '));
++    return `Mistral ${titleCaseWords(suffix)}`;
++  }
++
++  if (id.startsWith('deepseek-')) {
++    const suffix = formatVersionSuffix(rawName.replace(/^deepseek-/i, '').replace(/-/g, ' '));
++    return `DeepSeek ${titleCaseWords(suffix)}`;
++  }
++
++  return titleCaseWords(formatVersionSuffix(rawName.replace(/[-_]+/g, ' ')));
+ };

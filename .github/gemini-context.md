@@ -3,19 +3,13 @@
 ## Auto-generated signatures
 <!-- Updated by gen-context.js -->
 You are a coding assistant with complete knowledge of this codebase.
-The following code signatures were extracted by SigMap v6.5.1 on 2026-05-24T09:39:19.327Z.
+The following code signatures were extracted by SigMap v6.5.1 on 2026-05-24T12:34:46.731Z.
 
 These signatures represent every public function, class, and type in the project.
 Refer to them when answering questions about code structure, APIs, and implementation.
 Before answering questions about specific code areas, suggest running `sigmap ask "<query>"` to get the most relevant files. After config changes, `sigmap validate` confirms coverage.
 
 ## Code Signatures
-
-## changes (last 5 commits — 1 second ago)
-```
-.github\copilot-instructions.md               +focusChatInput  +ensureChatInputReady  +clearCouncilUiStorage  +getActiveRuntimeUrls
-.github\gemini-context.md                     +focusChatInput  +ensureChatInputReady  +clearCouncilUiStorage  +getActiveRuntimeUrls
-```
 
 ## .github
 

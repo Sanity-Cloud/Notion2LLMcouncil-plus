@@ -4,12 +4,6 @@
 <!-- Updated by gen-context.js -->
 # Code signatures
 
-## changes (last 5 commits — 1 second ago)
-```
-.github\copilot-instructions.md               +focusChatInput  +ensureChatInputReady  +clearCouncilUiStorage  +getActiveRuntimeUrls
-.github\gemini-context.md                     +focusChatInput  +ensureChatInputReady  +clearCouncilUiStorage  +getActiveRuntimeUrls
-```
-
 ## .github
 
 ### .github\copilot-instructions.md
