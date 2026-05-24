@@ -16,6 +16,7 @@ dist-release/
 # IDEs
 .vscode/
 .idea/
+*.code-workspace
 *.suo
 *.ntvs*
 *.njsproj
