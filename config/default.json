@@ -10,7 +10,7 @@
   },
   "council": {
     "localRoot": "vendor\\llm-council-plus",
-    "repoUrl": "https://github.com/jacob-bd/llm-council-plus.git",
+    "repoUrl": "https://github.com/Sanity-Cloud/llm-council-plus.git",
     "branch": "main",
     "backendPort": 8001,
     "frontendPort": 5173,

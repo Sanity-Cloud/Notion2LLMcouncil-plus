@@ -7,7 +7,7 @@ param(
     [int]$CouncilFrontendPort = 5173,
     [string]$NotionRepoUrl = "https://github.com/Sanity-Cloud/notion2api.git",
     [string]$NotionBranch = "main",
-    [string]$CouncilRepoUrl = "https://github.com/jacob-bd/llm-council-plus.git",
+    [string]$CouncilRepoUrl = "https://github.com/Sanity-Cloud/llm-council-plus.git",
     [string]$CouncilBranch = "main",
     [switch]$UseVendor,
     [switch]$RefreshLogin,

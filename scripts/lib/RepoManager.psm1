@@ -78,9 +78,11 @@ function Reset-PatchTargetPaths {
     foreach ($target in $Targets) {
         if (-not $target) { continue }
         Write-Step "Resetting patch target for $($Name): $target"
-        cmd.exe /c "git checkout -- `"$target`""
+        cmd.exe /c "git checkout -- `"$target`" 2>nul"
         if ($LASTEXITCODE -ne 0) {
-            throw "Failed to reset patch target '$target' for patch: $Name"
+            if (Test-Path $target) {
+                Remove-Item -Path $target -Force -Recurse -ErrorAction SilentlyContinue
+            }
         }
     }
 }
@@ -112,6 +114,16 @@ function Invoke-RepoPatchPostHooks {
                 -Root $Root `
                 -PatchPath $rateLimitPatch `
                 -Name "LLM Council Notion2API upload rate-limit guard"
+        }
+    }
+
+    if ($leaf -eq "llm-council-plus-notion2api-upload-rate-limit.patch") {
+        $saveExportPatch = Join-Path $patchDir "llm-council-plus-notion2api-save-export.patch"
+        if (Test-Path $saveExportPatch) {
+            Update-RepoPatch `
+                -Root $Root `
+                -PatchPath $saveExportPatch `
+                -Name "LLM Council Notion2API save and export layer"
         }
     }
 }
@@ -179,12 +191,23 @@ function Apply-SubmodulePatches {
         [string]$RepoRoot
     )
 
+    $RemoteUrl = ""
+    try {
+        $RemoteUrl = (git -C $CouncilRoot remote get-url origin 2>$null).Trim()
+    } catch {}
+
+    if ($RemoteUrl -match "Sanity-Cloud/llm-council-plus") {
+        Write-Step "LLM Council is using Sanity-Cloud fork ($RemoteUrl). Skipping patch application."
+        return
+    }
+
     $PatchFiles = @(
         (Join-Path $RepoRoot "scripts\patches\llm-council-plus-custom-model-icons.patch"),
         (Join-Path $RepoRoot "scripts\patches\llm-council-plus-first-message-title.patch"),
         (Join-Path $RepoRoot "scripts\patches\llm-council-plus-new-chat-stream-race.patch"),
         (Join-Path $RepoRoot "scripts\patches\llm-council-plus-notion2api-file-uploads.patch"),
-        (Join-Path $RepoRoot "scripts\patches\llm-council-plus-notion2api-upload-rate-limit.patch")
+        (Join-Path $RepoRoot "scripts\patches\llm-council-plus-notion2api-upload-rate-limit.patch"),
+        (Join-Path $RepoRoot "scripts\patches\llm-council-plus-notion2api-save-export.patch")
     )
 
     # 1. Get submodule commit
