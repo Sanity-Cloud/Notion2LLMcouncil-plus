@@ -85,6 +85,25 @@ function Reset-PatchTargetPaths {
     }
 }
 
+function Invoke-RepoPatchPostHooks {
+    param(
+        [string]$Root,
+        [string]$PatchPath,
+        [string]$Name
+    )
+
+    $leaf = Split-Path $PatchPath -Leaf
+    if ($leaf -ne "llm-council-plus-new-chat-stream-race.patch") { return }
+
+    $uploadPatch = Join-Path (Split-Path $PatchPath -Parent) "llm-council-plus-notion2api-file-uploads.patch"
+    if (-not (Test-Path $uploadPatch)) { return }
+
+    Update-RepoPatch `
+        -Root $Root `
+        -PatchPath $uploadPatch `
+        -Name "LLM Council Notion2API file uploads"
+}
+
 function Update-RepoPatch {
     param(
         [string]$Root,
@@ -103,12 +122,14 @@ function Update-RepoPatch {
                 Write-Step "Applying patch: $Name"
                 cmd.exe /c "git apply --ignore-whitespace `"$PatchPath`""
                 if ($LASTEXITCODE -ne 0) { throw "Failed to apply patch: $Name" }
+                Invoke-RepoPatchPostHooks -Root $Root -PatchPath $PatchPath -Name $Name
                 return
             }
 
             cmd.exe /c "git apply --reverse --check --ignore-whitespace `"$PatchPath`" 2>nul"
             if ($LASTEXITCODE -eq 0) {
                 Write-Step "Patch already applied: $Name"
+                Invoke-RepoPatchPostHooks -Root $Root -PatchPath $PatchPath -Name $Name
                 return
             }
 
@@ -122,6 +143,7 @@ function Update-RepoPatch {
                     Write-Step "Applying patch after reset: $Name"
                     cmd.exe /c "git apply --ignore-whitespace `"$PatchPath`""
                     if ($LASTEXITCODE -ne 0) { throw "Failed to apply patch after reset: $Name" }
+                    Invoke-RepoPatchPostHooks -Root $Root -PatchPath $PatchPath -Name $Name
                     return
                 }
             }
