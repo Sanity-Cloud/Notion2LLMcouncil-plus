@@ -318,12 +318,14 @@ function Start-CouncilBackend {
     $python = Get-Python -Root $CouncilRoot
     Write-Step "Starting LLM Council backend on http://127.0.0.1:$CouncilBackendPort"
     $env:LLM_COUNCIL_ENABLE_SHUTDOWN = "1"
+    $env:FRONTEND_HOST = "http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:5174,http://localhost:5174,http://127.0.0.1:3000,http://localhost:3000"
     $process = Start-Process -FilePath $python `
         -ArgumentList @("-m", "uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", "$CouncilBackendPort") `
         -WorkingDirectory $CouncilRoot -RedirectStandardOutput (Join-Path $LogDir "council-backend.out.log") -RedirectStandardError (Join-Path $LogDir "council-backend.err.log") `
         -WindowStyle Hidden -PassThru
     # Clear env var leakage
     $env:LLM_COUNCIL_ENABLE_SHUTDOWN = $null
+    $env:FRONTEND_HOST = $null
     Wait-HttpOk -Url $settingsUrl -ExpectedContent "council_models"
     $State.councilBackend = @{ name = "LLM Council backend"; pid = $process.Id; port = $CouncilBackendPort; url = "http://127.0.0.1:$CouncilBackendPort" }
     return $State
