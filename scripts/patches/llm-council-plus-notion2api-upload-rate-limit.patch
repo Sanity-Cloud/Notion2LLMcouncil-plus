@@ -1,8 +1,8 @@
 diff --git a/backend/council.py b/backend/council.py
-index 4882169..8a9f3d1 100644
+index 4882169..9cfc8dd 100644
 --- a/backend/council.py
 +++ b/backend/council.py
-@@ -2,6 +2,7 @@
+@@ -3,6 +3,7 @@
  from typing import List, Dict, Any, Tuple
  import asyncio
  import logging
@@ -10,10 +10,10 @@ index 4882169..8a9f3d1 100644
  from . import openrouter
  from . import ollama_client
  from .config import get_council_models, get_chairman_model
-@@ -33,6 +34,28 @@ PROVIDERS = {
+@@ -34,6 +35,25 @@ PROVIDERS = {
      "custom": CustomOpenAIProvider(),
  }
-+
+ 
 +
 +_NOTION_ATTACHMENT_SEMAPHORE = asyncio.Semaphore(1)
 +
@@ -36,7 +36,7 @@ index 4882169..8a9f3d1 100644
  def get_provider_for_model(model_id: str) -> Any:
      """Determine the provider for a given model ID."""
      if ":" in model_id:
-@@ -50,7 +73,12 @@ async def query_model(model: str, messages: List[Dict[str, str]], timeout: float
+@@ -50,7 +70,13 @@ async def query_model(model: str, messages: List[Dict[str, str]], timeout: float
      provider = get_provider_for_model(model)
      if attachments and model.startswith("custom:"):
          # Notion2API is configured as the custom OpenAI-compatible endpoint.
@@ -52,10 +52,10 @@ index 4882169..8a9f3d1 100644
  
  
 diff --git a/backend/providers/custom_openai.py b/backend/providers/custom_openai.py
-index 1a19ef9..a1cc344 100644
+index 1a19ef9..b19a636 100644
 --- a/backend/providers/custom_openai.py
 +++ b/backend/providers/custom_openai.py
-@@ -1,6 +1,8 @@
+@@ -1,5 +1,7 @@
  """Custom OpenAI-compatible endpoint provider."""
  
 +import asyncio
@@ -66,7 +66,7 @@ index 1a19ef9..a1cc344 100644
 @@ -22,6 +24,23 @@ class CustomOpenAIProvider(LLMProvider):
          marker = f"{name} {base_url}".lower()
          return "notion" in marker or "127.0.0.1:8000" in marker or "localhost:8000" in marker
-+
+ 
 +    def _attachment_retry_config(self) -> tuple[int, float]:
 +        try:
 +            attempts = max(1, int(os.getenv("LLM_COUNCIL_ATTACHMENT_MAX_ATTEMPTS", "3")))
@@ -83,17 +83,18 @@ index 1a19ef9..a1cc344 100644
 +        return status_code in {429, 503} and (
 +            "notion_429" in marker or "rate_limit" in marker or "rate limit" in marker or "fileimporterror" in marker
 +        )
- 
++
      async def query(self, model_id: str, messages: List[Dict[str, str]], timeout: float = 120.0, temperature: float = 0.7, attachments: List[Dict[str, Any]] | None = None) -> Dict[str, Any]:
          name, base_url, api_key = self._get_config()
-@@ -45,16 +64,30 @@ class CustomOpenAIProvider(LLMProvider):
+ 
+@@ -48,12 +67,29 @@ class CustomOpenAIProvider(LLMProvider):
              if attachments and self._supports_attachments(name, base_url):
                  payload["attachments"] = attachments
-+
+ 
 +            max_attempts, retry_delay = (1, 0.0)
 +            if payload.get("attachments"):
 +                max_attempts, retry_delay = self._attachment_retry_config()
- 
++
              async with httpx.AsyncClient(timeout=timeout) as client:
 -                response = await client.post(
 -                    f"{base_url}/chat/completions",
