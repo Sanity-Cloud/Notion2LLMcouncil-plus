@@ -436,6 +436,11 @@ Do not change the distribution strategy without updating `README.md`, `DEVELOPME
 | To query by topic | `sigmap --query "<topic>"` |
 
 Always run `sigmap ask` or `sigmap --query` before searching for files relevant to a task.
+## changes (last 5 commits — 1 second ago)
+```
+electron\lib\diagnostics.js                   ~getDiagnosticsStatus
+```
+
 ## .github
 
 ### .github\copilot-instructions.md
@@ -506,6 +511,19 @@ job: validate
 ```
 
 ## electron
+
+### electron\lib\diagnostics.js
+```
+module.exports = { getDiagnosticsStatus }
+function readJson(filePath)
+function readEnvValue(filePath, name)
+function tailFile(filePath, maxChars = 4000)
+function requestText(url, options = {})
+function requestJsonPost(url, bodyObject, options = {})
+function titleContains(body, expectedTitle)
+async function testService(name, url, options = {})
+async function getDiagnosticsStatus()
+```
 
 ### electron\diagnostics-renderer.js
 ```
@@ -579,19 +597,6 @@ module.exports = { defaultHotkeys, getHotkeyConfigPath, readHotkeys, writeHotkey
 function getHotkeyConfigPath()
 function readHotkeys()
 function writeHotkeys(hotkeys)
-```
-
-### electron\lib\diagnostics.js
-```
-module.exports = { getDiagnosticsStatus }
-function readJson(filePath)
-function readEnvValue(filePath, name)
-function tailFile(filePath, maxChars = 4000)
-function requestText(url, options = {})
-function requestJsonPost(url, bodyObject, options = {})
-function titleContains(body, expectedTitle)
-async function testService(name, url, options = {})
-async function getDiagnosticsStatus()
 ```
 
 ### electron\lib\integration-config.js
