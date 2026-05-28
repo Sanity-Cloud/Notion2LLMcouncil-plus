@@ -169,7 +169,7 @@ async function getDiagnosticsStatus() {
 
   const [settingsExportRes, askRes, healthRes] = await Promise.all([
     requestText(`${runtimeCouncilBackendUrl}/api/settings/export`),
-    requestText(`${runtimeCouncilBackendUrl}/api/ask`),
+    requestJsonPost(`${runtimeCouncilBackendUrl}/api/ask`, {}),
     requestText(`${runtimeCouncilBackendUrl}/api/health`),
   ]);
 
