@@ -436,9 +436,8 @@ Do not change the distribution strategy without updating `README.md`, `DEVELOPME
 | To query by topic | `sigmap --query "<topic>"` |
 
 Always run `sigmap ask` or `sigmap --query` before searching for files relevant to a task.
-## changes (last 5 commits — 2 minutes ago)
+## changes (last 5 commits — 5 hours ago)
 ```
-electron\lib\diagnostics.js                   ~getDiagnosticsStatus
 .github\copilot-instructions.md               +readJson  +readEnvValue  +tailFile  +requestText
 .github\gemini-context.md                     +readJson  +readEnvValue  +tailFile  +requestText
 ```

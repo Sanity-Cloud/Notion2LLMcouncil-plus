@@ -4,9 +4,8 @@
 <!-- Updated by gen-context.js -->
 # Code signatures
 
-## changes (last 5 commits — 2 minutes ago)
+## changes (last 5 commits — 5 hours ago)
 ```
-electron\lib\diagnostics.js                   ~getDiagnosticsStatus
 .github\copilot-instructions.md               +readJson  +readEnvValue  +tailFile  +requestText
 .github\gemini-context.md                     +readJson  +readEnvValue  +tailFile  +requestText
 ```
