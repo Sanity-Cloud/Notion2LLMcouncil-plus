@@ -1,6 +1,6 @@
 $commonUtilsPath = Join-Path $PSScriptRoot "CommonUtils.psm1"
 if (Test-Path $commonUtilsPath) {
-    Import-Module $commonUtilsPath -Force
+    Import-Module $commonUtilsPath
 }
 
 function Initialize-Repo {

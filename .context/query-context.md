@@ -1,5 +1,29 @@
 # SigMap Query Context
-Generated: 2026-05-24T12:42:32.299Z
+Generated: 2026-05-28T00:15:23.834Z
+
+## electron\diagnostics.html
+```
+title: Notion2Council Diagnostics
+div#checkedAt
+button#refresh
+button#start
+button#stop
+button#openUi
+button#openDocs
+button#openLogs
+div#services
+dl#provider
+dl#config
+input#notionLocalRoot
+input#notionPort
+input#councilLocalRoot
+input#councilBackendPort
+input#councilFrontendPort
+input#providerUrlPath
+button#saveConfig
+div#configPath
+pre#state
+```
 
 ## electron\hotkeys.html
 ```
@@ -17,6 +41,21 @@ button#testClipboardToNewChat
 button#reload
 div#status
 div#path
+```
+
+## electron\lib\launcher.js
+```
+module.exports = { startStack, stopStack }
+function resolvePowerShellPath()
+function showError(title, message)
+function readEnvValue(filePath, name)
+function hasSavedNotionAccount(integration)
+function runPowerShell(scriptPath, args = [])
+function runVisibleNotionLogin(integration, afterLogin)
+function getScriptPath(scriptName)
+function getBaseLaunchArgs()
+function startStack({ noBrowser = true } = {})
+function stopStack()
 ```
 
 ## electron\main.js
@@ -42,56 +81,16 @@ function setApplicationMenu()
 function registerHotkeys()
 ```
 
-## electron\windows\hotkeys.js
+## electron\lib\integration-config.js
 ```
-module.exports = { openHotkeySettings }
-function openHotkeySettings(parentWindow)
-```
-
-## .github\copilot-instructions.md
-```
-h2 Auto-generated signatures
-h2 SigMap commands
-h1 Code signatures
-h2 changes (last 5 commits — 1 second ago)
-h2 .github
-h3 .github\copilot-instructions.md
-h3 .github\gemini-context.md
-h3 .github\workflows\release.yml
-h3 .github\workflows\validate.yml
-h2 electron
-h3 electron\diagnostics-renderer.js
-h3 electron\diagnostics.html
-h3 electron\hotkeys-renderer.js
-h3 electron\hotkeys.html
-h3 electron\lib\config.js
-h3 electron\lib\diagnostics.js
-h3 electron\lib\integration-config.js
-h3 electron\lib\launcher.js
-h3 electron\lib\logger.js
-h3 electron\lib\utils.js
-```
-
-## .github\gemini-context.md
-```
-h2 Auto-generated signatures
-h2 Code Signatures
-h2 changes (last 5 commits — 1 second ago)
-h2 .github
-h3 .github\copilot-instructions.md
-h3 .github\gemini-context.md
-h3 .github\workflows\release.yml
-h3 .github\workflows\validate.yml
-h2 electron
-h3 electron\diagnostics-renderer.js
-h3 electron\diagnostics.html
-h3 electron\hotkeys-renderer.js
-h3 electron\hotkeys.html
-h3 electron\lib\config.js
-h3 electron\lib\diagnostics.js
-h3 electron\lib\integration-config.js
-h3 electron\lib\launcher.js
-h3 electron\lib\logger.js
-h3 electron\lib\utils.js
-h3 electron\main.js
+module.exports = { getIntegrationConfig, getEditableLocalConfig, saveLocalIntegrationConfig }
+function readJsonFile(filePath)
+function getNested(source, parts)
+function getConfigValue(localConfig, defaultConfig, parts, fallback)
+function getDefaultConfigPath(repoRoot)
+function getLocalConfigPath(repoRoot)
+function resolveRuntimePath(repoRoot, value, fallbackRelative)
+function getIntegrationConfig()
+function getEditableLocalConfig()
+function saveLocalIntegrationConfig(values)
 ```

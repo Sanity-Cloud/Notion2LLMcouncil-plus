@@ -1,3 +1,8 @@
+$commonUtilsPath = Join-Path $PSScriptRoot "CommonUtils.psm1"
+if (Test-Path $commonUtilsPath) {
+    Import-Module $commonUtilsPath
+}
+
 function Get-State
 {
     param([string]$StateFile)
