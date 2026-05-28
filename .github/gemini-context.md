@@ -3,19 +3,13 @@
 ## Auto-generated signatures
 <!-- Updated by gen-context.js -->
 You are a coding assistant with complete knowledge of this codebase.
-The following code signatures were extracted by SigMap v6.5.1 on 2026-05-28T17:10:19.080Z.
+The following code signatures were extracted by SigMap v6.5.1 on 2026-05-28T21:49:46.540Z.
 
 These signatures represent every public function, class, and type in the project.
 Refer to them when answering questions about code structure, APIs, and implementation.
 Before answering questions about specific code areas, suggest running `sigmap ask "<query>"` to get the most relevant files. After config changes, `sigmap validate` confirms coverage.
 
 ## Code Signatures
-
-## changes (last 5 commits — 5 hours ago)
-```
-.github\copilot-instructions.md               +readJson  +readEnvValue  +tailFile  +requestText
-.github\gemini-context.md                     +readJson  +readEnvValue  +tailFile  +requestText
-```
 
 ## .github
 
@@ -24,7 +18,6 @@ Before answering questions about specific code areas, suggest running `sigmap as
 h2 Auto-generated signatures
 h2 SigMap commands
 h1 Code signatures
-h2 changes (last 5 commits — 1 second ago)
 h2 .github
 h3 .github\copilot-instructions.md
 h3 .github\gemini-context.md
@@ -52,7 +45,6 @@ code-fence plain
 ```
 h2 Auto-generated signatures
 h2 Code Signatures
-h2 changes (last 5 commits — 1 second ago)
 h2 .github
 h3 .github\copilot-instructions.md
 h3 .github\gemini-context.md
