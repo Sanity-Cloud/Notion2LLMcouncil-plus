@@ -436,9 +436,11 @@ Do not change the distribution strategy without updating `README.md`, `DEVELOPME
 | To query by topic | `sigmap --query "<topic>"` |
 
 Always run `sigmap ask` or `sigmap --query` before searching for files relevant to a task.
-## changes (last 5 commits — 1 second ago)
+## changes (last 5 commits — 2 hours ago)
 ```
 electron\lib\diagnostics.js                   ~getDiagnosticsStatus
+.github\copilot-instructions.md               +readJson  +readEnvValue  +tailFile  +requestText
+.github\gemini-context.md                     +readJson  +readEnvValue  +tailFile  +requestText
 ```
 
 ## .github
@@ -448,18 +450,19 @@ electron\lib\diagnostics.js                   ~getDiagnosticsStatus
 h2 Auto-generated signatures
 h2 SigMap commands
 h1 Code signatures
+h2 changes (last 5 commits — 0 seconds ago)
 h2 .github
 h3 .github\copilot-instructions.md
 h3 .github\gemini-context.md
 h3 .github\workflows\release.yml
 h3 .github\workflows\validate.yml
 h2 electron
+h3 electron\lib\diagnostics.js
 h3 electron\diagnostics-renderer.js
 h3 electron\diagnostics.html
 h3 electron\hotkeys-renderer.js
 h3 electron\hotkeys.html
 h3 electron\lib\config.js
-h3 electron\lib\diagnostics.js
 h3 electron\lib\integration-config.js
 h3 electron\lib\launcher.js
 h3 electron\lib\logger.js
@@ -475,18 +478,19 @@ code-fence plain
 ```
 h2 Auto-generated signatures
 h2 Code Signatures
+h2 changes (last 5 commits — 0 seconds ago)
 h2 .github
 h3 .github\copilot-instructions.md
 h3 .github\gemini-context.md
 h3 .github\workflows\release.yml
 h3 .github\workflows\validate.yml
 h2 electron
+h3 electron\lib\diagnostics.js
 h3 electron\diagnostics-renderer.js
 h3 electron\diagnostics.html
 h3 electron\hotkeys-renderer.js
 h3 electron\hotkeys.html
 h3 electron\lib\config.js
-h3 electron\lib\diagnostics.js
 h3 electron\lib\integration-config.js
 h3 electron\lib\launcher.js
 h3 electron\lib\logger.js
