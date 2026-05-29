@@ -3,13 +3,22 @@
 ## Auto-generated signatures
 <!-- Updated by gen-context.js -->
 You are a coding assistant with complete knowledge of this codebase.
-The following code signatures were extracted by SigMap v6.5.1 on 2026-05-28T22:06:36.320Z.
+The following code signatures were extracted by SigMap v6.5.1 on 2026-05-29T06:15:55.910Z.
 
 These signatures represent every public function, class, and type in the project.
 Refer to them when answering questions about code structure, APIs, and implementation.
 Before answering questions about specific code areas, suggest running `sigmap ask "<query>"` to get the most relevant files. After config changes, `sigmap validate` confirms coverage.
 
 ## Code Signatures
+
+## deps
+```
+scratch\debug_conv_followup.py ← backend
+scratch\dump_conv.py ← backend
+scratch\test_council_run.py ← httpx
+scratch\test_followup_run.py ← httpx
+scratch\test_regex.py ← backend
+```
 
 ## .github
 
@@ -262,4 +271,34 @@ function createMainWindow(councilUiUrl)
 function getMainWindow()
 function showMainWindow()
 function toggleMainWindow()
+```
+
+## scratch
+
+### scratch\debug_conv_followup.py
+```
+def main()
+```
+
+### scratch\dump_conv.py
+```
+def main()
+```
+
+### scratch\test_council_run.py
+```
+def check_no_hits(label, text)
+def main()
+```
+
+### scratch\test_followup_run.py
+```
+def check_no_hits(label, text)
+def run_message_stream(client, conv_id, content)
+def main()
+```
+
+### scratch\test_regex.py
+```
+def main()
 ```

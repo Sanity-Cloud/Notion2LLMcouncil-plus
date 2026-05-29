@@ -4,6 +4,15 @@
 <!-- Updated by gen-context.js -->
 # Code signatures
 
+## deps
+```
+scratch\debug_conv_followup.py ← backend
+scratch\dump_conv.py ← backend
+scratch\test_council_run.py ← httpx
+scratch\test_followup_run.py ← httpx
+scratch\test_regex.py ← backend
+```
+
 ## .github
 
 ### .github\copilot-instructions.md
@@ -255,4 +264,34 @@ function createMainWindow(councilUiUrl)
 function getMainWindow()
 function showMainWindow()
 function toggleMainWindow()
+```
+
+## scratch
+
+### scratch\debug_conv_followup.py
+```
+def main()
+```
+
+### scratch\dump_conv.py
+```
+def main()
+```
+
+### scratch\test_council_run.py
+```
+def check_no_hits(label, text)
+def main()
+```
+
+### scratch\test_followup_run.py
+```
+def check_no_hits(label, text)
+def run_message_stream(client, conv_id, content)
+def main()
+```
+
+### scratch\test_regex.py
+```
+def main()
 ```
