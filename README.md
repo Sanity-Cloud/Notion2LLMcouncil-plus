@@ -7,6 +7,8 @@ Notion2LLMcouncil Plus is a small public integration launcher for running:
 
 The launcher starts both projects and automatically configures LLM Council Plus to use Notion2API as its custom OpenAI-compatible provider.
 
+Current bundled LLM Council Plus features include the standard 3-stage council flow, Advisor debates, Advisor MCP tools, and backend-mounted MCP SSE at `/mcp/sse` on the Council backend port.
+
 ## What It Does
 
 - Reuses existing local checkouts or clones both upstream repos into `vendor/`
@@ -17,6 +19,7 @@ The launcher starts both projects and automatically configures LLM Council Plus 
 - Starts Notion2API on `http://127.0.0.1:8000`
 - Starts LLM Council backend on `http://127.0.0.1:8001`
 - Starts LLM Council frontend on `http://127.0.0.1:5173`
+- Exposes LLM Council MCP SSE through the backend at `http://127.0.0.1:8001/mcp/sse`
 - Configures LLM Council custom provider:
   - name: `Notion2API`
   - URL: `http://127.0.0.1:8000/v1`
@@ -130,6 +133,7 @@ Until the Notion2API auto-login PR is merged upstream, vendor mode clones the PR
 | Notion2API | `http://127.0.0.1:8000` |
 | LLM Council backend | `http://127.0.0.1:8001` |
 | LLM Council frontend | `http://127.0.0.1:5173` |
+| LLM Council MCP SSE | `http://127.0.0.1:8001/mcp/sse` |
 
 ## Credential Safety
 
