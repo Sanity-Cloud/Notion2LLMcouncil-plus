@@ -243,11 +243,11 @@ function Initialize-NotionApiKey {
 function Initialize-NotionMode {
     $envPath = Join-Path $NotionRoot ".env"
     Set-EnvLine -Path $envPath -Name "APP_MODE" -Value $NotionAppMode
-    Set-EnvLine -Path $envPath -Name "NOTION_PERSIST_THREADS" -Value "false"
-    Set-EnvLine -Path $envPath -Name "NOTION_GENERATE_TITLES" -Value "false"
-    Set-EnvLine -Path $envPath -Name "NOTION_SAVE_THREAD_OPERATIONS" -Value "false"
-    Set-EnvLine -Path $envPath -Name "NOTION_SET_UNREAD_STATE" -Value "false"
-    Set-EnvLine -Path $envPath -Name "NOTION_DELETE_EPHEMERAL_THREADS" -Value "true"
+    Set-EnvLine -Path $envPath -Name "NOTION_PERSIST_THREADS"          -Value $(if ($NotionPersistThreads)         { "true" } else { "false" })
+    Set-EnvLine -Path $envPath -Name "NOTION_GENERATE_TITLES"          -Value $(if ($NotionGenerateTitles)         { "true" } else { "false" })
+    Set-EnvLine -Path $envPath -Name "NOTION_SAVE_THREAD_OPERATIONS"   -Value $(if ($NotionSaveThreadOperations)   { "true" } else { "false" })
+    Set-EnvLine -Path $envPath -Name "NOTION_SET_UNREAD_STATE"         -Value $(if ($NotionSetUnreadState)         { "true" } else { "false" })
+    Set-EnvLine -Path $envPath -Name "NOTION_DELETE_EPHEMERAL_THREADS" -Value $(if ($NotionDeleteEphemeralThreads) { "true" } else { "false" })
 }
 
 function Test-NotionLogin {
@@ -598,6 +598,11 @@ $ProviderUrlPath = Use-ConfigValue -Value (Get-ConfigProperty $Config @("provide
 $NotionAppMode = Use-ConfigValue -Value (Get-ConfigProperty $Config @("notion", "appMode")) -Fallback "standard"
 $NotionAutoLogin = [bool](Use-ConfigValue -Value (Get-ConfigProperty $Config @("notion", "autoLogin")) -Fallback $true)
 $NotionLoginTimeoutSeconds = [int](Use-ConfigValue -Value (Get-ConfigProperty $Config @("notion", "loginTimeoutSeconds")) -Fallback 300)
+$NotionPersistThreads         = [bool](Use-ConfigValue -Value (Get-ConfigProperty $Config @("notion", "persistThreads"))         -Fallback $false)
+$NotionGenerateTitles         = [bool](Use-ConfigValue -Value (Get-ConfigProperty $Config @("notion", "generateTitles"))         -Fallback $false)
+$NotionSaveThreadOperations   = [bool](Use-ConfigValue -Value (Get-ConfigProperty $Config @("notion", "saveThreadOperations"))   -Fallback $false)
+$NotionSetUnreadState         = [bool](Use-ConfigValue -Value (Get-ConfigProperty $Config @("notion", "setUnreadState"))         -Fallback $false)
+$NotionDeleteEphemeralThreads = [bool](Use-ConfigValue -Value (Get-ConfigProperty $Config @("notion", "deleteEphemeralThreads")) -Fallback $true)
 $ProviderApplyDefaultCouncil = [bool](Use-ConfigValue -Value (Get-ConfigProperty $Config @("provider", "applyDefaultCouncil")) -Fallback $true)
 $ConfiguredCouncilModels = ConvertTo-StringArray (Get-ConfigProperty $Config @("provider", "councilModels"))
 $ConfiguredChairmanModel = Use-ConfigValue -Value (Get-ConfigProperty $Config @("provider", "chairmanModel")) -Fallback "custom:claude-opus4.7"
