@@ -445,7 +445,7 @@ scratch\test_followup_run.py ← httpx
 scratch\test_regex.py ← backend
 ```
 
-## changes (last 5 commits — 19 hours ago)
+## changes (last 5 commits — 1 second ago)
 ```
 .github\copilot-instructions.md               +readJson  +readEnvValue  +tailFile  +requestText
 .github\gemini-context.md                     +readJson  +readEnvValue  +tailFile  +requestText
@@ -459,7 +459,7 @@ h2 Auto-generated signatures
 h2 SigMap commands
 h1 Code signatures
 h2 deps
-h2 changes (last 5 commits — 0 seconds ago)
+h2 changes (last 5 commits — 1 second ago)
 h2 .github
 h3 .github\copilot-instructions.md
 h3 .github\gemini-context.md
@@ -487,7 +487,7 @@ h3 electron\windows\main.js
 h2 Auto-generated signatures
 h2 Code Signatures
 h2 deps
-h2 changes (last 5 commits — 0 seconds ago)
+h2 changes (last 5 commits — 1 second ago)
 h2 .github
 h3 .github\copilot-instructions.md
 h3 .github\gemini-context.md
