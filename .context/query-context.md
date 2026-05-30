@@ -1,5 +1,29 @@
 # SigMap Query Context
-Generated: 2026-05-30T01:48:39.586Z
+Generated: 2026-05-30T02:38:33.008Z
+
+## electron\diagnostics.html
+```
+title: Notion2Council Diagnostics
+div#checkedAt
+button#refresh
+button#start
+button#stop
+button#openUi
+button#openDocs
+button#openLogs
+div#services
+dl#provider
+dl#config
+input#notionLocalRoot
+input#notionPort
+input#councilLocalRoot
+input#councilBackendPort
+input#councilFrontendPort
+input#providerUrlPath
+button#saveConfig
+div#configPath
+pre#state
+```
 
 ## electron\lib\integration-config.js
 ```
@@ -76,10 +100,4 @@ function getScriptPath(scriptName)
 function getBaseLaunchArgs()
 function startStack({ noBrowser = true } = {})
 function stopStack()
-```
-
-## .github\workflows\release.yml
-```
-keys: [name, on, permissions, env, jobs]
-job: build-windows
 ```

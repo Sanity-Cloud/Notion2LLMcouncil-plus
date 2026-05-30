@@ -89,6 +89,27 @@ function New-ApiKey {
     return [Convert]::ToBase64String($bytes).TrimEnd("=").Replace("+", "-").Replace("/", "_")
 }
 
+function Normalize-ProxyBypassEnvironment {
+    foreach ($name in @("NO_PROXY", "no_proxy")) {
+        $value = [Environment]::GetEnvironmentVariable($name, "Process")
+        if (-not $value) { continue }
+
+        $entries = @(
+            $value -split "," |
+                ForEach-Object { $_.Trim() } |
+                Where-Object { $_ -and $_ -notin @("::1", "::1/128") }
+        )
+
+        if ($entries.Count -gt 0) {
+            [Environment]::SetEnvironmentVariable($name, ($entries -join ","), "Process")
+        } else {
+            [Environment]::SetEnvironmentVariable($name, $null, "Process")
+        }
+    }
+}
+
+Normalize-ProxyBypassEnvironment
+
 function Test-PythonModules {
     param([string]$Python, [string[]]$Modules)
     if (-not $Modules -or $Modules.Count -eq 0) { return $true }

@@ -3,7 +3,7 @@
 ## Auto-generated signatures
 <!-- Updated by gen-context.js -->
 You are a coding assistant with complete knowledge of this codebase.
-The following code signatures were extracted by SigMap v6.5.1 on 2026-05-30T01:51:30.753Z.
+The following code signatures were extracted by SigMap v6.5.1 on 2026-05-30T02:43:39.590Z.
 
 These signatures represent every public function, class, and type in the project.
 Refer to them when answering questions about code structure, APIs, and implementation.
@@ -13,6 +13,8 @@ Before answering questions about specific code areas, suggest running `sigmap as
 
 ## deps
 ```
+scratch\App_upstream_utf8.jsx ← components/Sidebar, api
+scratch\ChatInterface_upstream_utf8.jsx ← StageTimer, SearchContext, Stage1, Stage2, Stage3
 scratch\debug_conv_followup.py ← backend
 scratch\dump_conv.py ← backend
 scratch\test_council_run.py ← httpx
@@ -20,7 +22,7 @@ scratch\test_followup_run.py ← httpx
 scratch\test_regex.py ← backend
 ```
 
-## changes (last 5 commits — 19 hours ago)
+## changes (last 5 commits — 1 second ago)
 ```
 .github\copilot-instructions.md               +readJson  +readEnvValue  +tailFile  +requestText
 .github\gemini-context.md                     +readJson  +readEnvValue  +tailFile  +requestText
@@ -34,7 +36,7 @@ h2 Auto-generated signatures
 h2 SigMap commands
 h1 Code signatures
 h2 deps
-h2 changes (last 5 commits — 0 seconds ago)
+h2 changes (last 5 commits — 1 second ago)
 h2 .github
 h3 .github\copilot-instructions.md
 h3 .github\gemini-context.md
@@ -62,7 +64,7 @@ h3 electron\windows\main.js
 h2 Auto-generated signatures
 h2 Code Signatures
 h2 deps
-h2 changes (last 5 commits — 0 seconds ago)
+h2 changes (last 5 commits — 1 second ago)
 h2 .github
 h3 .github\copilot-instructions.md
 h3 .github\gemini-context.md
@@ -283,6 +285,34 @@ function toggleMainWindow()
 ```
 
 ## scratch
+
+### scratch\app_jsx_diff.utf8.patch
+```
+function App() {
+```
+
+### scratch\App_upstream_utf8.jsx
+```
+class AppErrorBoundary
+  constructor(props)
+  static getDerivedStateFromError()
+  render()
+  if(this.state.hasError)
+function AppLoadingFallback()
+function App()
+```
+
+### scratch\ChatInterface_upstream_utf8.jsx
+```
+function hasStage1Results(msg)
+function hasStage2Results(msg)
+function hasStage2Started(msg)
+function shouldShowStage1CouncilGrid(msg)
+function shouldShowStage1Results(msg)
+function getDeliberationScrollPhase(msg)
+function renderStage1Content(msg)
+function isCouncilTurnPending(msg, isActiveTurn, isLoading)
+```
 
 ### scratch\debug_conv_followup.py
 ```
