@@ -438,6 +438,8 @@ Do not change the distribution strategy without updating `README.md`, `DEVELOPME
 Always run `sigmap ask` or `sigmap --query` before searching for files relevant to a task.
 ## deps
 ```
+scratch\App_upstream_utf8.jsx ← components/Sidebar, api
+scratch\ChatInterface_upstream_utf8.jsx ← StageTimer, SearchContext, Stage1, Stage2, Stage3
 scratch\debug_conv_followup.py ← backend
 scratch\dump_conv.py ← backend
 scratch\test_council_run.py ← httpx
@@ -708,6 +710,34 @@ function toggleMainWindow()
 ```
 
 ## scratch
+
+### scratch\app_jsx_diff.utf8.patch
+```
+function App() {
+```
+
+### scratch\App_upstream_utf8.jsx
+```
+class AppErrorBoundary
+  constructor(props)
+  static getDerivedStateFromError()
+  render()
+  if(this.state.hasError)
+function AppLoadingFallback()
+function App()
+```
+
+### scratch\ChatInterface_upstream_utf8.jsx
+```
+function hasStage1Results(msg)
+function hasStage2Results(msg)
+function hasStage2Started(msg)
+function shouldShowStage1CouncilGrid(msg)
+function shouldShowStage1Results(msg)
+function getDeliberationScrollPhase(msg)
+function renderStage1Content(msg)
+function isCouncilTurnPending(msg, isActiveTurn, isLoading)
+```
 
 ### scratch\debug_conv_followup.py
 ```
