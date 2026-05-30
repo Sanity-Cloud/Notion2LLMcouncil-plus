@@ -209,6 +209,54 @@
       margin-top: 12px;
     }
 
+    select {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #0b0f14;
+      color: var(--text);
+      padding: 8px 10px;
+      font: 13px Segoe UI, system-ui, sans-serif;
+      cursor: pointer;
+    }
+
+    .checkbox-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px 16px;
+      margin-top: 10px;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .checkbox-row input[type=checkbox] {
+      width: 15px;
+      height: 15px;
+      accent-color: var(--accent);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    fieldset {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin: 14px 0 0;
+      padding: 10px 14px 14px;
+    }
+
+    legend {
+      color: var(--muted);
+      font-size: 12px;
+      padding: 0 6px;
+    }
+
     @media (max-width: 860px) {
       header { display: block; }
       .actions { justify-content: flex-start; margin-top: 12px; }
@@ -260,6 +308,41 @@
           <label>Frontend port<input id="councilFrontendPort" inputmode="numeric" /></label>
           <label>Provider path<input id="providerUrlPath" spellcheck="false" /></label>
         </div>
+        <fieldset>
+          <legend>Notion2API Settings</legend>
+          <label>App mode
+            <select id="notionAppMode">
+              <option value="standard">standard — full context, thinking &amp; search (recommended)</option>
+              <option value="fast">fast — minimal context</option>
+            </select>
+          </label>
+          <div class="checkbox-grid">
+            <label class="checkbox-row">
+              <input type="checkbox" id="notionPersistThreads" />
+              Save chats to Notion
+            </label>
+            <label class="checkbox-row">
+              <input type="checkbox" id="notionGenerateTitles" />
+              Auto-generate thread titles
+            </label>
+            <label class="checkbox-row">
+              <input type="checkbox" id="notionSaveThreadOperations" />
+              Save thread operations
+            </label>
+            <label class="checkbox-row">
+              <input type="checkbox" id="notionSetUnreadState" />
+              Mark threads as unread
+            </label>
+            <label class="checkbox-row">
+              <input type="checkbox" id="notionDeleteEphemeralThreads" />
+              Delete ephemeral threads on exit
+            </label>
+            <label class="checkbox-row">
+              <input type="checkbox" id="providerApplyDefaultCouncil" />
+              Reset Council lineup from launcher defaults on startup
+            </label>
+          </div>
+        </fieldset>
         <div class="actions config-actions">
           <button id="saveConfig">Save Local Config</button>
         </div>

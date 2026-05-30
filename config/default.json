@@ -6,7 +6,12 @@
     "port": 8000,
     "appMode": "standard",
     "autoLogin": true,
-    "loginTimeoutSeconds": 300
+    "loginTimeoutSeconds": 300,
+    "persistThreads": false,
+    "generateTitles": false,
+    "saveThreadOperations": false,
+    "setUnreadState": false,
+    "deleteEphemeralThreads": true
   },
   "council": {
     "localRoot": "vendor\\llm-council-plus",
@@ -24,7 +29,7 @@
     "enabledKey": "custom",
     "urlPath": "/v1",
     "supportsStreaming": true,
-    "applyDefaultCouncil": true,
+    "applyDefaultCouncil": false,
     "councilModels": [
       "custom:gpt-5.5",
       "custom:claude-opus4.7",

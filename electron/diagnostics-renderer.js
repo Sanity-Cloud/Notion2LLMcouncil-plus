@@ -10,7 +10,25 @@ const stateEl = document.getElementById('state');
 const logEl = document.getElementById('log');
 const statusEl = document.getElementById('status');
 const configPathEl = document.getElementById('configPath');
-const configFields = ['notionLocalRoot', 'notionPort', 'councilLocalRoot', 'councilBackendPort', 'councilFrontendPort', 'providerUrlPath'];
+const checkboxFields = [
+  'notionPersistThreads',
+  'notionGenerateTitles',
+  'notionSaveThreadOperations',
+  'notionSetUnreadState',
+  'notionDeleteEphemeralThreads',
+  'providerApplyDefaultCouncil',
+];
+
+const configFields = [
+  'notionLocalRoot',
+  'notionPort',
+  'councilLocalRoot',
+  'councilBackendPort',
+  'councilFrontendPort',
+  'providerUrlPath',
+  'notionAppMode',
+  ...checkboxFields,
+];
 
 function setStatus(text) {
   statusEl.textContent = text || '';
@@ -94,13 +112,22 @@ function render(data) {
 }
 
 function readConfigForm() {
-  return Object.fromEntries(configFields.map(id => [id, document.getElementById(id).value.trim()]));
+  return Object.fromEntries(configFields.map(id => {
+    const el = document.getElementById(id);
+    return [id, checkboxFields.includes(id) ? el.checked : el.value.trim()];
+  }));
 }
 
 function writeConfigForm(data) {
   configPathEl.textContent = `Saved at: ${data.configPath}`;
   for (const id of configFields) {
-    document.getElementById(id).value = data.values?.[id] ?? '';
+    const el = document.getElementById(id);
+    if (!el) continue;
+    if (checkboxFields.includes(id)) {
+      el.checked = Boolean(data.values?.[id]);
+    } else {
+      el.value = data.values?.[id] ?? '';
+    }
   }
 }
 

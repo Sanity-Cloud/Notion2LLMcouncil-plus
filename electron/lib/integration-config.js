@@ -61,9 +61,16 @@ function getIntegrationConfig() {
   const localConfig = readJsonFile(configPath);
 
   const notionPort = Number(getConfigValue(localConfig, defaultConfig, ['notion', 'port'], 8000));
+  const notionAppMode = getConfigValue(localConfig, defaultConfig, ['notion', 'appMode'], 'standard');
+  const notionPersistThreads = getConfigValue(localConfig, defaultConfig, ['notion', 'persistThreads'], false);
+  const notionGenerateTitles = getConfigValue(localConfig, defaultConfig, ['notion', 'generateTitles'], false);
+  const notionSaveThreadOperations = getConfigValue(localConfig, defaultConfig, ['notion', 'saveThreadOperations'], false);
+  const notionSetUnreadState = getConfigValue(localConfig, defaultConfig, ['notion', 'setUnreadState'], false);
+  const notionDeleteEphemeralThreads = getConfigValue(localConfig, defaultConfig, ['notion', 'deleteEphemeralThreads'], true);
   const councilBackendPort = Number(getConfigValue(localConfig, defaultConfig, ['council', 'backendPort'], 8001));
   const councilFrontendPort = Number(getConfigValue(localConfig, defaultConfig, ['council', 'frontendPort'], 5173));
   const providerUrlPath = getConfigValue(localConfig, defaultConfig, ['provider', 'urlPath'], '/v1');
+  const providerApplyDefaultCouncil = getConfigValue(localConfig, defaultConfig, ['provider', 'applyDefaultCouncil'], false);
   const providerEnabledKey = getConfigValue(localConfig, defaultConfig, ['provider', 'enabledKey'], 'custom');
   const providerName = getConfigValue(localConfig, defaultConfig, ['provider', 'name'], 'Notion2API');
   const notionRoot = resolveRuntimePath(repoRoot, getConfigValue(localConfig, defaultConfig, ['notion', 'localRoot'], ''), 'vendor\\notion2api');
@@ -103,6 +110,13 @@ function getIntegrationConfig() {
     verifyProvider,
     askSmokeTest,
     clearUiStorageOnProviderDrift,
+    notionAppMode,
+    notionPersistThreads,
+    notionGenerateTitles,
+    notionSaveThreadOperations,
+    notionSetUnreadState,
+    notionDeleteEphemeralThreads,
+    providerApplyDefaultCouncil,
     providerUrlPath,
     councilModels,
   };
@@ -115,6 +129,13 @@ function getEditableLocalConfig() {
     values: {
       notionLocalRoot: current.notionRoot,
       notionPort: current.notionPort,
+      notionAppMode: current.notionAppMode,
+      notionPersistThreads: current.notionPersistThreads,
+      notionGenerateTitles: current.notionGenerateTitles,
+      notionSaveThreadOperations: current.notionSaveThreadOperations,
+      notionSetUnreadState: current.notionSetUnreadState,
+      notionDeleteEphemeralThreads: current.notionDeleteEphemeralThreads,
+      providerApplyDefaultCouncil: current.providerApplyDefaultCouncil,
       councilLocalRoot: current.councilRoot,
       councilBackendPort: current.councilBackendPort,
       councilFrontendPort: current.councilFrontendPort,
@@ -132,6 +153,12 @@ function saveLocalIntegrationConfig(values) {
       ...(existing.notion || {}),
       localRoot: values.notionLocalRoot || undefined,
       port: Number(values.notionPort) || current.notionPort,
+      appMode: values.notionAppMode || current.notionAppMode,
+      persistThreads: Boolean(values.notionPersistThreads),
+      generateTitles: Boolean(values.notionGenerateTitles),
+      saveThreadOperations: Boolean(values.notionSaveThreadOperations),
+      setUnreadState: Boolean(values.notionSetUnreadState),
+      deleteEphemeralThreads: Boolean(values.notionDeleteEphemeralThreads),
     },
     council: {
       ...(existing.council || {}),
@@ -142,6 +169,7 @@ function saveLocalIntegrationConfig(values) {
     provider: {
       ...(existing.provider || {}),
       urlPath: values.providerUrlPath || '/v1',
+      applyDefaultCouncil: Boolean(values.providerApplyDefaultCouncil),
     },
   };
 
