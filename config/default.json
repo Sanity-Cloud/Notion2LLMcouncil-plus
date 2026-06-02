@@ -33,8 +33,19 @@
     "councilModels": [
       "custom:gpt-5.5",
       "custom:claude-opus4.7",
+      "custom:claude-opus4.8",
       "custom:gemini-3.1pro",
-      "custom:kimi-2.6"
+      "custom:kimi-2.6",
+      "custom:deepseek-v4pro",
+      "custom:claude-sonnet4.6",
+      "custom:claude-opus4.6",
+      "custom:gpt-5.2",
+      "custom:gpt-5.4",
+      "custom:gpt-5.4mini",
+      "custom:gpt-5.4nano",
+      "custom:gemini-3flash",
+      "custom:gemini-3.5flash",
+      "custom:gemini-2.5flash"
     ],
     "chairmanModel": "custom:claude-opus4.7",
     "councilMemberFilters": {
