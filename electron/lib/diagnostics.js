@@ -212,7 +212,7 @@ async function getDiagnosticsStatus() {
             ? config.councilModels[0]
             : 'custom:gpt-5.5';
           const smokePayload = {
-            content: 'Ping! Respond with exactly \'pong\' to verify connection.',
+            content: 'Ping! Respond with a long sentence confirming that the connection is active and everything is working, at least 30 characters.',
             models: [testModel],
             execution_mode: 'chat_only'
           };
