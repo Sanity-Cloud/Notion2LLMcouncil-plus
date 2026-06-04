@@ -113,6 +113,19 @@ function requestJsonPost(url, bodyObject, options = {}) {
   });
 }
 
+function getCouncilSmokePayload(config, options = {}) {
+  const testModel = (Array.isArray(config.councilModels) && config.councilModels.length > 0)
+    ? config.councilModels[0]
+    : 'custom:gpt-5.5';
+  return {
+    content: options.content || 'Reply with exactly: pong',
+    models: [testModel],
+    chairman_model: config.chairmanModel || 'custom:claude-opus4.7',
+    web_search: false,
+    execution_mode: 'chat_only',
+  };
+}
+
 
 function titleContains(body, expectedTitle) {
   if (!expectedTitle) return true;
@@ -169,7 +182,7 @@ async function getDiagnosticsStatus() {
 
   const [settingsExportRes, askRes, healthRes] = await Promise.all([
     requestText(`${runtimeCouncilBackendUrl}/api/settings/export`),
-    requestJsonPost(`${runtimeCouncilBackendUrl}/api/ask`, {}),
+    requestText(`${runtimeCouncilBackendUrl}/api/ask`),
     requestText(`${runtimeCouncilBackendUrl}/api/health`),
   ]);
 
@@ -208,15 +221,10 @@ async function getDiagnosticsStatus() {
       let smokeDetail = '';
       if (enabled && urlMatches && config.askSmokeTest !== false) {
         try {
-          const testModel = (Array.isArray(config.councilModels) && config.councilModels.length > 0)
-            ? config.councilModels[0]
-            : 'custom:gpt-5.5';
-          const smokePayload = {
-            content: 'Ping! Respond with a long sentence confirming that the connection is active and everything is working, at least 30 characters.',
-            models: [testModel],
-            execution_mode: 'chat_only'
-          };
-          const smokeRes = await requestJsonPost(`${runtimeCouncilBackendUrl}/api/ask`, smokePayload);
+          const smokePayload = getCouncilSmokePayload(config, {
+            content: 'Reply with exactly: pong'
+          });
+          const smokeRes = await requestJsonPost(`${runtimeCouncilBackendUrl}/api/ask`, smokePayload, { timeoutMs: 30000 });
           if (smokeRes.ok) {
             const smokeJson = JSON.parse(smokeRes.body);
             if (smokeJson.responses && smokeJson.responses[0]) {
