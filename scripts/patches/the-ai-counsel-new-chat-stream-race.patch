@@ -2,7 +2,15 @@ diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
 index 04ab790..001a876 100644
 --- a/frontend/src/App.jsx
 +++ b/frontend/src/App.jsx
-@@ -580,6 +580,7 @@ function App() {
+@@ -159,6 +159,7 @@ function App() {
+   const isInitialMount = useRef(true);
+   const conversationVersionRef = useRef(0);
+   const skipLoadForIdRef = useRef(null);
++  const activeConversationIdRef = useRef(null);
+ 
+   const computeCouncilConfigured = useCallback((models) => {
+     const members = (models || []).filter((m) => m && m.trim());
+@@ -580,6 +581,7 @@ function App() {
        abortControllerRef.current = null;
      }
      setIsLoading(false);
