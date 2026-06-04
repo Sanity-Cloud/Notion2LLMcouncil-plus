@@ -59,19 +59,25 @@ function Set-EnvLine {
     param([string]$Path, [string]$Name, [string]$Value)
     $lines = if (Test-Path $Path) { @(Get-Content -Path $Path) } else { @() }
     $updated = $false
+    $changed = $false
     $newLines = foreach ($line in $lines) {
         if ($line.TrimStart().StartsWith("$Name=")) {
             $updated = $true
+            if ($line -cne "$Name=$Value") { $changed = $true }
             "$Name=$Value"
         } else {
             $line
         }
     }
-    if (-not $updated) { $newLines += "$Name=$Value" }
+    if (-not $updated) {
+        $newLines += "$Name=$Value"
+        $changed = $true
+    }
     
     # Write UTF8 WITHOUT BOM for .env compatibility
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllLines($Path, $newLines, $utf8NoBom)
+    return $changed
 }
 
 function Get-EnvLineValue {
@@ -306,12 +312,24 @@ function Backup-CouncilSettingsExport {
 function Initialize-NotionMode {
     $envPath = Join-Path $NotionRoot ".env"
 
-    Set-EnvLine -Path $envPath -Name "APP_MODE" -Value $NotionAppMode
-    Set-EnvLine -Path $envPath -Name "NOTION_PERSIST_THREADS" -Value (ConvertTo-EnvBool $NotionPersistThreads)
-    Set-EnvLine -Path $envPath -Name "NOTION_GENERATE_TITLES" -Value (ConvertTo-EnvBool $NotionGenerateTitles)
-    Set-EnvLine -Path $envPath -Name "NOTION_SAVE_THREAD_OPERATIONS" -Value (ConvertTo-EnvBool $NotionSaveThreadOperations)
-    Set-EnvLine -Path $envPath -Name "NOTION_SET_UNREAD_STATE" -Value (ConvertTo-EnvBool $NotionSetUnreadState)
-    Set-EnvLine -Path $envPath -Name "NOTION_DELETE_EPHEMERAL_THREADS" -Value (ConvertTo-EnvBool $NotionDeleteEphemeralThreads)
+    if ($NotionPersistThreads -and $NotionDeleteEphemeralThreads) {
+        Write-Warning "Save chats to Notion is enabled, so delete ephemeral threads is being forced off to preserve Notion chat history."
+        $script:NotionDeleteEphemeralThreads = $false
+        $NotionDeleteEphemeralThreads = $false
+    }
+
+    $changed = $false
+    $changed = (Set-EnvLine -Path $envPath -Name "APP_MODE" -Value $NotionAppMode) -or $changed
+    $changed = (Set-EnvLine -Path $envPath -Name "NOTION_PERSIST_THREADS" -Value (ConvertTo-EnvBool $NotionPersistThreads)) -or $changed
+    $changed = (Set-EnvLine -Path $envPath -Name "NOTION_GENERATE_TITLES" -Value (ConvertTo-EnvBool $NotionGenerateTitles)) -or $changed
+    $changed = (Set-EnvLine -Path $envPath -Name "NOTION_SAVE_THREAD_OPERATIONS" -Value (ConvertTo-EnvBool $NotionSaveThreadOperations)) -or $changed
+    $changed = (Set-EnvLine -Path $envPath -Name "NOTION_SET_UNREAD_STATE" -Value (ConvertTo-EnvBool $NotionSetUnreadState)) -or $changed
+    $changed = (Set-EnvLine -Path $envPath -Name "NOTION_DELETE_EPHEMERAL_THREADS" -Value (ConvertTo-EnvBool $NotionDeleteEphemeralThreads)) -or $changed
+
+    if ($changed) {
+        Set-Content -Path $RestartNotionFlag -Value "notion-mode-changed" -Encoding UTF8
+        Write-Step "Notion2API mode settings changed; restart will apply them"
+    }
 }
 
 function Test-NotionLogin {

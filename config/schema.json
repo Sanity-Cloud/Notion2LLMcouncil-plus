@@ -12,7 +12,12 @@
         "port": { "type": "integer" },
         "appMode": { "type": "string", "enum": ["standard", "debug"] },
         "autoLogin": { "type": "boolean" },
-        "loginTimeoutSeconds": { "type": "integer" }
+        "loginTimeoutSeconds": { "type": "integer" },
+        "persistThreads": { "type": "boolean" },
+        "generateTitles": { "type": "boolean" },
+        "saveThreadOperations": { "type": "boolean" },
+        "setUnreadState": { "type": "boolean" },
+        "deleteEphemeralThreads": { "type": "boolean" }
       }
     },
     "council": {

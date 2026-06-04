@@ -30,6 +30,19 @@ const configFields = [
   ...checkboxFields,
 ];
 
+const notionPersistThreadsEl = document.getElementById('notionPersistThreads');
+const notionDeleteEphemeralThreadsEl = document.getElementById('notionDeleteEphemeralThreads');
+
+function syncNotionPersistenceControls() {
+  if (!notionPersistThreadsEl || !notionDeleteEphemeralThreadsEl) return;
+  if (notionPersistThreadsEl.checked) {
+    notionDeleteEphemeralThreadsEl.checked = false;
+    notionDeleteEphemeralThreadsEl.disabled = true;
+  } else {
+    notionDeleteEphemeralThreadsEl.disabled = false;
+  }
+}
+
 function setStatus(text) {
   statusEl.textContent = text || '';
 }
@@ -112,6 +125,7 @@ function render(data) {
 }
 
 function readConfigForm() {
+  syncNotionPersistenceControls();
   return Object.fromEntries(configFields.map(id => {
     const el = document.getElementById(id);
     return [id, checkboxFields.includes(id) ? el.checked : el.value.trim()];
@@ -129,6 +143,7 @@ function writeConfigForm(data) {
       el.value = data.values?.[id] ?? '';
     }
   }
+  syncNotionPersistenceControls();
 }
 
 async function refresh() {
@@ -178,6 +193,11 @@ document.getElementById('saveConfig').addEventListener('click', async () => {
   } catch (error) {
     setStatus(`Could not save local configuration: ${error.message}`);
   }
+});
+
+notionPersistThreadsEl?.addEventListener('change', syncNotionPersistenceControls);
+notionDeleteEphemeralThreadsEl?.addEventListener('change', () => {
+  if (notionPersistThreadsEl?.checked) syncNotionPersistenceControls();
 });
 
 document.querySelectorAll('[data-log]').forEach(button => {

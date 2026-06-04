@@ -149,6 +149,7 @@ function getEditableLocalConfig() {
 function saveLocalIntegrationConfig(values) {
   const current = getIntegrationConfig();
   const existing = readJsonFile(current.configPath);
+  const persistThreads = Boolean(values.notionPersistThreads);
   const localConfig = {
     ...existing,
     notion: {
@@ -156,11 +157,11 @@ function saveLocalIntegrationConfig(values) {
       localRoot: values.notionLocalRoot || undefined,
       port: Number(values.notionPort) || current.notionPort,
       appMode: values.notionAppMode || current.notionAppMode,
-      persistThreads: Boolean(values.notionPersistThreads),
+      persistThreads,
       generateTitles: Boolean(values.notionGenerateTitles),
       saveThreadOperations: Boolean(values.notionSaveThreadOperations),
       setUnreadState: Boolean(values.notionSetUnreadState),
-      deleteEphemeralThreads: Boolean(values.notionDeleteEphemeralThreads),
+      deleteEphemeralThreads: persistThreads ? false : Boolean(values.notionDeleteEphemeralThreads),
     },
     council: {
       ...(existing.council || {}),
