@@ -3,8 +3,6 @@ name: Build Windows Release
 on:
   workflow_dispatch:
   push:
-    branches:
-      - master
     tags:
       - "v*"
 
@@ -34,6 +32,14 @@ jobs:
           $pkg = Get-Content package.json -Raw | ConvertFrom-Json
           "version=$($pkg.version)" >> $env:GITHUB_OUTPUT
           "tag=v$($pkg.version)" >> $env:GITHUB_OUTPUT
+
+      - name: Validate release ref
+        shell: powershell
+        run: |
+          $expectedTag = "${{ steps.version.outputs.tag }}"
+          if ("${{ github.event_name }}" -eq "push" -and "${{ github.ref_name }}" -ne $expectedTag) {
+            throw "Release tag '${{ github.ref_name }}' must match package version tag '$expectedTag'."
+          }
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
@@ -88,9 +94,31 @@ jobs:
             Copy-Item -Path $artifact -Destination $assetRoot -Force
           }
 
-          Compress-Archive -Path (Join-Path $assetRoot "*") -DestinationPath (Join-Path $stage $bundle) -Force
+          $bundlePath = Join-Path $stage $bundle
+          Compress-Archive -Path (Join-Path $assetRoot "*") -DestinationPath $bundlePath -Force
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $bundlePath))
+          try {
+            $entries = @($zip.Entries | ForEach-Object { $_.FullName })
+          } finally {
+            $zip.Dispose()
+          }
+
+          $expectedNames = @($expectedArtifacts | ForEach-Object { Split-Path $_ -Leaf })
+          foreach ($name in $expectedNames) {
+            if ($entries -notcontains $name) {
+              throw "Release bundle missing expected file: $name"
+            }
+          }
+
+          $hash = (Get-FileHash -Path $bundlePath -Algorithm SHA256).Hash.ToLowerInvariant()
+          $checksumPath = Join-Path $stage "$bundle.sha256"
+          $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+          [System.IO.File]::WriteAllText($checksumPath, "$hash  $bundle`n", $utf8NoBom)
 
           Write-Host "Staged release asset: $stage\$bundle"
+          Write-Host "Staged checksum: $stage\$bundle.sha256"
           Get-ChildItem $assetRoot -File | Format-Table Name, Length
           Get-ChildItem $stage -File | Format-Table Name, Length
 
@@ -127,7 +155,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Notion2Council-Windows
-          path: github-release/*.zip
+          path: |
+            github-release/*.zip
+            github-release/*.sha256
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
@@ -142,4 +172,6 @@ jobs:
           draft: false
           prerelease: false
           make_latest: true
-          files: github-release/*.zip
+          files: |
+            github-release/*.zip
+            github-release/*.sha256

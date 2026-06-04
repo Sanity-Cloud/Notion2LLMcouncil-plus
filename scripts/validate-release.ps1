@@ -135,6 +135,15 @@ foreach ($js in $jsFiles) {
 
 Write-Check "Release workflow does not publish broad runtime globs"
 $workflow = Get-Content -Raw -Path (Join-Path $RepoRoot ".github/workflows/release.yml")
+if ($workflow -match "(?m)^\s*branches:\s*\r?\n\s*-\s*master\s*$") {
+    throw "Release workflow must not publish on master branch pushes. Use tag/manual release triggers only."
+}
+if ($workflow -notmatch "(?m)^\s*workflow_dispatch:\s*$") {
+    throw "Release workflow should support manual workflow_dispatch releases."
+}
+if ($workflow -notmatch "(?m)^\s*tags:\s*\r?\n\s*-\s*['""]v\*['""]\s*$") {
+    throw "Release workflow should publish from v* tags."
+}
 if ($workflow -match "(?m)^\s*files:\s*\r?\n\s*release/\*\*") {
     throw "Release workflow still publishes release/** directly. Stage a single package instead."
 }
@@ -143,6 +152,12 @@ if ($workflow -match "(?m)^\s*path:\s*\r?\n\s*release/\*\*") {
 }
 if ($workflow -notmatch "github-release/\*\.zip") {
     throw "Release workflow should publish github-release/*.zip."
+}
+if ($workflow -notmatch "github-release/\*\.sha256") {
+    throw "Release workflow should publish github-release/*.sha256."
+}
+if ($workflow -notmatch "Release bundle missing expected file") {
+    throw "Release workflow should assert the staged bundle contains the expected installer files."
 }
 
 Write-Check "Release artifact names include package version"
