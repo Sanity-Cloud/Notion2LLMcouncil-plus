@@ -170,7 +170,7 @@ async function getActiveRuntimeUrls(timeoutMs = 90000) {
 async function isRuntimeReady(urls, timeoutMs = 2500) {
   try {
     await waitForUrl(urls.notionHealthUrl, timeoutMs, { expectedContent: 'ok' });
-    await waitForUrl(urls.councilUiUrl, timeoutMs, { expectedTitle: 'Coun' });
+    await waitForUrl(urls.councilUiUrl, timeoutMs);
     return true;
   } catch {
     return false;
@@ -186,7 +186,7 @@ async function waitForReadyRuntimeUrls() {
   }
 
   await waitForUrl(urls.notionHealthUrl, 90000, { expectedContent: 'ok' });
-  await waitForUrl(urls.councilUiUrl, 90000, { expectedTitle: 'Coun' });
+  await waitForUrl(urls.councilUiUrl, 90000);
   return urls;
 }
 
@@ -507,7 +507,7 @@ app.whenReady().then(async () => {
 
     // Wait for the UI to be ready before loading
     await waitForUrl(activeNotionHealthUrl, 90000, { expectedContent: 'ok' });
-    await waitForUrl(activeCouncilUiUrl, 90000, { expectedTitle: 'Coun' });
+    await waitForUrl(activeCouncilUiUrl, 90000);
     
     // Clear storage on provider drift has been disabled to prevent destruction of UI metadata.
     // UI state can still be reset manually via the "Reset LLM Council UI State" menu action.

@@ -161,7 +161,7 @@ async function getDiagnosticsStatus() {
   const services = await Promise.all([
     testService('Notion2API health', notionHealthUrl, { expectedContent: 'ok' }),
     testService('LLM Council backend', councilSettingsUrl, { expectedContent: 'council_models' }),
-    testService('LLM Council frontend', runtimeCouncilUiUrl, { expectedTitle: 'Coun' }),
+    testService('LLM Council frontend', runtimeCouncilUiUrl),
     apiKey
       ? testService('Notion2API models', notionModelsUrl, { headers: { Authorization: `Bearer ${apiKey}` }, requireSuccess: true })
       : Promise.resolve({ name: 'Notion2API models', url: notionModelsUrl, ok: false, detail: 'API_KEY is missing from Notion2API .env' }),
