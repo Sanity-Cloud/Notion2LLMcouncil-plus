@@ -201,10 +201,7 @@ function Apply-SubmodulePatches {
         $RemoteUrl = (git -C $CouncilRoot remote get-url origin 2>$null).Trim()
     } catch {}
 
-    if ($RemoteUrl -match "Sanity-Cloud/the-ai-counsel") {
-        Write-Step "LLM Council is using Sanity-Cloud fork ($RemoteUrl). Skipping patch application."
-        return
-    }
+
 
     $PatchFiles = @(
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-model-icons.patch"),
