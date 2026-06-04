@@ -1,0 +1,150 @@
+﻿diff --git a/backend/model_preflight.py b/backend/model_preflight.py
+index ce7d858..1ed638e 100644
+--- a/backend/model_preflight.py
++++ b/backend/model_preflight.py
+@@ -14,6 +14,11 @@ logger = logging.getLogger(__name__)
+ PREFLIGHT_PROMPT = "Reply with OK."
+ DEFAULT_PREFLIGHT_TIMEOUT = 5.0
+ 
++# Maximum number of retry attempts for transient rate-limit errors during preflight.
++PREFLIGHT_RATE_LIMIT_RETRIES = 2
++# Base backoff delay (seconds) between rate-limit retries; doubles each attempt.
++PREFLIGHT_RATE_LIMIT_BACKOFF = 1.5
++
+ 
+ @dataclass
+ class ModelPreflightResult:
+@@ -21,6 +26,9 @@ class ModelPreflightResult:
+ 
+     failures: list[dict[str, str]] = field(default_factory=list)
+     timeouts: list[str] = field(default_factory=list)
++    # Models that were rate-limited for the full retry budget but were not
++    # counted as hard failures (the run is still allowed to proceed).
++    rate_limited: list[str] = field(default_factory=list)
+ 
+     @property
+     def ok(self) -> bool:
+@@ -47,34 +55,86 @@ def _is_timeout_error(message: str) -> bool:
+     return any(marker in text for marker in ("timeout", "timed out", "readtimeout", "connecttimeout"))
+ 
+ 
+-async def _preflight_one(model: str, timeout: float) -> tuple[str, str | None, bool]:
++def _is_transient_rate_limit(message: str) -> bool:
++    """Return True when the error looks like a transient Notion/API rate limit."""
++    text = (message or "").lower()
++    return any(
++        marker in text
++        for marker in (
++            "notion rate limit",
++            "rate limit",
++            "rate_limit",
++            "429",
++            "too many requests",
++            "quota",
++            "throttl",
++        )
++    )
++
++
++async def _preflight_one(model: str, timeout: float) -> tuple[str, str | None, bool, bool]:
++    """Ping a single model once.
++
++    Returns (model, error_message, timed_out, rate_limited).
++    error_message is None on success.
++    """
+     messages = [{"role": "user", "content": PREFLIGHT_PROMPT}]
+     try:
+         result = await query_model(model, messages, timeout=timeout, temperature=0.0)
+     except asyncio.TimeoutError:
+-        return model, None, True
++        return model, None, True, False
+     except Exception as exc:
+         message = str(exc) or repr(exc)
+         if _is_timeout_error(message):
+-            return model, None, True
+-        return model, message, False
++            return model, None, True, False
++        return model, message, False, _is_transient_rate_limit(message)
+ 
+     if not result:
+-        return model, "Model returned empty or null response", False
++        return model, "Model returned empty or null response", False, False
+     if not result.get("error"):
+-        return model, None, False
++        return model, None, False, False
+ 
+     message = result.get("error_message", "Unknown model error")
+     if _is_timeout_error(message):
+-        return model, None, True
+-    return model, message, False
++        return model, None, True, False
++    return model, message, False, _is_transient_rate_limit(message)
++
++
++async def _preflight_one_with_retry(model: str, timeout: float) -> tuple[str, str | None, bool, bool]:
++    """Ping a single model, retrying transient rate-limit errors with backoff.
++
++    Returns (model, error_message, timed_out, still_rate_limited_after_retries).
++    """
++    delay = PREFLIGHT_RATE_LIMIT_BACKOFF
++    for attempt in range(PREFLIGHT_RATE_LIMIT_RETRIES + 1):
++        model_out, error, timed_out, rate_limited = await _preflight_one(model, timeout)
++        if not rate_limited or timed_out:
++            return model_out, error, timed_out, False
++        if attempt < PREFLIGHT_RATE_LIMIT_RETRIES:
++            logger.warning(
++                "Preflight rate-limited on %s (attempt %d/%d) ΓÇö retrying in %.1fs",
++                model,
++                attempt + 1,
++                PREFLIGHT_RATE_LIMIT_RETRIES + 1,
++                delay,
++            )
++            await asyncio.sleep(delay)
++            delay *= 2
++    # Exhausted retries: still rate-limited.
++    return model, error, False, True
+ 
+ 
+ async def preflight_models(
+     models: Iterable[str],
+     timeout: float = DEFAULT_PREFLIGHT_TIMEOUT,
+ ) -> ModelPreflightResult:
+-    """Ping selected models and report immediate non-timeout failures."""
++    """Ping selected models and report immediate non-timeout failures.
++
++    Transient Notion/API rate-limit errors are retried with exponential
++    backoff up to PREFLIGHT_RATE_LIMIT_RETRIES times.  If a model is still
++    rate-limited after all retries it is recorded in result.rate_limited
++    (a soft warning) and the run is allowed to proceed rather than aborting.
++    """
+ 
+     result = ModelPreflightResult()
+     unique_models = _dedupe_models(models)
+@@ -85,10 +145,10 @@ async def preflight_models(
+ 
+     async def _preflight_with_sem(m: str):
+         async with sem:
+-            return await _preflight_one(m, timeout)
++            return await _preflight_one_with_retry(m, timeout)
+ 
+     checks = [_preflight_with_sem(model) for model in unique_models]
+-    for model, error, timed_out in await asyncio.gather(*checks):
++    for model, error, timed_out, still_rate_limited in await asyncio.gather(*checks):
+         if timed_out:
+             result.timeouts.append(model)
+             logger.warning(
+@@ -96,6 +156,14 @@ async def preflight_models(
+                 model,
+                 timeout,
+             )
++        elif still_rate_limited:
++            result.rate_limited.append(model)
++            logger.warning(
++                "Preflight rate-limited for %s after %d attempts ΓÇö "
++                "allowing run to proceed; Notion may throttle the actual request",
++                model,
++                PREFLIGHT_RATE_LIMIT_RETRIES + 1,
++            )
+         elif error:
+             result.failures.append({"model": model, "error": error})
+ 
