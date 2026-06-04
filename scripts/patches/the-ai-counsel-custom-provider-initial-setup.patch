@@ -1,0 +1,24 @@
+diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
+index 70b127a..ac313cc 100644
+--- a/frontend/src/App.jsx
++++ b/frontend/src/App.jsx
+@@ -192,11 +192,16 @@ function App() {
+       setAvailableSearchProviders(buildAvailableSearchProviders(settings));
+-
++
++      const customProviderConfigured = settings.custom_endpoint_url &&
++        settings.custom_endpoint_api_key_set &&
++        settings.enabled_providers?.custom !== false;
++
+       const hasApiKey = settings.openrouter_api_key_set ||
+         settings.groq_api_key_set ||
+         settings.openai_api_key_set ||
+         settings.anthropic_api_key_set ||
+         settings.google_api_key_set ||
+         settings.mistral_api_key_set ||
+-        settings.deepseek_api_key_set;
++        settings.deepseek_api_key_set ||
++        customProviderConfigured;
+-
++
+       // 2. Test Ollama Connection

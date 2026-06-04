@@ -205,6 +205,7 @@ function Apply-SubmodulePatches {
 
     $PatchFiles = @(
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-model-icons.patch"),
+        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-provider-initial-setup.patch"),
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-first-message-title.patch"),
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-new-chat-stream-race.patch"),
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-file-uploads.patch"),
@@ -262,6 +263,11 @@ function Apply-SubmodulePatches {
         -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-model-icons.patch") `
         -Name "LLM Council custom model brand icons" `
         -Optional
+
+    Update-RepoPatch `
+        -Root $CouncilRoot `
+        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-provider-initial-setup.patch") `
+        -Name "LLM Council custom provider initial setup detection"
 
     Update-RepoPatch `
         -Root $CouncilRoot `

@@ -2,6 +2,14 @@
 
 All notable changes to Notion2LLMcouncil Plus will be documented in this file.
 
+## [0.4.4] - 2026-06-04
+
+### Fixed
+- Repaired launcher startup drift when restored Council settings contain a stale Notion2API custom provider key.
+- Fixed diagnostics `/api/ask` smoke tests to use the Council request schema and a longer timeout.
+- Prevented persisted Notion chats from being deleted by mutually exclusive ephemeral cleanup settings.
+- Prevented the Council settings modal from opening on every load when the custom Notion2API provider is configured.
+
 ## [0.4.3] - 2026-06-04
 
 ### Changed
