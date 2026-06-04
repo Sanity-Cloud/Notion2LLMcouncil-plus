@@ -1,7 +1,7 @@
 param(
     [string]$Preset = "",
     [string]$ConfigPath = "",
-    [string]$CouncilRoot = "X:\Code\llm-council-plus",
+    [string]$CouncilRoot = "X:\Code\the-ai-counsel",
     [int]$CouncilBackendPort = 8001,
     [switch]$List,
     [switch]$Show,

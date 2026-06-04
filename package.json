@@ -1,6 +1,6 @@
 {
   "name": "notion2council-desktop",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "private": true,
   "description": "Electron shell and launcher menu for Notion2LLMcouncil Plus.",
   "author": "Sanity Cloud",
@@ -13,7 +13,7 @@
     "validate:ci": "powershell -NoProfile -File ./scripts/validate-release.ps1",
     "electron:build": "npm run validate && npm run electron:build:exe && npm run electron:build:zip && npm run electron:build:msi",
     "electron:build:exe": "electron-builder --config electron-builder.portable.json --win portable --publish never",
-    "electron:build:zip": "electron-builder --config electron-builder.portable.json --win zip --config.artifactName=Notion2Council-0.4.2-win-x64.zip --publish never",
+    "electron:build:zip": "electron-builder --config electron-builder.portable.json --win zip --config.artifactName=Notion2Council-0.4.3-win-x64.zip --publish never",
     "electron:build:msi": "electron-builder --win msi --publish never",
     "electron:pack": "electron-builder --dir",
     "release:local": "powershell -NoProfile -File ./scripts/package-release.ps1",
@@ -58,10 +58,10 @@
       "icon": "electron/icon.png"
     },
     "portable": {
-      "artifactName": "Notion2Council-0.4.2-portable.exe"
+      "artifactName": "Notion2Council-0.4.3-portable.exe"
     },
     "msi": {
-      "artifactName": "Notion2Council-0.4.2-setup.msi",
+      "artifactName": "Notion2Council-0.4.3-setup.msi",
       "upgradeCode": "AD379612-CB12-4220-A03D-76A8A3C98E51",
       "oneClick": false,
       "perMachine": false

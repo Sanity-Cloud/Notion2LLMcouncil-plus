@@ -102,8 +102,8 @@ function Invoke-RepoPatchPostHooks {
     $patchDir = Split-Path $PatchPath -Parent
     $leaf = Split-Path $PatchPath -Leaf
 
-    if ($leaf -eq "llm-council-plus-new-chat-stream-race.patch") {
-        $uploadPatch = Join-Path $patchDir "llm-council-plus-notion2api-file-uploads.patch"
+    if ($leaf -eq "the-ai-counsel-new-chat-stream-race.patch") {
+        $uploadPatch = Join-Path $patchDir "the-ai-counsel-notion2api-file-uploads.patch"
         if (Test-Path $uploadPatch) {
             Update-RepoPatch `
                 -Root $Root `
@@ -112,8 +112,8 @@ function Invoke-RepoPatchPostHooks {
         }
     }
 
-    if ($leaf -eq "llm-council-plus-notion2api-file-uploads.patch") {
-        $rateLimitPatch = Join-Path $patchDir "llm-council-plus-notion2api-upload-rate-limit.patch"
+    if ($leaf -eq "the-ai-counsel-notion2api-file-uploads.patch") {
+        $rateLimitPatch = Join-Path $patchDir "the-ai-counsel-notion2api-upload-rate-limit.patch"
         if (Test-Path $rateLimitPatch) {
             Update-RepoPatch `
                 -Root $Root `
@@ -122,8 +122,8 @@ function Invoke-RepoPatchPostHooks {
         }
     }
 
-    if ($leaf -eq "llm-council-plus-notion2api-upload-rate-limit.patch") {
-        $saveExportPatch = Join-Path $patchDir "llm-council-plus-notion2api-save-export.patch"
+    if ($leaf -eq "the-ai-counsel-notion2api-upload-rate-limit.patch") {
+        $saveExportPatch = Join-Path $patchDir "the-ai-counsel-notion2api-save-export.patch"
         if (Test-Path $saveExportPatch) {
             Update-RepoPatch `
                 -Root $Root `
@@ -201,18 +201,18 @@ function Apply-SubmodulePatches {
         $RemoteUrl = (git -C $CouncilRoot remote get-url origin 2>$null).Trim()
     } catch {}
 
-    if ($RemoteUrl -match "Sanity-Cloud/llm-council-plus") {
+    if ($RemoteUrl -match "Sanity-Cloud/the-ai-counsel") {
         Write-Step "LLM Council is using Sanity-Cloud fork ($RemoteUrl). Skipping patch application."
         return
     }
 
     $PatchFiles = @(
-        (Join-Path $RepoRoot "scripts\patches\llm-council-plus-custom-model-icons.patch"),
-        (Join-Path $RepoRoot "scripts\patches\llm-council-plus-first-message-title.patch"),
-        (Join-Path $RepoRoot "scripts\patches\llm-council-plus-new-chat-stream-race.patch"),
-        (Join-Path $RepoRoot "scripts\patches\llm-council-plus-notion2api-file-uploads.patch"),
-        (Join-Path $RepoRoot "scripts\patches\llm-council-plus-notion2api-upload-rate-limit.patch"),
-        (Join-Path $RepoRoot "scripts\patches\llm-council-plus-notion2api-save-export.patch")
+        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-model-icons.patch"),
+        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-first-message-title.patch"),
+        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-new-chat-stream-race.patch"),
+        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-file-uploads.patch"),
+        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-upload-rate-limit.patch"),
+        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-save-export.patch")
     )
 
     # 1. Get submodule commit
@@ -260,18 +260,18 @@ function Apply-SubmodulePatches {
     # rate-limit guard.
     Update-RepoPatch `
         -Root $CouncilRoot `
-        -PatchPath (Join-Path $RepoRoot "scripts\patches\llm-council-plus-custom-model-icons.patch") `
+        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-model-icons.patch") `
         -Name "LLM Council custom model brand icons" `
         -Optional
 
     Update-RepoPatch `
         -Root $CouncilRoot `
-        -PatchPath (Join-Path $RepoRoot "scripts\patches\llm-council-plus-first-message-title.patch") `
+        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-first-message-title.patch") `
         -Name "LLM Council first message conversation titles"
 
     Update-RepoPatch `
         -Root $CouncilRoot `
-        -PatchPath (Join-Path $RepoRoot "scripts\patches\llm-council-plus-new-chat-stream-race.patch") `
+        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-new-chat-stream-race.patch") `
         -Name "LLM Council new chat stream race guard"
 
     # Write marker file if we got here successfully

@@ -1,5 +1,5 @@
 param(
-    [string]$CouncilRoot = "X:\Code\llm-council-plus",
+    [string]$CouncilRoot = "X:\Code\the-ai-counsel",
     [int]$ModelTimeoutSeconds = 300,
     [switch]$RestartBackend
 )

@@ -7,7 +7,7 @@ param(
     [int]$CouncilFrontendPort = 5173,
     [string]$NotionRepoUrl = "https://github.com/Sanity-Cloud/notion2api.git",
     [string]$NotionBranch = "main",
-    [string]$CouncilRepoUrl = "https://github.com/Sanity-Cloud/llm-council-plus.git",
+    [string]$CouncilRepoUrl = "https://github.com/Sanity-Cloud/the-ai-counsel.git",
     [string]$CouncilBranch = "main",
     [switch]$UseVendor,
     [switch]$RefreshLogin,
@@ -625,7 +625,7 @@ if (-not ($BoundParameters -contains "NotionRepoUrl")) { $NotionRepoUrl = Use-Co
 if (-not ($BoundParameters -contains "CouncilBranch")) { $CouncilBranch = Use-ConfigValue -Value (Get-ConfigProperty $Config @("council", "branch")) -Fallback $CouncilBranch }
 if (-not ($BoundParameters -contains "CouncilRepoUrl")) { $CouncilRepoUrl = Use-ConfigValue -Value (Get-ConfigProperty $Config @("council", "repoUrl")) -Fallback $CouncilRepoUrl }
 
-if ($UseVendor) { $NotionRoot = Join-Path $VendorRoot "notion2api"; $CouncilRoot = Join-Path $VendorRoot "llm-council-plus" }
+if ($UseVendor) { $NotionRoot = Join-Path $VendorRoot "notion2api"; $CouncilRoot = Join-Path $VendorRoot "the-ai-counsel" }
 Initialize-Repo -Path $NotionRoot -Url $NotionRepoUrl -Branch $NotionBranch
 Initialize-Repo -Path $CouncilRoot -Url $CouncilRepoUrl -Branch $CouncilBranch
 $NotionRoot = (Resolve-Path $NotionRoot).Path

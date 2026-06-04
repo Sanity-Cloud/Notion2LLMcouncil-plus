@@ -74,7 +74,7 @@ function getIntegrationConfig() {
   const providerEnabledKey = getConfigValue(localConfig, defaultConfig, ['provider', 'enabledKey'], 'custom');
   const providerName = getConfigValue(localConfig, defaultConfig, ['provider', 'name'], 'Notion2API');
   const notionRoot = resolveRuntimePath(repoRoot, getConfigValue(localConfig, defaultConfig, ['notion', 'localRoot'], ''), 'vendor\\notion2api');
-  const councilRoot = resolveRuntimePath(repoRoot, getConfigValue(localConfig, defaultConfig, ['council', 'localRoot'], ''), 'vendor\\llm-council-plus');
+  const councilRoot = resolveRuntimePath(repoRoot, getConfigValue(localConfig, defaultConfig, ['council', 'localRoot'], ''), 'vendor\\the-ai-counsel');
   const settingsMode = getConfigValue(localConfig, defaultConfig, ['council', 'settingsMode'], 'auto');
   const verifyProvider = getConfigValue(localConfig, defaultConfig, ['council', 'verifyProvider'], true);
   const askSmokeTest = getConfigValue(localConfig, defaultConfig, ['council', 'askSmokeTest'], true);

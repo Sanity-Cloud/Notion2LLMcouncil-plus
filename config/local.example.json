@@ -4,7 +4,7 @@
     "port": 8000
   },
   "council": {
-    "localRoot": "C:\\path\\to\\your\\llm-council-plus",
+    "localRoot": "C:\\path\\to\\your\\the-ai-counsel",
     "backendPort": 8001,
     "frontendPort": 5173
   },

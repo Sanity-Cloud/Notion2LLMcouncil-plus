@@ -2,6 +2,12 @@
 
 All notable changes to Notion2LLMcouncil Plus will be documented in this file.
 
+## [0.4.3] - 2026-06-04
+
+### Changed
+- Migrated the council UI repository reference and vendor path from `llm-council-plus` to `the-ai-counsel` due to upstream repository renaming by the author.
+- Updated launcher, electron configuration, patch scripts, and documentation references.
+
 ## [0.4.0] - 2026-05-30
 
 ### Added

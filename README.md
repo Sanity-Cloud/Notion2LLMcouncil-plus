@@ -3,7 +3,7 @@
 Notion2LLMcouncil Plus is a small public integration launcher for running:
 
 - [notion2api](https://github.com/maverickxone/notion2api) as a local OpenAI-compatible Notion AI gateway
-- [llm-council-plus](https://github.com/jacob-bd/llm-council-plus) as the council UI
+- [the-ai-counsel](https://github.com/jacob-bd/the-ai-counsel) as the council UI
 
 The launcher starts both projects and automatically configures LLM Council Plus to use Notion2API as its custom OpenAI-compatible provider.
 
@@ -92,7 +92,7 @@ Stop launcher-managed services:
 Use existing local checkouts:
 
 ```powershell
-.\launch.bat -NotionRoot X:\Code\notion2api-pub -CouncilRoot X:\Code\llm-council-plus
+.\launch.bat -NotionRoot X:\Code\notion2api-pub -CouncilRoot X:\Code\the-ai-counsel
 ```
 
 Or set those defaults once in `config/local.json`:
@@ -103,7 +103,7 @@ Or set those defaults once in `config/local.json`:
     "localRoot": "D:\\Code\\notion2api-pub"
   },
   "council": {
-    "localRoot": "D:\\Code\\llm-council-plus"
+    "localRoot": "D:\\Code\\the-ai-counsel"
   }
 }
 ```
