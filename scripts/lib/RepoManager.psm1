@@ -210,7 +210,8 @@ function Apply-SubmodulePatches {
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-file-uploads.patch"),
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-upload-rate-limit.patch"),
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-save-export.patch"),
-        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-preflight-rate-limit.patch")
+        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-preflight-rate-limit.patch"),
+        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-openai-runtime-retry.patch")
     )
 
     # 1. Get submodule commit
@@ -276,6 +277,11 @@ function Apply-SubmodulePatches {
         -Root $CouncilRoot `
         -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-preflight-rate-limit.patch") `
         -Name "LLM Council preflight rate-limit retry and soft-fail"
+
+    Update-RepoPatch `
+        -Root $CouncilRoot `
+        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-openai-runtime-retry.patch") `
+        -Name "LLM Council custom OpenAI runtime 429 retry with backoff"
 
     # Write marker file if we got here successfully
     Set-Content -Path $MarkerFile -Value $ExpectedState -NoNewline
