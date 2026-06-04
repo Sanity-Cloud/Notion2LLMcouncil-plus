@@ -3,7 +3,7 @@
 ## Auto-generated signatures
 <!-- Updated by gen-context.js -->
 You are a coding assistant with complete knowledge of this codebase.
-The following code signatures were extracted by SigMap v6.5.1 on 2026-06-04T10:22:30.275Z.
+The following code signatures were extracted by SigMap v6.5.1 on 2026-06-04T10:59:12.627Z.
 
 These signatures represent every public function, class, and type in the project.
 Refer to them when answering questions about code structure, APIs, and implementation.
@@ -11,11 +11,10 @@ Before answering questions about specific code areas, suggest running `sigmap as
 
 ## Code Signatures
 
-## changes (last 5 commits — 2 seconds ago)
+## changes (last 5 commits — 1 second ago)
 ```
-electron\diagnostics-renderer.js              ~render  ~setStatus  ~readConfigForm  ~writeConfigForm
 electron\lib\diagnostics.js                   ~getDiagnosticsStatus
-electron\lib\integration-config.js            ~getIntegrationConfig  ~getEditableLocalConfig  ~saveLocalIntegrationConfig
+electron\lib\integration-config.js            ~getIntegrationConfig
 .github\copilot-instructions.md               +readJson  +readEnvValue  +tailFile  +requestText
 .github\gemini-context.md                     +readJson  +readEnvValue  +tailFile  +requestText
 ```

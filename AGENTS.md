@@ -436,11 +436,10 @@ Do not change the distribution strategy without updating `README.md`, `DEVELOPME
 | To query by topic | `sigmap --query "<topic>"` |
 
 Always run `sigmap ask` or `sigmap --query` before searching for files relevant to a task.
-## changes (last 5 commits — 2 seconds ago)
+## changes (last 5 commits — 1 second ago)
 ```
-electron\diagnostics-renderer.js              ~render  ~setStatus  ~readConfigForm  ~writeConfigForm
 electron\lib\diagnostics.js                   ~getDiagnosticsStatus
-electron\lib\integration-config.js            ~getIntegrationConfig  ~getEditableLocalConfig  ~saveLocalIntegrationConfig
+electron\lib\integration-config.js            ~getIntegrationConfig
 .github\copilot-instructions.md               +readJson  +readEnvValue  +tailFile  +requestText
 .github\gemini-context.md                     +readJson  +readEnvValue  +tailFile  +requestText
 ```
