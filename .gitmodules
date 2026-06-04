@@ -1,3 +1,6 @@
 [submodule "vendor/notion2api"]
 	path = vendor/notion2api
 	url = https://github.com/Sanity-Cloud/notion2api.git
+[submodule "vendor/the-ai-counsel"]
+	path = vendor/the-ai-counsel
+	url = https://github.com/jacob-bd/the-ai-counsel.git
