@@ -538,7 +538,10 @@ function Start-CouncilFrontend {
     param($State)
     $allowedPorts = @($CouncilFrontendPort, 5173, 5174, 3000) | Select-Object -Unique
     foreach ($candidate in $allowedPorts) {
-        if (Test-HttpOk -Url "http://127.0.0.1:$candidate/" -ExpectedTitle "LLM Council") {
+        if (
+            (Test-HttpOk -Url "http://127.0.0.1:$candidate/" -ExpectedTitle "LLM Council") -or
+            (Test-HttpOk -Url "http://127.0.0.1:$candidate/" -ExpectedTitle "The AI Counsel")
+        ) {
             # Ensure both script-scoped and local variables reflect the chosen port
             $script:CouncilFrontendPort = $candidate
             $CouncilFrontendPort = $candidate
