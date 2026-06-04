@@ -183,7 +183,7 @@ index 697fcfa..d9697c2 100644
  
      if body.execution_mode == "chat_only" and len(result.stage1) == 1:
 diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
-index 001a876..868d5b2 100644
+index 3f821f7..f879e6a 100644
 --- a/frontend/src/App.jsx
 +++ b/frontend/src/App.jsx
 @@ -23,6 +23,11 @@ function finalizeTimers(timers = {}) {
@@ -206,7 +206,7 @@ index 001a876..868d5b2 100644
    const [sidebarOpen, setSidebarOpen] = useState(false);
    const [appMode, setAppMode] = useState(null); // null shows landing page
    const abortControllerRef = useRef(null);
-@@ -199,6 +205,7 @@ function App() {
+@@ -200,6 +206,7 @@ function App() {
        // Load execution mode preference
        setExecutionMode(settings.execution_mode || DEFAULT_EXECUTION_MODE);
        setSearchProvider(settings.search_provider || 'duckduckgo');
@@ -214,7 +214,7 @@ index 001a876..868d5b2 100644
  
        setCritiqueMode(settings.critique_mode || 'freeform');
        setDebateRounds(settings.debate_rounds || 1);
-@@ -272,6 +279,7 @@ function App() {
+@@ -273,6 +280,7 @@ function App() {
        setSearchProvider(settings.search_provider || 'duckduckgo');
        setAvailableSearchProviders(buildAvailableSearchProviders(settings));
        setExecutionMode(settings.execution_mode || DEFAULT_EXECUTION_MODE);
@@ -222,7 +222,7 @@ index 001a876..868d5b2 100644
  
        setCritiqueMode(settings.critique_mode || 'freeform');
        setDebateRounds(settings.debate_rounds || 1);
-@@ -873,7 +881,7 @@ function App() {
+@@ -874,7 +882,7 @@ function App() {
      }
    };
  
@@ -231,7 +231,7 @@ index 001a876..868d5b2 100644
      if (!currentConversationId) return;
  
      let effectiveMode = executionMode;
-@@ -933,7 +941,7 @@ function App() {
+@@ -934,7 +942,7 @@ function App() {
        }
  
        // Optimistically add user message to UI
@@ -240,7 +240,7 @@ index 001a876..868d5b2 100644
        setCurrentConversation((prev) => ({
          ...prev,
          id: activeConversationId, // transition draft ID to actual database UUID
-@@ -985,6 +993,7 @@ function App() {
+@@ -986,6 +994,7 @@ function App() {
          executionMode: effectiveMode,
          councilModels,
          chairmanModel: effectiveMode === 'full' ? chairmanModel : undefined,
@@ -248,7 +248,7 @@ index 001a876..868d5b2 100644
        };
        if (isDebate) {
          streamOptions.debateRounds = debateRounds;
-@@ -1644,6 +1653,7 @@ function App() {
+@@ -1645,6 +1654,7 @@ function App() {
                  onSendMessage={handleSendMessage}
                  onAbort={handleAbort}
                  isLoading={isLoading}
