@@ -1,5 +1,6 @@
 logs/
 vendor/
+data/
 *.log
 *.tmp
 *.local.json
@@ -7,6 +8,10 @@ config/local.json
 .env
 .env.*
 !.env.example
+**/accounts.json
+**/settings.launcher-backup-*.json
+**/settings.live-drift-test-backup-*.json
+**/conversations/
 
 # Build and dependencies
 node_modules/

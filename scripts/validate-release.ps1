@@ -88,7 +88,9 @@ $psScripts = @(
     "scripts/launch.ps1",
     "scripts/package-release.ps1",
     "scripts/setup-desktop.ps1",
-    "scripts/create-electron-icons.ps1"
+    "scripts/backup-runtime-data.ps1",
+    "scripts/create-electron-icons.ps1",
+    "scripts/test-council-settings-utils.ps1"
 )
 foreach ($script in $psScripts) {
     $fullPath = Join-Path $RepoRoot $script
@@ -117,6 +119,10 @@ Write-Check "PowerShell modules import cleanly"
 foreach ($mod in $psModules) {
     Import-Module $mod.FullName -Force -ErrorAction Stop
 }
+
+Write-Check "Council provider settings negative-path tests"
+powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $RepoRoot "scripts/test-council-settings-utils.ps1")
+if ($LASTEXITCODE -ne 0) { throw "Council provider settings tests failed." }
 
 Write-Check "Electron JS files parse"
 $jsFiles = @(

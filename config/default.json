@@ -29,6 +29,7 @@
     "enabledKey": "custom",
     "urlPath": "/v1",
     "supportsStreaming": true,
+    "autoRepair": true,
     "applyDefaultCouncil": false,
     "councilModels": [
       "custom:gpt-5.5",

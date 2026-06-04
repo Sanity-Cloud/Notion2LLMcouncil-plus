@@ -25,6 +25,8 @@ $LogDir = if ($env:NOTION2COUNCIL_LOG_DIR) { $env:NOTION2COUNCIL_LOG_DIR } else 
 $VendorRoot = if ($env:NOTION2COUNCIL_RUNTIME_ROOT) { Join-Path $env:NOTION2COUNCIL_RUNTIME_ROOT "vendor" } else { Join-Path $RepoRoot "vendor" }
 $StateFile = Join-Path $LogDir "launcher-state.json"
 $RestartNotionFlag = Join-Path $LogDir "restart-notion.flag"
+$LauncherEventLogMaxBytes = 1048576
+$LauncherSettingsBackupRetain = 10
 
 # Import Modules
 Import-Module (Join-Path $LibDir "CommonUtils.psm1") -Force
@@ -33,6 +35,7 @@ Import-Module (Join-Path $LibDir "ProcessManager.psm1") -Force
 Import-Module (Join-Path $LibDir "StateManager.psm1") -Force
 Import-Module (Join-Path $LibDir "NetworkUtils.psm1") -Force
 Import-Module (Join-Path $LibDir "RepoManager.psm1") -Force
+Import-Module (Join-Path $LibDir "CouncilSettingsUtils.psm1") -Force
 
 # Initialization
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
@@ -250,6 +253,56 @@ function ConvertTo-EnvBool {
     return "false"
 }
 
+function Write-LauncherEvent {
+    param([string]$Message)
+
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss zzz"
+    $line = "[$timestamp] $Message"
+    $eventLogPath = Join-Path $LogDir "launcher-events.log"
+    if (Test-Path $eventLogPath) {
+        $item = Get-Item $eventLogPath
+        if ($item.Length -ge $LauncherEventLogMaxBytes) {
+            $archivePath = Join-Path $LogDir "launcher-events.$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
+            Move-Item -LiteralPath $eventLogPath -Destination $archivePath -Force
+        }
+    }
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::AppendAllText($eventLogPath, $line + [Environment]::NewLine, $utf8NoBom)
+}
+
+function Remove-OldCouncilSettingsBackups {
+    param([string]$DataDir)
+
+    if (-not (Test-Path $DataDir)) { return }
+
+    $backups = @(Get-ChildItem -Path $DataDir -Filter "settings.launcher-backup-*.json" -File | Sort-Object LastWriteTime -Descending)
+    if ($backups.Count -le $LauncherSettingsBackupRetain) { return }
+
+    $backups | Select-Object -Skip $LauncherSettingsBackupRetain | ForEach-Object {
+        Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Backup-CouncilSettingsExport {
+    param($Settings)
+
+    if ($null -eq $Settings) { return "" }
+
+    $dataDir = Join-Path $CouncilRoot "data"
+    if (-not (Test-Path $dataDir)) {
+        New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
+    }
+
+    $backupPath = Join-Path $dataDir "settings.launcher-backup-$(Get-Date -Format 'yyyyMMdd-HHmmss').json"
+    $tempPath = "$backupPath.tmp"
+    $json = $Settings | ConvertTo-Json -Depth 20
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($tempPath, $json + [Environment]::NewLine, $utf8NoBom)
+    Move-Item -LiteralPath $tempPath -Destination $backupPath -Force
+    Remove-OldCouncilSettingsBackups -DataDir $dataDir
+    return $backupPath
+}
+
 function Initialize-NotionMode {
     $envPath = Join-Path $NotionRoot ".env"
 
@@ -380,6 +433,7 @@ function Set-CouncilSettings {
     
     $needsUpdate = $true
     $settings = $null
+    $providerDriftDetected = $false
     
     try {
         $settings = Invoke-RestMethod -Method Get -Uri $exportUrl -Headers $headers -TimeoutSec 10
@@ -389,9 +443,9 @@ function Set-CouncilSettings {
             $isCustomEnabled = $true
         }
         
-        if ($settings.custom_endpoint_url -eq $expectedUrl -and 
-            $settings.custom_endpoint_api_key -eq $NotionApiKey -and 
-            $isCustomEnabled) {
+        $providerCheck = Test-CouncilProviderSettings -Settings $settings -ExpectedUrl $expectedUrl -ExpectedApiKey $NotionApiKey
+
+        if ($providerCheck.Ok -and $isCustomEnabled) {
             
             $modelsMatch = $true
             if ($ProviderApplyDefaultCouncil) {
@@ -407,6 +461,17 @@ function Set-CouncilSettings {
             if ($modelsMatch) {
                 Write-Step "LLM Council settings are already up to date"
                 $needsUpdate = $false
+            }
+        } else {
+            $providerDriftDetected = $true
+            $driftMessage = "LLM Council custom provider drift detected: $($providerCheck.Issues -join '; ')"
+            if (-not $ProviderAutoRepair) {
+                Write-Warning "$driftMessage. Provider auto-repair is disabled; leaving Council settings unchanged."
+                Write-LauncherEvent "$driftMessage. Provider auto-repair disabled; no settings import performed."
+                $needsUpdate = $false
+            } else {
+                Write-Warning "$driftMessage. Repairing settings."
+                Write-LauncherEvent "$driftMessage. Repairing settings via /api/settings/import."
             }
         }
     } catch {
@@ -450,6 +515,13 @@ function Set-CouncilSettings {
     
     if ($needsUpdate) {
         Write-Step "Updating LLM Council custom provider configuration"
+        if ($ProviderAutoRepair) {
+            $backupPath = Backup-CouncilSettingsExport -Settings $settings
+            if ($backupPath) {
+                Write-Step "Backed up previous LLM Council settings before repair"
+                Write-LauncherEvent "Backed up previous LLM Council settings before repair: $backupPath"
+            }
+        }
         
         $settings.custom_endpoint_name = $ProviderName
         $settings.custom_endpoint_url = $expectedUrl
@@ -491,16 +563,22 @@ function Set-CouncilSettings {
         # Verify the settings
         Write-Step "Verifying updated LLM Council settings"
         $verifiedSettings = Invoke-RestMethod -Method Get -Uri $exportUrl -Headers $headers -TimeoutSec 10
-        if ($verifiedSettings.custom_endpoint_url -ne $expectedUrl) {
-            throw "Verification failed: custom_endpoint_url is '$($verifiedSettings.custom_endpoint_url)', expected '$expectedUrl'"
-        }
-        if ($verifiedSettings.custom_endpoint_api_key -ne $NotionApiKey) {
-            throw "Verification failed: custom_endpoint_api_key does not match active Notion API Key"
-        }
-        if (-not $verifiedSettings.enabled_providers -or $verifiedSettings.enabled_providers.custom -ne $true) {
-            throw "Verification failed: custom provider is not enabled"
+        Test-CouncilProviderSettingsOrThrow -Settings $verifiedSettings -ExpectedUrl $expectedUrl -ExpectedApiKey $NotionApiKey
+        if (-not $verifiedSettings.council_models -or @($verifiedSettings.council_models).Count -eq 0) {
+            Write-Warning "LLM Council has no council models configured. Add at least one member in settings before starting a council run."
         }
         Write-Step "LLM Council settings successfully verified"
+    }
+
+    if (-not $needsUpdate -and -not ($providerDriftDetected -and -not $ProviderAutoRepair)) {
+        Write-Step "Verifying LLM Council provider key sync"
+        $verifiedSettings = Invoke-RestMethod -Method Get -Uri $exportUrl -Headers $headers -TimeoutSec 10
+        Test-CouncilProviderSettingsOrThrow -Settings $verifiedSettings -ExpectedUrl $expectedUrl -ExpectedApiKey $NotionApiKey
+        if (-not $verifiedSettings.council_models -or @($verifiedSettings.council_models).Count -eq 0) {
+            Write-Warning "LLM Council has no council models configured. Add at least one member in settings before starting a council run."
+        }
+    } elseif ($providerDriftDetected -and -not $ProviderAutoRepair) {
+        Write-Warning "Skipping provider key-sync verification because provider auto-repair is disabled and drift was left unchanged."
     }
 
     # API Smoke Test using the newly verified custom endpoint
@@ -609,6 +687,7 @@ if (-not ($BoundParameters -contains "CouncilBackendPort")) { $CouncilBackendPor
 if (-not ($BoundParameters -contains "CouncilFrontendPort")) { $CouncilFrontendPort = [int](Use-ConfigValue -Value (Get-ConfigProperty $Config @("council", "frontendPort")) -Fallback $CouncilFrontendPort) }
 $ProviderName = Use-ConfigValue -Value (Get-ConfigProperty $Config @("provider", "name")) -Fallback "Notion2API"
 $ProviderUrlPath = Use-ConfigValue -Value (Get-ConfigProperty $Config @("provider", "urlPath")) -Fallback "/v1"
+$ProviderAutoRepair = [bool](Use-ConfigValue -Value (Get-ConfigProperty $Config @("provider", "autoRepair")) -Fallback $true)
 $NotionAppMode = Use-ConfigValue -Value (Get-ConfigProperty $Config @("notion", "appMode")) -Fallback "standard"
 $NotionAutoLogin = [bool](Use-ConfigValue -Value (Get-ConfigProperty $Config @("notion", "autoLogin")) -Fallback $true)
 $NotionLoginTimeoutSeconds = [int](Use-ConfigValue -Value (Get-ConfigProperty $Config @("notion", "loginTimeoutSeconds")) -Fallback 300)

@@ -36,6 +36,7 @@
         "enabledKey": { "type": "string" },
         "urlPath": { "type": "string" },
         "supportsStreaming": { "type": "boolean" },
+        "autoRepair": { "type": "boolean" },
         "applyDefaultCouncil": { "type": "boolean" },
         "councilModels": { "type": "array", "items": { "type": "string" } },
         "chairmanModel": { "type": "string" },
