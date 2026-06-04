@@ -1,39 +1,9 @@
-diff --git a/frontend/src/components/CouncilGrid.jsx b/frontend/src/components/CouncilGrid.jsx
-index e3d4bb2..5601012 100644
---- a/frontend/src/components/CouncilGrid.jsx
-+++ b/frontend/src/components/CouncilGrid.jsx
-@@ -23,6 +23,7 @@ const PROVIDER_CONFIG = {
-     deepseek: { color: '#4e61e6', label: 'DeepSeek', logo: deepseekLogo },
-     openrouter: { color: '#7f5af0', label: 'OpenRouter', logo: openrouterLogo },
-     custom: { color: '#06b6d4', label: 'Custom', logo: customLogo },
-+    kimi: { color: '#111827', label: 'Kimi', logo: null, icon: '月' },
-     default: { color: '#888888', label: 'Model', logo: null, icon: '🤖' }
- };
- 
-@@ -30,8 +31,16 @@ const getProviderInfo = (modelId) => {
-     if (!modelId) return PROVIDER_CONFIG.default;
-     const id = modelId.toLowerCase();
- 
--    // Check for provider prefixes FIRST (order matters!)
--    if (id.startsWith('custom:')) return PROVIDER_CONFIG.custom;
-+    if (id.startsWith('custom:')) {
-+        const subId = id.substring(7);
-+        if (subId.includes('gpt') || subId.includes('openai')) return PROVIDER_CONFIG.openai;
-+        if (subId.includes('claude') || subId.includes('anthropic')) return PROVIDER_CONFIG.anthropic;
-+        if (subId.includes('gemini') || subId.includes('google')) return PROVIDER_CONFIG.google;
-+        if (subId.includes('mistral') || subId.includes('mixtral')) return PROVIDER_CONFIG.mistral;
-+        if (subId.includes('deepseek')) return PROVIDER_CONFIG.deepseek;
-+        if (subId.includes('kimi') || subId.includes('moonshot')) return PROVIDER_CONFIG.kimi;
-+        return PROVIDER_CONFIG.custom;
-+    }
-     if (id.startsWith('ollama:')) return PROVIDER_CONFIG.ollama;
-     if (id.startsWith('groq:')) return PROVIDER_CONFIG.groq;
- 
 diff --git a/frontend/src/components/Stage1.jsx b/frontend/src/components/Stage1.jsx
-index 8d87cd1..1cad19d 100644
+index 6dc7d17..d3eaee0 100644
 --- a/frontend/src/components/Stage1.jsx
 +++ b/frontend/src/components/Stage1.jsx
-@@ -77,9 +77,14 @@ export default function Stage1({ responses, startTime, endTime }) {
+@@ -75,10 +75,15 @@ export default function Stage1({ responses, startTime, endTime }) {
+               key={index}
                className={`tab ${safeActiveTab === index ? 'active' : ''} ${resp?.error ? 'tab-error' : ''}`}
                onClick={() => setActiveTab(index)}
 -              style={safeActiveTab === index ? { borderColor: visuals.color, color: visuals.color } : {}}
@@ -50,7 +20,7 @@ index 8d87cd1..1cad19d 100644
                  {visuals.icon}
                </span>
                <span className="tab-name">{shortName}</span>
-@@ -96,7 +101,7 @@ export default function Stage1({ responses, startTime, endTime }) {
+@@ -95,7 +100,7 @@ export default function Stage1({ responses, startTime, endTime }) {
                {currentVisuals.icon}
              </span>
              <div className="model-info">
@@ -60,10 +30,11 @@ index 8d87cd1..1cad19d 100644
                  {currentVisuals.name}
                </span>
 diff --git a/frontend/src/components/Stage2.jsx b/frontend/src/components/Stage2.jsx
-index a000334..d21b601 100644
+index 71cd732..014aea1 100644
 --- a/frontend/src/components/Stage2.jsx
 +++ b/frontend/src/components/Stage2.jsx
-@@ -97,9 +97,14 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
+@@ -328,10 +328,15 @@ function RawEvaluationTabs({
+                             key={index}
                              className={`tab ${safeActiveTab === index ? 'active' : ''} ${rank?.error ? 'tab-error' : ''}`}
                              onClick={() => setActiveTab(index)}
 -                            style={safeActiveTab === index ? { borderColor: visuals.color, color: visuals.color } : {}}
@@ -80,7 +51,7 @@ index a000334..d21b601 100644
                                  {visuals.icon}
                              </span>
                              <span className="tab-name">{shortName}</span>
-@@ -116,7 +121,7 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
+@@ -348,7 +353,7 @@ function RawEvaluationTabs({
                              {currentVisuals.icon}
                          </span>
                          <div className="model-info">
@@ -89,20 +60,12 @@ index a000334..d21b601 100644
                              <span className="model-provider-badge" style={{ borderColor: currentVisuals.color, color: currentVisuals.color }}>
                                  {currentVisuals.name}
                              </span>
-@@ -204,6 +209,7 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
-                     <h4>🏆 Visual Leaderboard</h4>
-                     <p className="stage-description">
--                        Combined results across all peer evaluations. Bar length corresponds to average rank value.
-+                        Combined results across all peer evaluations. Lower average rank is better; #1 is the top-ranked response.
-+                        Bar length shows the numeric average rank, so shorter is better.
-                     </p>
-                     <div className="aggregate-list">
-                         {aggregateRankings.map((agg, index) => {
 diff --git a/frontend/src/components/Stage3.jsx b/frontend/src/components/Stage3.jsx
-index a3d3946..643da5a 100644
+index d71af50..f35db8a 100644
 --- a/frontend/src/components/Stage3.jsx
 +++ b/frontend/src/components/Stage3.jsx
-@@ -49,6 +49,6 @@ export default function Stage3({ finalResponse, startTime, endTime }) {
+@@ -68,7 +68,7 @@ export default function Stage3({ finalResponse, labelToModel, startTime, endTime
+                         </span>
                          <div className="chairman-info">
                              <span className="chairman-role">
 -                                <span>👨‍⚖️</span> Chairman's Verdict
@@ -110,8 +73,38 @@ index a3d3946..643da5a 100644
                              </span>
                              <span className="chairman-model">{shortName}</span>
                              <span className="chairman-provider-badge">{visuals.name}</span>
+diff --git a/frontend/src/utils/councilGridUtils.js b/frontend/src/utils/councilGridUtils.js
+index 3ae84a4..77f831e 100644
+--- a/frontend/src/utils/councilGridUtils.js
++++ b/frontend/src/utils/councilGridUtils.js
+@@ -18,6 +18,7 @@ export const PROVIDER_CONFIG = {
+   groq: { color: '#f55036', label: 'Groq', logo: groqLogo },
+   ollama: { color: '#ffffff', label: 'Local', logo: ollamaLogo },
+   deepseek: { color: '#4e61e6', label: 'DeepSeek', logo: deepseekLogo },
++  kimi: { color: '#111827', label: 'Kimi', logo: null, icon: '月' },
+   nvidia: { color: '#76b900', label: 'NVIDIA', logo: nvidiaLogo },
+   openrouter: { color: '#7f5af0', label: 'OpenRouter', logo: openrouterLogo },
+   custom: { color: '#06b6d4', label: 'Custom', logo: customLogo },
+@@ -44,6 +45,17 @@ export function getProviderInfo(modelId) {
+   if (!modelId) return PROVIDER_CONFIG.default;
+   const id = modelId.toLowerCase();
+ 
++  if (id.startsWith('custom:')) {
++    const subId = id.substring(7);
++    if (subId.includes('gpt') || subId.includes('openai')) return PROVIDER_CONFIG.openai;
++    if (subId.includes('claude') || subId.includes('anthropic')) return PROVIDER_CONFIG.anthropic;
++    if (subId.includes('gemini') || subId.includes('google')) return PROVIDER_CONFIG.google;
++    if (subId.includes('mistral') || subId.includes('mixtral')) return PROVIDER_CONFIG.mistral;
++    if (subId.includes('deepseek')) return PROVIDER_CONFIG.deepseek;
++    if (subId.includes('kimi') || subId.includes('moonshot')) return PROVIDER_CONFIG.kimi;
++    return PROVIDER_CONFIG.custom;
++  }
++
+   if (id.startsWith('openrouter:') || id.includes('openrouter')) return PROVIDER_CONFIG.openrouter;
+ 
+   for (const [prefix, key] of PROVIDER_PREFIXES) {
 diff --git a/frontend/src/utils/modelHelpers.js b/frontend/src/utils/modelHelpers.js
-index e289e91..31ad3e9 100644
+index 175cac6..b6ad162 100644
 --- a/frontend/src/utils/modelHelpers.js
 +++ b/frontend/src/utils/modelHelpers.js
 @@ -46,6 +46,11 @@ export const getModelVisuals = (modelId) => {
@@ -126,12 +119,11 @@ index e289e91..31ad3e9 100644
    // Local (fallback for models without provider prefix or slash)
    if (!id.includes('/') && !id.includes(':')) {
      return { name: 'Local', color: '#f1f5f9', short: 'Local', icon: '💻' };
-@@ -56,12 +61,68 @@ export const getModelVisuals = (modelId) => {
- };
- 
+@@ -58,15 +63,66 @@ export const getModelVisuals = (modelId) => {
  export const getShortModelName = (modelId) => {
    if (!modelId) return 'Unknown';
-+
+ 
+-  let name = modelId.replace(/:free$/, '');
 +  const formatVersionSuffix = (value) => {
 +    return value
 +      .replace(/(\d(?:\.\d+)*)(pro|flash|turbo|mini|nano|opus|sonnet|haiku)\b/gi, '$1 $2')
@@ -156,13 +148,7 @@ index e289e91..31ad3e9 100644
 +    .replace(/^mistral:/i, '')
 +    .replace(/^deepseek:/i, '');
 +
-   // Handle "provider/model-name" format
--  const parts = modelId.split('/');
--  if (parts.length > 1) return parts[1];
--  // Handle "provider:model-name" format
--  const colParts = modelId.split(':');
--  if (colParts.length > 1) return colParts[1];
--  return modelId;
++  // Handle "provider/model-name" format
 +  const rawName = cleanModelId.includes('/') ? cleanModelId.split('/').pop() : cleanModelId;
 +  const id = rawName.toLowerCase();
 +
@@ -188,16 +174,21 @@ index e289e91..31ad3e9 100644
 +  if (id.startsWith('moonshot-')) {
 +    return rawName.replace(/^moonshot-/i, 'Kimi ').replace(/-/g, ' ');
 +  }
-+
+ 
+-  if (name.includes(':')) {
+-    name = name.split(':').slice(1).join(':');
 +  if (id.startsWith('mistral-')) {
 +    const suffix = formatVersionSuffix(rawName.replace(/^mistral-/i, '').replace(/-/g, ' '));
 +    return `Mistral ${titleCaseWords(suffix)}`;
-+  }
-+
+   }
+ 
+-  if (name.includes('/')) {
+-    name = name.split('/').pop();
 +  if (id.startsWith('deepseek-')) {
 +    const suffix = formatVersionSuffix(rawName.replace(/^deepseek-/i, '').replace(/-/g, ' '));
 +    return `DeepSeek ${titleCaseWords(suffix)}`;
-+  }
-+
+   }
+ 
+-  return name;
 +  return titleCaseWords(formatVersionSuffix(rawName.replace(/[-_]+/g, ' ')));
  };

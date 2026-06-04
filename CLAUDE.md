@@ -9,6 +9,8 @@
 electron\diagnostics-renderer.js              ~render  ~setStatus  ~readConfigForm  ~writeConfigForm
 electron\lib\diagnostics.js                   ~getDiagnosticsStatus
 electron\lib\integration-config.js            ~getIntegrationConfig  ~getEditableLocalConfig  ~saveLocalIntegrationConfig
+.github\copilot-instructions.md               +readJson  +readEnvValue  +tailFile  +requestText
+.github\gemini-context.md                     +readJson  +readEnvValue  +tailFile  +requestText
 ```
 
 ## .github
@@ -18,7 +20,7 @@ electron\lib\integration-config.js            ~getIntegrationConfig  ~getEditabl
 h2 Auto-generated signatures
 h2 SigMap commands
 h1 Code signatures
-h2 changes (last 5 commits — 1 second ago)
+h2 changes (last 5 commits — 2 seconds ago)
 h2 .github
 h3 .github\copilot-instructions.md
 h3 .github\gemini-context.md
@@ -27,11 +29,11 @@ h3 .github\workflows\validate.yml
 h2 electron
 h3 electron\diagnostics-renderer.js
 h3 electron\diagnostics.html
+h3 electron\lib\diagnostics.js
 h3 electron\lib\integration-config.js
 h3 electron\hotkeys-renderer.js
 h3 electron\hotkeys.html
 h3 electron\lib\config.js
-h3 electron\lib\diagnostics.js
 h3 electron\lib\launcher.js
 h3 electron\lib\logger.js
 h3 electron\lib\utils.js
@@ -46,7 +48,7 @@ h2 scratch
 ```
 h2 Auto-generated signatures
 h2 Code Signatures
-h2 changes (last 5 commits — 1 second ago)
+h2 changes (last 5 commits — 2 seconds ago)
 h2 .github
 h3 .github\copilot-instructions.md
 h3 .github\gemini-context.md
@@ -55,11 +57,11 @@ h3 .github\workflows\validate.yml
 h2 electron
 h3 electron\diagnostics-renderer.js
 h3 electron\diagnostics.html
+h3 electron\lib\diagnostics.js
 h3 electron\lib\integration-config.js
 h3 electron\hotkeys-renderer.js
 h3 electron\hotkeys.html
 h3 electron\lib\config.js
-h3 electron\lib\diagnostics.js
 h3 electron\lib\launcher.js
 h3 electron\lib\logger.js
 h3 electron\lib\utils.js

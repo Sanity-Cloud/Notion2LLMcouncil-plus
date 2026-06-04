@@ -1,55 +1,31 @@
-diff --git a/backend/council.py b/backend/council.py
-index 7973a0b..4882169 100644
---- a/backend/council.py
-+++ b/backend/council.py
-@@ -45,9 +45,12 @@ def get_provider_for_model(model_id: str) -> Any:
-     return PROVIDERS["openrouter"]
- 
- 
--async def query_model(model: str, messages: List[Dict[str, str]], timeout: float = 120.0, temperature: float = 0.7) -> Dict[str, Any]:
-+async def query_model(model: str, messages: List[Dict[str, str]], timeout: float = 120.0, temperature: float = 0.7, attachments: "List[Dict[str, Any]] | None" = None) -> Dict[str, Any]:
-     """Dispatch query to appropriate provider."""
-     provider = get_provider_for_model(model)
-+    if attachments and model.startswith("custom:"):
-+        # Notion2API is configured as the custom OpenAI-compatible endpoint.
-+        return await provider.query(model, messages, timeout, temperature, attachments=attachments)
-     return await provider.query(model, messages, timeout, temperature)
- 
- 
-@@ -81,7 +84,7 @@ async def query_models_parallel(models: List[str], messages: List[Dict[str, str]
-     return dict(results)
- 
- 
--async def stage1_collect_responses(user_query: str, search_context: str = "", request: Any = None, models_override: "List[str] | None" = None, history: "List[Dict[str, str]] | None" = None) -> Any:
-+async def stage1_collect_responses(user_query: str, search_context: str = "", request: Any = None, models_override: "List[str] | None" = None, history: "List[Dict[str, str]] | None" = None, attachments: "List[Dict[str, Any]] | None" = None) -> Any:
+diff --git a/backend/debate.py b/backend/debate.py
+index bf4582e..faf6a48 100644
+--- a/backend/debate.py
++++ b/backend/debate.py
+@@ -366,6 +366,7 @@ async def run_iterative_debate(
+     chairman_override: Optional[str] = None,
+     history: Optional[List[Dict[str, str]]] = None,
+     debate_rounds: Optional[int] = None,
++    attachments: Optional[List[Dict[str, Any]]] = None,
+ ) -> AsyncGenerator[Dict[str, Any], None]:
      """
-     Stage 1: Collect individual responses from all council models.
- 
-@@ -91,6 +94,7 @@ async def stage1_collect_responses(user_query: str, search_context: str = "", re
-         request: FastAPI request object for checking disconnects
-         models_override: Per-request model list (bypasses global config)
-         history: Prior conversation turns as [{role, content}, ...] for multi-turn
-+        attachments: Inline file attachments to pass through to the Notion2API custom endpoint
- 
-     Yields:
-         - First yield: total_models (int)
-@@ -130,7 +134,7 @@ async def stage1_collect_responses(user_query: str, search_context: str = "", re
- 
-     async def _query_safe(m: str):
-         try:
--            return m, await query_model(m, messages, temperature=council_temp)
-+            return m, await query_model(m, messages, temperature=council_temp, attachments=attachments)
-         except Exception as e:
-             return m, {"error": True, "error_message": str(e)}
- 
+     Orchestrate multi-round debate. Yields SSE-ready event dicts.
+@@ -524,6 +525,7 @@ async def run_iterative_debate(
+             history=history if round_num == 1 else None,
+             messages_override=messages_override,
+             per_model_messages=per_model_messages,
++            attachments=attachments if round_num == 1 else None,
+         ):
+             if isinstance(item, int):
+                 total_models = item
 diff --git a/backend/main.py b/backend/main.py
-index fd0402a..5dd99db 100644
+index 697fcfa..d9697c2 100644
 --- a/backend/main.py
 +++ b/backend/main.py
-@@ -127,12 +127,14 @@ class SendMessageRequest(BaseModel):
-     execution_mode: ExecutionMode = "full"
+@@ -346,16 +346,31 @@ class SendMessageRequest(BaseModel):
      council_models: Optional[List[str]] = None
      chairman_model: Optional[str] = None
+     debate_rounds: Optional[int] = None
 +    attachments: Optional[List[Dict[str, Any]]] = None
  
  
@@ -60,9 +36,6 @@ index fd0402a..5dd99db 100644
 +    attachments: Optional[List[Dict[str, Any]]] = None
      web_search: bool = False
      execution_mode: ExecutionMode = "chat_only"
- 
-@@ -207,6 +209,19 @@ class PipelineResult:
-     aggregate_rankings: Any = None
  
  
 +def _content_with_attachment_summary(content: str, attachments: Optional[List[Dict[str, Any]]] = None) -> str:
@@ -78,74 +51,99 @@ index fd0402a..5dd99db 100644
 +    return f"{content}\n\nAttached files:\n" + "\n".join(files)
 +
 +
- async def _run_council_pipeline(
-     content: str,
-     execution_mode: str,
-@@ -216,11 +231,12 @@ async def _run_council_pipeline(
-     chairman_override: Optional[str] = None,
+ def _validate_execution_mode(mode: str) -> None:
+     """Validate execution_mode for endpoints using Optional[str] (e.g. settings update)."""
+     valid = ("chat_only", "chat_ranking", "full")
+@@ -459,6 +474,7 @@ async def _run_council_pipeline(
      request: Optional[Request] = None,
      history: Optional[List[Dict[str, str]]] = None,
+     preflight: bool = True,
 +    attachments: Optional[List[Dict[str, Any]]] = None,
  ) -> PipelineResult:
      """Shared orchestration for stage1 → stage2 → stage3 (non-streaming)."""
      result = PipelineResult()
+@@ -469,12 +485,13 @@ async def _run_council_pipeline(
+             execution_mode=execution_mode,
+             council_models=models_override,
+             chairman_model=chairman_override,
++            attachments=attachments,
+         )
+         preflight_error = await _run_model_preflight(_build_council_preflight_models(body))
+         if preflight_error:
+             raise HTTPException(status_code=400, detail=preflight_error)
  
 -    async for item in stage1_collect_responses(content, search_context, request=request, models_override=models_override, history=history):
 +    async for item in stage1_collect_responses(content, search_context, request=request, models_override=models_override, history=history, attachments=attachments):
          if isinstance(item, int):
              continue
          result.stage1.append(item)
-@@ -319,6 +335,7 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
-     if conversation is None:
-         raise HTTPException(status_code=404, detail="Conversation not found")
- 
-+    content_for_prompt = _content_with_attachment_summary(body.content, body.attachments)
-     history = _build_chat_history(conversation)
-     # Check if this is the first message
-     is_first_message = len(conversation["messages"]) == 0
-@@ -332,7 +349,7 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
-             label_to_model = {}
-             aggregate_rankings = {}
-             
+@@ -646,7 +663,8 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
+         cost_report = None
+         _register_run(conversation_id, body.execution_mode)
+         try:
 -            storage.add_user_message(conversation_id, body.content, conversation=conversation)
++            content_for_prompt = _content_with_attachment_summary(body.content, body.attachments)
 +            storage.add_user_message(conversation_id, content_for_prompt, conversation=conversation)
  
-             # Start title generation in parallel (don't await yet)
-             title_task = None
-@@ -378,7 +395,7 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
-             
+             preflight_error = await _run_model_preflight(_build_council_preflight_models(body))
+             if preflight_error:
+@@ -704,7 +722,7 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
+ 
              total_models = 0
-             
+ 
 -            async for item in stage1_collect_responses(body.content, search_context, request, models_override=body.council_models, history=history):
 +            async for item in stage1_collect_responses(content_for_prompt, search_context, request, models_override=body.council_models, history=history, attachments=body.attachments):
                  if isinstance(item, int):
                      total_models = item
-                     print(f"DEBUG: Sending stage1_init with total={total_models}")
-@@ -405,7 +422,7 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
+                     _active_runs[conversation_id]["progress"]["stage1"]["total"] = total_models
+@@ -733,7 +751,7 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
                  await asyncio.sleep(0.05)
-                 
+ 
                  # Iterate over the async generator
 -                async for item in stage2_collect_rankings(body.content, stage1_results, search_context, request):
 +                async for item in stage2_collect_rankings(content_for_prompt, stage1_results, search_context, request):
                      # First item is the label mapping
                      if isinstance(item, dict) and not item.get('model'):
                          label_to_model = item
-@@ -435,7 +452,7 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
+@@ -764,7 +782,7 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
                      print("Client disconnected before Stage 3")
                      raise asyncio.CancelledError("Client disconnected")
  
 -                stage3_result = await stage3_synthesize_final(body.content, stage1_results, stage2_results, search_context, chairman_override=body.chairman_model)
 +                stage3_result = await stage3_synthesize_final(content_for_prompt, stage1_results, stage2_results, search_context, chairman_override=body.chairman_model)
+                 _active_runs[conversation_id]["stage3_response"] = stage3_result
                  yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
  
-             # Wait for title generation if it was started
-@@ -510,19 +527,20 @@ async def send_message_sync(conversation_id: str, body: SendMessageRequest):
-     if conversation is None:
-         raise HTTPException(status_code=404, detail="Conversation not found")
+@@ -877,7 +895,8 @@ async def send_debate_message_stream(conversation_id: str, body: SendMessageRequ
+         debate_converged = False
+         _register_run(conversation_id, body.execution_mode)
+         try:
+-            storage.add_user_message(conversation_id, body.content, conversation=conversation)
++            content_for_prompt = _content_with_attachment_summary(body.content, body.attachments)
++            storage.add_user_message(conversation_id, content_for_prompt, conversation=conversation)
  
-+    content_for_prompt = _content_with_attachment_summary(body.content, body.attachments)
-     history = _build_chat_history(conversation)
+             preflight_error = await _run_model_preflight(_build_council_preflight_models(body))
+             if preflight_error:
+@@ -930,11 +949,12 @@ async def send_debate_message_stream(conversation_id: str, body: SendMessageRequ
+             effective_rounds = min(max(effective_rounds, 1), MAX_DEBATE_ROUNDS)
+ 
+             async for event in run_iterative_debate(
+-                body.content, search_context, request, body.execution_mode,
++                content_for_prompt, search_context, request, body.execution_mode,
+                 models_override=body.council_models,
+                 chairman_override=body.chairman_model,
+                 history=history,
+                 debate_rounds=effective_rounds,
++                attachments=body.attachments,
+             ):
+                 event_type = event.get("type")
+                 yield f"data: {json.dumps(event)}\n\n"
+@@ -1263,19 +1283,21 @@ async def send_message_sync(conversation_id: str, body: SendMessageRequest):
+     if preflight_error:
+         raise HTTPException(status_code=400, detail=preflight_error)
+ 
 -    storage.add_user_message(conversation_id, body.content, conversation=conversation)
++    content_for_prompt = _content_with_attachment_summary(body.content, body.attachments)
 +    storage.add_user_message(conversation_id, content_for_prompt, conversation=conversation)
  
      search_context = ""
@@ -159,14 +157,15 @@ index fd0402a..5dd99db 100644
 -        body.content, body.execution_mode, search_context,
 +        content_for_prompt, body.execution_mode, search_context,
          models_override=body.council_models, chairman_override=body.chairman_model,
--        history=history,
-+        history=history, attachments=body.attachments,
+         history=history,
+         preflight=False,
++        attachments=body.attachments,
      )
  
-     metadata = {"execution_mode": body.execution_mode}
-@@ -561,13 +579,14 @@ async def ask_oneshot(body: AskRequest):
-     if not models:
-         raise HTTPException(status_code=400, detail="At least one model is required")
+     metadata = {"execution_mode": body.execution_mode, "cost_report": result.cost_report}
+@@ -1326,14 +1348,16 @@ async def ask_oneshot(body: AskRequest):
+     if preflight_error:
+         raise HTTPException(status_code=400, detail=preflight_error)
  
 +    content_for_prompt = _content_with_attachment_summary(body.content, body.attachments)
      search_context = ""
@@ -176,161 +175,113 @@ index fd0402a..5dd99db 100644
  
      result = await _run_council_pipeline(
 -        body.content, body.execution_mode, search_context,
--        models_override=models, chairman_override=body.chairman_model
 +        content_for_prompt, body.execution_mode, search_context,
-+        models_override=models, chairman_override=body.chairman_model, attachments=body.attachments
+         models_override=models, chairman_override=body.chairman_model,
+         preflight=False,
++        attachments=body.attachments,
      )
  
      if body.execution_mode == "chat_only" and len(result.stage1) == 1:
-diff --git a/backend/providers/custom_openai.py b/backend/providers/custom_openai.py
-index 893689b..1a19ef9 100644
---- a/backend/providers/custom_openai.py
-+++ b/backend/providers/custom_openai.py
-@@ -17,7 +17,12 @@ class CustomOpenAIProvider(LLMProvider):
-         api_key = settings.custom_endpoint_api_key or ""
-         return name, url, api_key
- 
--    async def query(self, model_id: str, messages: List[Dict[str, str]], timeout: float = 120.0, temperature: float = 0.7) -> Dict[str, Any]:
-+    def _supports_attachments(self, name: str, base_url: str) -> bool:
-+        """Attachments are only sent to Notion2API-compatible custom endpoints."""
-+        marker = f"{name} {base_url}".lower()
-+        return "notion" in marker or "127.0.0.1:8000" in marker or "localhost:8000" in marker
-+
-+    async def query(self, model_id: str, messages: List[Dict[str, str]], timeout: float = 120.0, temperature: float = 0.7, attachments: List[Dict[str, Any]] | None = None) -> Dict[str, Any]:
-         name, base_url, api_key = self._get_config()
- 
-         if not base_url:
-@@ -35,15 +40,19 @@ class CustomOpenAIProvider(LLMProvider):
-             if api_key:
-                 headers["Authorization"] = f"Bearer {api_key}"
- 
-+            payload = {
-+                "model": model,
-+                "messages": messages,
-+                "temperature": temperature,
-+            }
-+            if attachments and self._supports_attachments(name, base_url):
-+                payload["attachments"] = attachments
-+
-             async with httpx.AsyncClient(timeout=timeout) as client:
-                 response = await client.post(
-                     f"{base_url}/chat/completions",
-                     headers=headers,
--                    json={
--                        "model": model,
--                        "messages": messages,
--                        "temperature": temperature
--                    }
-+                    json=payload
-                 )
- 
-                 if response.status_code != 200:
 diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
-index e0d79fd..3907b32 100644
+index 001a876..868d5b2 100644
 --- a/frontend/src/App.jsx
 +++ b/frontend/src/App.jsx
-@@ -23,6 +23,11 @@ const deriveConversationTitle = (content) => {
-   return title;
- };
+@@ -23,6 +23,11 @@ function finalizeTimers(timers = {}) {
+ const isDefaultConversationTitle = (title) =>
+   !title || title === 'New Conversation' || title === 'Untitled Conversation';
  
 +const isNotion2ApiSettings = (settings = {}) => {
 +  const marker = `${settings.custom_endpoint_name || ''} ${settings.custom_endpoint_url || ''}`.toLowerCase();
 +  return settings.enabled_providers?.custom === true && (marker.includes('notion') || marker.includes('127.0.0.1:8000') || marker.includes('localhost:8000'));
 +};
 +
- function App() {
-   const [conversations, setConversations] = useState([]);
-   const [currentConversationId, setCurrentConversationId] = useState(null);
-@@ -40,6 +45,7 @@ function App() {
-   const [chairmanModel, setChairmanModel] = useState(null);
-   const [searchProvider, setSearchProvider] = useState('duckduckgo');
-   const [executionMode, setExecutionMode] = useState(DEFAULT_EXECUTION_MODE);
+ const deriveConversationTitle = (content) => {
+   if (!content || typeof content !== 'string') return 'Untitled Conversation';
+ 
+@@ -144,6 +149,7 @@ function App() {
+   const [autoConverge, setAutoConverge] = useState(true);
+   const [convergenceThreshold, setConvergenceThreshold] = useState(2);
+   const [dateFormat, setDateFormat] = useState('auto');
 +  const [notion2ApiAttachmentsEnabled, setNotion2ApiAttachmentsEnabled] = useState(false);
    const [sidebarOpen, setSidebarOpen] = useState(false);
+   const [appMode, setAppMode] = useState(null); // null shows landing page
    const abortControllerRef = useRef(null);
-   const requestIdRef = useRef(0);
-@@ -59,6 +65,7 @@ function App() {
+@@ -199,6 +205,7 @@ function App() {
        // Load execution mode preference
        setExecutionMode(settings.execution_mode || DEFAULT_EXECUTION_MODE);
        setSearchProvider(settings.search_provider || 'duckduckgo');
 +      setNotion2ApiAttachmentsEnabled(isNotion2ApiSettings(settings));
  
-       const hasCustomEndpoint =
-         settings.enabled_providers?.custom === true &&
-@@ -130,6 +137,7 @@ function App() {
-       setCouncilModels(models);
-       setChairmanModel(chairman);
+       setCritiqueMode(settings.critique_mode || 'freeform');
+       setDebateRounds(settings.debate_rounds || 1);
+@@ -272,6 +279,7 @@ function App() {
        setSearchProvider(settings.search_provider || 'duckduckgo');
+       setAvailableSearchProviders(buildAvailableSearchProviders(settings));
+       setExecutionMode(settings.execution_mode || DEFAULT_EXECUTION_MODE);
 +      setNotion2ApiAttachmentsEnabled(isNotion2ApiSettings(settings));
  
-       const hasCouncilMembers = models.some(m => m && m.trim() !== '');
-       const hasChairman = chairman && chairman.trim() !== '';
-@@ -332,7 +340,7 @@ function App() {
+       setCritiqueMode(settings.critique_mode || 'freeform');
+       setDebateRounds(settings.debate_rounds || 1);
+@@ -873,7 +881,7 @@ function App() {
      }
    };
  
--  const handleSendMessage = async (content, webSearch) => {
-+  const handleSendMessage = async (content, webSearch, attachments = []) => {
+-  const handleSendMessage = async (content, searchProvider) => {
++  const handleSendMessage = async (content, searchProvider, attachments = []) => {
      if (!currentConversationId) return;
  
-     // Assign unique ID to this request to prevent race conditions
-@@ -361,7 +369,7 @@ function App() {
-     setIsLoading(true);
-     try {
+     let effectiveMode = executionMode;
+@@ -933,7 +941,7 @@ function App() {
+       }
+ 
        // Optimistically add user message to UI
 -      const userMessage = { role: 'user', content };
 +      const userMessage = { role: 'user', content, attachments: attachments.map(({ name, content_type }) => ({ name, content_type })) };
-       setCurrentConversation((prev) => {
-         const target = prev && prev.id === activeConversationId ? prev : {
-           id: activeConversationId,
-@@ -419,7 +427,7 @@ function App() {
-       // Send message with streaming
-       await api.sendMessageStream(
-         activeConversationId,
--        { content, webSearch, executionMode },
-+        { content, webSearch, executionMode, attachments },
-         (eventType, event) => {
-           const isActiveConversation = activeConversationIdRef.current === activeConversationId;
-           if (!isActiveConversation && !['title_complete', 'complete', 'error'].includes(eventType)) {
-@@ -839,6 +847,7 @@ function App() {
-         onSendMessage={handleSendMessage}
-         onAbort={handleAbort}
-         isLoading={isLoading}
-+        attachmentsEnabled={notion2ApiAttachmentsEnabled}
-         councilConfigured={councilConfigured}
-         councilModels={councilModels}
-         chairmanModel={chairmanModel}
+       setCurrentConversation((prev) => ({
+         ...prev,
+         id: activeConversationId, // transition draft ID to actual database UUID
+@@ -985,6 +993,7 @@ function App() {
+         executionMode: effectiveMode,
+         councilModels,
+         chairmanModel: effectiveMode === 'full' ? chairmanModel : undefined,
++        attachments,
+       };
+       if (isDebate) {
+         streamOptions.debateRounds = debateRounds;
+@@ -1644,6 +1653,7 @@ function App() {
+                 onSendMessage={handleSendMessage}
+                 onAbort={handleAbort}
+                 isLoading={isLoading}
++                attachmentsEnabled={notion2ApiAttachmentsEnabled}
+                 councilConfigured={councilConfigured}
+                 councilModels={councilModels}
+                 chairmanModel={chairmanModel}
 diff --git a/frontend/src/api.js b/frontend/src/api.js
-index af99a5e..78274ab 100644
+index dc7e35b..133b35f 100644
 --- a/frontend/src/api.js
 +++ b/frontend/src/api.js
-@@ -330,7 +330,7 @@ export const api = {
-    * @returns {Promise<void>}
-    */
-   async sendMessageStream(conversationId, options, onEvent, signal) {
--    const { content, webSearch = false, executionMode = 'full' } = options;
-+    const { content, webSearch = false, executionMode = 'full', attachments = [] } = options;
-     const response = await fetch(
-       `${API_BASE}/api/conversations/${conversationId}/message/stream?_t=${Date.now()}`,
-       {
-@@ -339,7 +339,7 @@ export const api = {
-           'Content-Type': 'application/json',
-           'Cache-Control': 'no-cache',
-         },
--        body: JSON.stringify({ content, web_search: webSearch, execution_mode: executionMode }),
-+        body: JSON.stringify({ content, web_search: webSearch, execution_mode: executionMode, attachments }),
-         signal,
-         cache: 'no-store',
-       }
+@@ -462,11 +462,13 @@ export const api = {
+       executionMode = 'full',
+       councilModels = null,
+       chairmanModel = null,
++      attachments = [],
+     } = options;
+     const body = {
+       content,
+       search_provider: searchProvider,
+       execution_mode: executionMode,
++      attachments,
+     };
+     if (councilModels && councilModels.length > 0) {
+       body.council_models = councilModels;
 diff --git a/frontend/src/components/ChatInterface.css b/frontend/src/components/ChatInterface.css
-index 879e77b..28ae399 100644
+index dd920c0..2353108 100644
 --- a/frontend/src/components/ChatInterface.css
 +++ b/frontend/src/components/ChatInterface.css
-@@ -683,4 +683,81 @@
-     width: 40px;
-     height: 40px;
-   }
-+}
+@@ -978,3 +978,80 @@
+   box-shadow: 0 0 10px rgba(6, 182, 212, 0.05);
+   animation: pop-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+ }
 +
 +.attach-button {
 +  display: flex;
@@ -407,32 +358,26 @@ index 879e77b..28ae399 100644
 +
 +.attachment-error {
 +  color: #fca5a5;
- }
-\ No newline at end of file
++}
 diff --git a/frontend/src/components/ChatInterface.jsx b/frontend/src/components/ChatInterface.jsx
-index 3879816..7650740 100644
+index c916056..96a48cc 100644
 --- a/frontend/src/components/ChatInterface.jsx
 +++ b/frontend/src/components/ChatInterface.jsx
-@@ -15,6 +15,7 @@ export default function ChatInterface({
-     onSendMessage,
-     onAbort,
-     isLoading,
+@@ -122,8 +122,11 @@ export default function ChatInterface({
+     debateRounds = 1,
+     autoConverge = true,
+     convergenceThreshold = 2,
 +    attachmentsEnabled = false,
-     councilConfigured,
-     onOpenSettings,
-     councilModels = [],
-@@ -25,6 +26,8 @@ export default function ChatInterface({
  }) {
      const [input, setInput] = useState('');
-     const [webSearch, setWebSearch] = useState(false);
 +    const [attachments, setAttachments] = useState([]);
 +    const fileInputRef = useRef(null);
-     const messagesEndRef = useRef(null);
-     const messagesContainerRef = useRef(null);
- 
-@@ -47,11 +50,54 @@ export default function ChatInterface({
-         }
-     }, [conversation]);
+     const [activeSearchProvider, setActiveSearchProvider] = useState(null);
+     const [searchPopoverOpen, setSearchPopoverOpen] = useState(false);
+     const searchPopoverRef = useRef(null);
+@@ -172,11 +175,54 @@ export default function ChatInterface({
+         return () => document.removeEventListener('mousedown', handleClickOutside);
+     }, [searchPopoverOpen]);
  
 +    const readFileAsAttachment = (file) => new Promise((resolve, reject) => {
 +        const reader = new FileReader();
@@ -478,26 +423,22 @@ index 3879816..7650740 100644
      const handleSubmit = (e) => {
          e.preventDefault();
 -        if (input.trim() && !isLoading) {
--            onSendMessage(input, webSearch);
+-            onSendMessage(input, activeSearchProvider);
 +        const validAttachments = attachments.filter(item => !item.error);
 +        if ((input.trim() || validAttachments.length) && !isLoading) {
-+            onSendMessage(input.trim() || 'Please analyze the attached file(s).', webSearch, validAttachments);
++            onSendMessage(input.trim() || 'Please analyze the attached file(s).', activeSearchProvider, validAttachments);
              setInput('');
 +            setAttachments([]);
          }
      };
  
-@@ -107,9 +153,20 @@ export default function ChatInterface({
+@@ -299,7 +345,18 @@ export default function ChatInterface({
  
                              <div className="message-content">
                                  {msg.role === 'user' ? (
--                                    <div className="markdown-content">
--                                        <ReactMarkdown>{msg.content}</ReactMarkdown>
--                                    </div>
+-                                    <MarkdownContent>{msg.content}</MarkdownContent>
 +                                    <>
-+                                        <div className="markdown-content">
-+                                            <ReactMarkdown>{msg.content}</ReactMarkdown>
-+                                        </div>
++                                        <MarkdownContent>{msg.content}</MarkdownContent>
 +                                        {msg.attachments?.length > 0 && (
 +                                            <div className="message-attachments">
 +                                                {msg.attachments.map((file, fileIndex) => (
@@ -508,12 +449,12 @@ index 3879816..7650740 100644
 +                                            </div>
 +                                        )}
 +                                    </>
-                                 ) : (
-                                     <>
-                                         {/* Search Loading */}
-@@ -247,6 +304,28 @@ export default function ChatInterface({
-                                 {webSearch && <span className="search-label">Search On</span>}
-                             </label>
+                                 ) : (msg.mode === 'advisors' || msg.type === 'advisor_debate') ? (
+                                     <DebateView
+                                         personas={msg.personas || []}
+@@ -401,6 +458,28 @@ export default function ChatInterface({
+                                 )}
+                             </div>
  
 +                            {attachmentsEnabled && (
 +                                <>
@@ -540,7 +481,7 @@ index 3879816..7650740 100644
                              <textarea
                                  className="message-input"
                                  placeholder={isLoading ? "Consulting..." : "Ask the Council..."}
-@@ -263,12 +342,24 @@ export default function ChatInterface({
+@@ -417,12 +496,24 @@ export default function ChatInterface({
                                      ⏹
                                  </button>
                              ) : (

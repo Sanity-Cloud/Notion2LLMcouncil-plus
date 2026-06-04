@@ -1,101 +1,10 @@
-diff --git a/backend/storage.py b/backend/storage.py
-index cfcd17a..1b3048e 100644
---- a/backend/storage.py
-+++ b/backend/storage.py
-@@ -60,6 +60,19 @@ def rebuild_index() -> List[Dict[str, Any]]:
-             try:
-                 with open(path, 'r') as f:
-                     data = json.load(f)
-+                    # Auto-repair title if missing/default and there is a first user message
-+                    if data.get("title") in (None, "", "New Conversation", "Untitled Conversation"):
-+                        first_content = ""
-+                        for msg in data.get("messages", []):
-+                            if msg.get("role") == "user" and msg.get("content"):
-+                                first_content = msg.get("content")
-+                                break
-+                        if first_content:
-+                            data["title"] = _derive_conversation_title(first_content)
-+                            # Save back to file
-+                            with open(path, 'w') as out_f:
-+                                json.dump(data, out_f, indent=2)
-+
-                     index.append({
-                         "id": data["id"],
-                         "created_at": data["created_at"],
-@@ -197,9 +210,51 @@ def list_conversations() -> List[Dict[str, Any]]:
-     if index is None:
-         return rebuild_index()
-         
-+    # Check if we have any entries with default/stale titles that actually have messages
-+    # If we do, we can repair them by loading the conversation file, deriving the title, and saving it.
-+    repaired_any = False
-+    for entry in index:
-+        if entry.get("title") in (None, "", "New Conversation", "Untitled Conversation") and entry.get("message_count", 0) > 0:
-+            # Load conversation
-+            conv = get_conversation(entry["id"])
-+            if conv:
-+                # Find first user message
-+                first_content = ""
-+                for msg in conv.get("messages", []):
-+                    if msg.get("role") == "user" and msg.get("content"):
-+                        first_content = msg.get("content")
-+                        break
-+                if first_content:
-+                    new_title = _derive_conversation_title(first_content)
-+                    conv["title"] = new_title
-+                    # Save conversation to file (this also updates the entry in index and saves index)
-+                    save_conversation(conv)
-+                    repaired_any = True
-+
-+    if repaired_any:
-+        # Reload index after repairs are written
-+        index = _load_index() or []
-+
-     return index
- 
- 
-+def _derive_conversation_title(content: str) -> str:
-+    """Create a stable fallback title from the first user message."""
-+    if not content or not isinstance(content, str):
-+        return "Untitled Conversation"
-+
-+    title = " ".join(content.strip().split())
-+    if not title:
-+        return "Untitled Conversation"
-+
-+    title = title.strip("\"'")
-+
-+    if len(title) > 50:
-+        title = title[:47] + "..."
-+
-+    return title
-+
-+
- def add_user_message(conversation_id: str, content: str, conversation: Optional[Dict[str, Any]] = None):
-     """Add a user message to a conversation.
- 
-@@ -213,6 +268,14 @@ def add_user_message(conversation_id: str, content: str, conversation: Optional[
-     if conversation is None:
-         raise ValueError(f"Conversation {conversation_id} not found")
- 
-+    is_first_user_message = not any(
-+        msg.get("role") == "user"
-+        for msg in conversation.get("messages", [])
-+    )
-+
-+    if is_first_user_message and conversation.get("title") in (None, "", "New Conversation", "Untitled Conversation"):
-+        conversation["title"] = _derive_conversation_title(content)
-+
-     conversation["messages"].append({
-         "role": "user",
-         "content": content
 diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
-index 657b4c3..d8b7df2 100644
+index 70b127a..04ab790 100644
 --- a/frontend/src/App.jsx
 +++ b/frontend/src/App.jsx
-@@ -6,6 +6,23 @@ import { api, DEFAULT_EXECUTION_MODE } from './api';
- import './App.css';
- import './components/StageCopyButtons.css';
+@@ -20,6 +20,23 @@ function finalizeTimers(timers = {}) {
+   return next;
+ }
  
 +const isDefaultConversationTitle = (title) =>
 +  !title || title === 'New Conversation' || title === 'Untitled Conversation';
@@ -114,140 +23,65 @@ index 657b4c3..d8b7df2 100644
 +  return title;
 +};
 +
- function App() {
-   const [conversations, setConversations] = useState([]);
-   const [currentConversationId, setCurrentConversationId] = useState(null);
-@@ -27,6 +44,7 @@ function App() {
-   const abortControllerRef = useRef(null);
-   const requestIdRef = useRef(0);
-   const isInitialMount = useRef(true);
-+  const activeConversationIdRef = useRef(null);
- 
-   // Check initial configuration on mount
-   useEffect(() => {
-@@ -42,13 +60,19 @@ function App() {
-       setExecutionMode(settings.execution_mode || DEFAULT_EXECUTION_MODE);
-       setSearchProvider(settings.search_provider || 'duckduckgo');
- 
-+      const hasCustomEndpoint =
-+        settings.enabled_providers?.custom === true &&
-+        !!settings.custom_endpoint_url &&
-+        !!(settings.custom_endpoint_api_key_set || settings.custom_endpoint_api_key);
-+
-       const hasApiKey = settings.openrouter_api_key_set ||
-         settings.groq_api_key_set ||
-         settings.openai_api_key_set ||
-         settings.anthropic_api_key_set ||
-         settings.google_api_key_set ||
-         settings.mistral_api_key_set ||
--        settings.deepseek_api_key_set;
-+        settings.deepseek_api_key_set ||
-+        hasCustomEndpoint;
- 
-       // 2. Test Ollama Connection
-       // We do this regardless to update the status indicator
-@@ -125,6 +149,10 @@ function App() {
-     loadConversations();
-   }, []);
- 
-+  useEffect(() => {
-+    activeConversationIdRef.current = currentConversationId;
-+  }, [currentConversationId]);
-+
-   // Auto-save execution mode preference when changed
-   useEffect(() => {
-     // Skip saving on initial mount
-@@ -187,7 +215,22 @@ function App() {
+ const IDLE_LOADING = {
+   search: false,
+   stage1: false,
+@@ -364,10 +381,26 @@ function App() {
    const loadConversations = async (retryCount = 0) => {
      try {
        const convs = await api.listConversations();
--      setConversations(convs);
-+      
+-      setConversations(convs.map((conv) => ({
+-        ...conv,
+-        mode: getConversationMode(conv),
+-      })));
 +      setConversations((prev) =>
 +        convs.map((conv) => {
 +          const local = prev.find((item) => item.id === conv.id);
++
++          const updated = {
++            ...conv,
++            mode: getConversationMode(conv),
++          };
 +
 +          if (
 +            local &&
 +            isDefaultConversationTitle(conv.title) &&
 +            !isDefaultConversationTitle(local.title)
 +          ) {
-+            return { ...conv, title: local.title };
++            updated.title = local.title;
 +          }
 +
-+          return conv;
++          return updated;
 +        })
 +      );
      } catch (error) {
        console.error('Failed to load conversations:', error);
        // Retry up to 3 times with increasing delays (1s, 2s, 3s)
-@@ -218,9 +261,14 @@ function App() {
+@@ -881,6 +914,23 @@ function App() {
+         }
+       }
  
-     try {
-       const newConv = await api.createConversation();
--      setConversations([
--        { id: newConv.id, created_at: newConv.created_at, message_count: 0 },
--        ...conversations,
-+      setConversations((prev) => [
-+        {
-+          id: newConv.id,
-+          created_at: newConv.created_at,
-+          title: newConv.title || 'New Conversation',
-+          message_count: 0,
-+        },
-+        ...prev.filter((conv) => conv.id !== newConv.id),
-       ]);
-       setCurrentConversationId(newConv.id);
-     } catch (error) {
-@@ -236,7 +284,7 @@ function App() {
-     try {
-       await api.deleteConversation(id);
-       // Remove from local state
--      setConversations(conversations.filter(c => c.id !== id));
-+      setConversations((prev) => prev.filter(c => c.id !== id));
-       // If we deleted the current conversation, clear it
-       if (id === currentConversationId) {
-         setCurrentConversationId(null);
-@@ -261,6 +309,22 @@ function App() {
- 
-     // Assign unique ID to this request to prevent race conditions
-     const currentRequestId = ++requestIdRef.current;
-+    const activeConversationId = currentConversationId;
++      activeConversationIdRef.current = activeConversationId;
 +
-+    // Optimistically update conversation title in list and current state if it is a new/untitled conversation
-+    const currentConvInList = conversations.find(c => c.id === activeConversationId);
-+    const currentTitle = currentConvInList?.title || currentConversation?.title;
-+    const hasNoTitle = isDefaultConversationTitle(currentTitle);
++      // Optimistically update conversation title in list and current state if it is a new/untitled conversation
++      const currentConvInList = conversations.find(c => c.id === activeConversationId);
++      const currentTitle = currentConvInList?.title || currentConversation?.title;
++      const hasNoTitle = isDefaultConversationTitle(currentTitle);
 +
-+    if (hasNoTitle) {
-+      const optimisticTitle = deriveConversationTitle(content);
-+      setConversations(prev => prev.map(c =>
-+        c.id === activeConversationId ? { ...c, title: optimisticTitle } : c
-+      ));
-+      setCurrentConversation(prev =>
-+        prev && prev.id === activeConversationId ? { ...prev, title: optimisticTitle } : prev
-+      );
-+    }
- 
-     // Create new AbortController for this request
-     abortControllerRef.current = new AbortController();
-@@ -309,9 +373,14 @@ function App() {
- 
-       // Send message with streaming
-       await api.sendMessageStream(
--        currentConversationId,
-+        activeConversationId,
-         { content, webSearch, executionMode },
-         (eventType, event) => {
-+          const isActiveConversation = activeConversationIdRef.current === activeConversationId;
-+          if (!isActiveConversation && !['title_complete', 'complete', 'error'].includes(eventType)) {
-+            return;
-+          }
++      if (hasNoTitle) {
++        const optimisticTitle = deriveConversationTitle(content);
++        setConversations(prev => prev.map(c =>
++          c.id === activeConversationId ? { ...c, title: optimisticTitle } : c
++        ));
++        setCurrentConversation(prev =>
++          prev && prev.id === activeConversationId ? { ...prev, title: optimisticTitle } : prev
++        );
++      }
 +
-           switch (eventType) {
-             case 'search_start':
-               setCurrentConversation((prev) => {
-@@ -597,6 +666,14 @@ function App() {
+       // Optimistically add user message to UI
+       const userMessage = { role: 'user', content };
+       setCurrentConversation((prev) => ({
+@@ -1418,6 +1468,14 @@ function App() {
                break;
  
              case 'title_complete':
@@ -262,52 +96,3 @@ index 657b4c3..d8b7df2 100644
                // Reload conversations to get updated title
                loadConversations();
                break;
-@@ -622,7 +699,7 @@ function App() {
-         console.log('Request aborted');
-         // Mark the assistant message as aborted and stop timers
-         setCurrentConversation((prev) => {
--          if (!prev || prev.messages.length < 2) return prev;
-+          if (!prev || prev.id !== activeConversationId || prev.messages.length < 2) return prev;
-           const messages = [...prev.messages];
-           const lastMsg = messages[messages.length - 1];
-           if (lastMsg.role === 'assistant') {
-@@ -651,10 +728,13 @@ function App() {
-       }
-       console.error('Failed to send message:', error);
-       // Remove optimistic messages on error
--      setCurrentConversation((prev) => ({
--        ...prev,
--        messages: prev.messages.slice(0, -2),
--      }));
-+      setCurrentConversation((prev) => {
-+        if (!prev || prev.id !== activeConversationId) return prev;
-+        return {
-+          ...prev,
-+          messages: prev.messages.slice(0, -2),
-+        };
-+      });
-       setIsLoading(false);
-     } finally {
-       // Only clear the controller if this is still the current request
-diff --git a/frontend/src/components/ChatInterface.jsx b/frontend/src/components/ChatInterface.jsx
-index 3c1eb65..3879816 100644
---- a/frontend/src/components/ChatInterface.jsx
-+++ b/frontend/src/components/ChatInterface.jsx
-@@ -137,7 +137,7 @@ export default function ChatInterface({
-                                         )}
- 
-                                         {/* Stage 1: Council Grid Visualization */}
--                                        {(msg.loading?.stage1 || (msg.stage1 && !msg.stage2)) && (
-+                                        {(msg.loading?.stage1 || msg.stage1) && (
-                                             <div className="stage-container">
-                                                 <div className="stage-header">
-                                                     <h3>Stage 1: Council Deliberation</h3>
-@@ -162,7 +162,7 @@ export default function ChatInterface({
-                                         )}
- 
-                                         {/* Stage 1 Results (Accordion/List - kept for detail view) */}
--                                        {(msg.loading?.stage1 || (msg.stage1 && !msg.stage2)) ? (
-+                                        {(msg.loading?.stage1 || msg.stage1) ? (
-                                             msg.loading?.stage1 && !msg.stage1 ? (
-                                                 <Stage1Skeleton />
-                                             ) : msg.stage1 && (

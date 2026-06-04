@@ -3,7 +3,7 @@
 ## Auto-generated signatures
 <!-- Updated by gen-context.js -->
 You are a coding assistant with complete knowledge of this codebase.
-The following code signatures were extracted by SigMap v6.5.1 on 2026-06-02T13:52:25.959Z.
+The following code signatures were extracted by SigMap v6.5.1 on 2026-06-04T10:22:30.275Z.
 
 These signatures represent every public function, class, and type in the project.
 Refer to them when answering questions about code structure, APIs, and implementation.
@@ -16,6 +16,8 @@ Before answering questions about specific code areas, suggest running `sigmap as
 electron\diagnostics-renderer.js              ~render  ~setStatus  ~readConfigForm  ~writeConfigForm
 electron\lib\diagnostics.js                   ~getDiagnosticsStatus
 electron\lib\integration-config.js            ~getIntegrationConfig  ~getEditableLocalConfig  ~saveLocalIntegrationConfig
+.github\copilot-instructions.md               +readJson  +readEnvValue  +tailFile  +requestText
+.github\gemini-context.md                     +readJson  +readEnvValue  +tailFile  +requestText
 ```
 
 ## .github
@@ -25,7 +27,7 @@ electron\lib\integration-config.js            ~getIntegrationConfig  ~getEditabl
 h2 Auto-generated signatures
 h2 SigMap commands
 h1 Code signatures
-h2 changes (last 5 commits — 1 second ago)
+h2 changes (last 5 commits — 2 seconds ago)
 h2 .github
 h3 .github\copilot-instructions.md
 h3 .github\gemini-context.md
@@ -34,11 +36,11 @@ h3 .github\workflows\validate.yml
 h2 electron
 h3 electron\diagnostics-renderer.js
 h3 electron\diagnostics.html
+h3 electron\lib\diagnostics.js
 h3 electron\lib\integration-config.js
 h3 electron\hotkeys-renderer.js
 h3 electron\hotkeys.html
 h3 electron\lib\config.js
-h3 electron\lib\diagnostics.js
 h3 electron\lib\launcher.js
 h3 electron\lib\logger.js
 h3 electron\lib\utils.js
@@ -53,7 +55,7 @@ h2 scratch
 ```
 h2 Auto-generated signatures
 h2 Code Signatures
-h2 changes (last 5 commits — 1 second ago)
+h2 changes (last 5 commits — 2 seconds ago)
 h2 .github
 h3 .github\copilot-instructions.md
 h3 .github\gemini-context.md
@@ -62,11 +64,11 @@ h3 .github\workflows\validate.yml
 h2 electron
 h3 electron\diagnostics-renderer.js
 h3 electron\diagnostics.html
+h3 electron\lib\diagnostics.js
 h3 electron\lib\integration-config.js
 h3 electron\hotkeys-renderer.js
 h3 electron\hotkeys.html
 h3 electron\lib\config.js
-h3 electron\lib\diagnostics.js
 h3 electron\lib\launcher.js
 h3 electron\lib\logger.js
 h3 electron\lib\utils.js
