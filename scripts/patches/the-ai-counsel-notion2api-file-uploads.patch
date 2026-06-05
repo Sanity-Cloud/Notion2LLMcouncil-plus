@@ -183,22 +183,23 @@ index 697fcfa..d9697c2 100644
  
      if body.execution_mode == "chat_only" and len(result.stage1) == 1:
 diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
-index 3f821f7..f879e6a 100644
+index 70b127a..0ae137e 100644
 --- a/frontend/src/App.jsx
 +++ b/frontend/src/App.jsx
-@@ -23,6 +23,11 @@ function finalizeTimers(timers = {}) {
- const isDefaultConversationTitle = (title) =>
-   !title || title === 'New Conversation' || title === 'Untitled Conversation';
+@@ -104,6 +104,12 @@ const buildAdvisorProgressMessage = (progress, existing = {}) => {
+   };
+ };
  
 +const isNotion2ApiSettings = (settings = {}) => {
 +  const marker = `${settings.custom_endpoint_name || ''} ${settings.custom_endpoint_url || ''}`.toLowerCase();
 +  return settings.enabled_providers?.custom === true && (marker.includes('notion') || marker.includes('127.0.0.1:8000') || marker.includes('localhost:8000'));
 +};
 +
- const deriveConversationTitle = (content) => {
-   if (!content || typeof content !== 'string') return 'Untitled Conversation';
- 
-@@ -144,6 +149,7 @@ function App() {
++
+ function App() {
+   const [conversations, setConversations] = useState([]);
+   const [currentConversationId, setCurrentConversationId] = useState(null);
+@@ -127,6 +133,7 @@ function App() {
    const [autoConverge, setAutoConverge] = useState(true);
    const [convergenceThreshold, setConvergenceThreshold] = useState(2);
    const [dateFormat, setDateFormat] = useState('auto');
@@ -206,7 +207,7 @@ index 3f821f7..f879e6a 100644
    const [sidebarOpen, setSidebarOpen] = useState(false);
    const [appMode, setAppMode] = useState(null); // null shows landing page
    const abortControllerRef = useRef(null);
-@@ -200,6 +206,7 @@ function App() {
+@@ -182,6 +189,7 @@ function App() {
        // Load execution mode preference
        setExecutionMode(settings.execution_mode || DEFAULT_EXECUTION_MODE);
        setSearchProvider(settings.search_provider || 'duckduckgo');
@@ -214,7 +215,7 @@ index 3f821f7..f879e6a 100644
  
        setCritiqueMode(settings.critique_mode || 'freeform');
        setDebateRounds(settings.debate_rounds || 1);
-@@ -273,6 +280,7 @@ function App() {
+@@ -255,6 +263,7 @@ function App() {
        setSearchProvider(settings.search_provider || 'duckduckgo');
        setAvailableSearchProviders(buildAvailableSearchProviders(settings));
        setExecutionMode(settings.execution_mode || DEFAULT_EXECUTION_MODE);
@@ -222,7 +223,7 @@ index 3f821f7..f879e6a 100644
  
        setCritiqueMode(settings.critique_mode || 'freeform');
        setDebateRounds(settings.debate_rounds || 1);
-@@ -874,7 +882,7 @@ function App() {
+@@ -839,7 +848,7 @@ function App() {
      }
    };
  
@@ -231,7 +232,7 @@ index 3f821f7..f879e6a 100644
      if (!currentConversationId) return;
  
      let effectiveMode = executionMode;
-@@ -934,7 +942,7 @@ function App() {
+@@ -882,7 +891,7 @@ function App() {
        }
  
        // Optimistically add user message to UI
@@ -240,7 +241,7 @@ index 3f821f7..f879e6a 100644
        setCurrentConversation((prev) => ({
          ...prev,
          id: activeConversationId, // transition draft ID to actual database UUID
-@@ -986,6 +994,7 @@ function App() {
+@@ -934,6 +943,7 @@ function App() {
          executionMode: effectiveMode,
          councilModels,
          chairmanModel: effectiveMode === 'full' ? chairmanModel : undefined,
@@ -248,7 +249,7 @@ index 3f821f7..f879e6a 100644
        };
        if (isDebate) {
          streamOptions.debateRounds = debateRounds;
-@@ -1645,6 +1654,7 @@ function App() {
+@@ -1585,6 +1595,7 @@ function App() {
                  onSendMessage={handleSendMessage}
                  onAbort={handleAbort}
                  isLoading={isLoading}

@@ -210,7 +210,6 @@ function Apply-SubmodulePatches {
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-new-chat-stream-race.patch"),
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-file-uploads.patch"),
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-upload-rate-limit.patch"),
-        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-save-export.patch"),
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-preflight-rate-limit.patch"),
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-openai-runtime-retry.patch")
     )
@@ -249,6 +248,13 @@ function Apply-SubmodulePatches {
     Write-Step "Submodule patches not applied or dirty; resetting and applying all patches"
     Push-Location $CouncilRoot
     try {
+        $DirtyStatus = cmd.exe /c "git status --porcelain" 2>$null
+        if ($DirtyStatus) {
+            Write-Warning "Council checkout has uncommitted changes; backing up before reset."
+            $BackupDir = "${CouncilRoot}.backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+            Copy-Item -Path $CouncilRoot -Destination $BackupDir -Recurse -Force
+            Write-Step "Backup created at: $BackupDir"
+        }
         cmd.exe /c "git checkout -- ."
         cmd.exe /c "git clean -fd"
     } finally {
