@@ -753,7 +753,19 @@ Write-Host "`nReady:"
 Write-Host "  Notion2API:        http://127.0.0.1:$NotionPort"
 Write-Host "  LLM Council API:   http://127.0.0.1:$CouncilBackendPort"
 Write-Host "  LLM Council UI:    http://127.0.0.1:$CouncilFrontendPort"
-Write-Host "  Logs:              $LogDir`n"
+Write-Host "  Logs:              $LogDir"
+
+# Provider Diagnostics Panel
+Write-Host "`nDiagnostics:"
+Write-Host "  Custom endpoint URL: http://127.0.0.1:$NotionPort/v1"
+$hasKey = -not [string]::IsNullOrWhiteSpace($notionApiKey)
+Write-Host "  API key present: $hasKey"
+if ($hasKey) {
+    $keyPrefix = $notionApiKey.Substring(0, [math]::Min(5, $notionApiKey.Length)) + "..."
+    Write-Host "  API key prefix: $keyPrefix"
+}
+Write-Host "  Save to Notion: $NotionPersistThreads"
+Write-Host "  Ephemeral deletion: $NotionDeleteEphemeralThreads`n"
 
 if (-not $NoBrowser) { Start-Process "http://127.0.0.1:$CouncilFrontendPort/" }
 

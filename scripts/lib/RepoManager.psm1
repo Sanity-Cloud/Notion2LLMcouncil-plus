@@ -203,17 +203,33 @@ function Apply-SubmodulePatches {
 
 
 
-    $PatchFiles = @(
-        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-model-icons.patch"),
-        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-provider-initial-setup.patch"),
-        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-first-message-title.patch"),
-        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-new-chat-stream-race.patch"),
-        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-file-uploads.patch"),
-        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-upload-rate-limit.patch"),
-        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-save-export.patch"),
-        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-preflight-rate-limit.patch"),
-        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-openai-runtime-retry.patch")
+    $PatchFilesList = @(
+        @{ Name="scripts\patches\the-ai-counsel-custom-model-icons.patch"; PrId=$null }
+        @{ Name="scripts\patches\the-ai-counsel-custom-provider-initial-setup.patch"; PrId=$null }
+        @{ Name="scripts\patches\the-ai-counsel-first-message-title.patch"; PrId=$null }
+        @{ Name="scripts\patches\the-ai-counsel-new-chat-stream-race.patch"; PrId=$null }
+        @{ Name="scripts\patches\the-ai-counsel-notion2api-file-uploads.patch"; PrId=6 }
+        @{ Name="scripts\patches\the-ai-counsel-notion2api-upload-rate-limit.patch"; PrId=$null }
+        @{ Name="scripts\patches\the-ai-counsel-notion2api-save-export.patch"; PrId=$null }
+        @{ Name="scripts\patches\the-ai-counsel-preflight-rate-limit.patch"; PrId=$null }
+        @{ Name="scripts\patches\the-ai-counsel-custom-openai-runtime-retry.patch"; PrId=5 }
     )
+
+    $PatchFiles = foreach ($p in $PatchFilesList) {
+        $patchPath = Join-Path $RepoRoot $p.Name
+
+        if (-not (Test-Path $patchPath)) {
+            Write-Warning "Patch file not found: $patchPath"
+            continue
+        }
+
+        if ($p.PrId -and (Test-PrMerged -PrId $p.PrId -RepoUrl $RemoteUrl)) {
+            Write-Host "Skipping $($p.Name) because upstream PR #$($p.PrId) is merged."
+            continue
+        }
+
+        $patchPath
+    }
 
     # 1. Get submodule commit
     $SubmoduleCommit = ""
@@ -225,15 +241,43 @@ function Apply-SubmodulePatches {
 
     # 2. Get hash of all patch files that exist
     $PatchHashes = ""
+    $LedgerEntries = @()
     foreach ($file in $PatchFiles) {
         if (Test-Path $file) {
             $hash = Get-Sha256Hash -Path $file
             $fileName = Split-Path $file -Leaf
             $PatchHashes += "$fileName=$hash`n"
+
+            # Identify PR number if mapped
+            $prId = $null
+            foreach ($p in $PatchFilesList) {
+                if (($p.Name -replace '\\', '/') -match ($fileName -replace '\\', '/')) {
+                    $prId = $p.PrId
+                    break
+                }
+            }
+
+            $LedgerEntries += @{
+                name = $fileName -replace "\.patch$", ""
+                file = "scripts/patches/$fileName"
+                status = "applied"
+                upstreamPr = $prId
+                supersededByMerge = $false
+            }
         }
     }
 
+    $LedgerObject = @{
+        base = "the-ai-counsel@$SubmoduleCommit"
+        patches = $LedgerEntries
+    }
+
     $ExpectedState = "SubmoduleCommit=$SubmoduleCommit`n$PatchHashes"
+
+    $LedgerFile = Join-Path $RepoRoot "patches.json"
+    $LedgerJson = $LedgerObject | ConvertTo-Json -Depth 5
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($LedgerFile, $LedgerJson, $utf8NoBom)
 
     $MarkerFile = Join-Path $CouncilRoot ".patches-applied"
     $CurrentState = ""
@@ -294,4 +338,91 @@ function Apply-SubmodulePatches {
     Write-Step "Patches successfully applied and marker file written"
 }
 
-Export-ModuleMember -Function Initialize-Repo, Get-Python, Update-RepoPatch, Apply-SubmodulePatches
+Export-ModuleMember -Function Initialize-Repo, Get-Python, Update-RepoPatch, Apply-SubmodulePatches, Test-PrMerged
+
+
+function Get-GitHubOwnerRepoFromRemoteUrl {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $RepoUrl
+    )
+
+    $url = $RepoUrl.Trim()
+
+    if ($url -match '^https://github\.com/(?<owner>[^/]+)/(?<repo>[^/]+?)(?:\.git)?/?$') {
+        return "$($Matches.owner)/$($Matches.repo)"
+    }
+
+    if ($url -match '^git@github\.com:(?<owner>[^/]+)/(?<repo>[^/]+?)(?:\.git)?$') {
+        return "$($Matches.owner)/$($Matches.repo)"
+    }
+
+    if ($url -match '^([^/\s]+)/([^/\s]+)$') {
+        return "$($Matches[1])/$($Matches[2])"
+    }
+
+    throw "Could not parse GitHub owner/repo from remote URL: $RepoUrl"
+}
+
+function Test-PrMerged {
+    param(
+        [Parameter(Mandatory = $true)]
+        [int] $PrId,
+
+        [Parameter(Mandatory = $true)]
+        [string] $RepoUrl
+    )
+
+    try {
+        $ownerRepo = Get-GitHubOwnerRepoFromRemoteUrl -RepoUrl $RepoUrl
+    }
+    catch {
+        Write-Warning "Could not determine GitHub repo for PR #$PrId. Assuming not merged. $($_.Exception.Message)"
+        return $false
+    }
+
+    $ghCommand = Get-Command gh -ErrorAction SilentlyContinue
+    if ($ghCommand) {
+        try {
+            $mergedText = & gh pr view $PrId `
+                --repo $ownerRepo `
+                --json merged `
+                --jq ".merged" 2>$null
+
+            if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($mergedText)) {
+                return ($mergedText.Trim().ToLowerInvariant() -eq "true")
+            }
+
+            Write-Warning "gh could not determine merge status for PR #$PrId in $ownerRepo. Falling back to GitHub API."
+        }
+        catch {
+            Write-Warning "gh failed while checking PR #$PrId in $ownerRepo. Falling back to GitHub API. $($_.Exception.Message)"
+        }
+    }
+
+    try {
+        $headers = @{
+            "Accept"               = "application/vnd.github+json"
+            "X-GitHub-Api-Version" = "2022-11-28"
+            "User-Agent"           = "Notion2Council-Launcher"
+        }
+
+        $token = $env:GH_TOKEN
+        if ([string]::IsNullOrWhiteSpace($token)) {
+            $token = $env:GITHUB_TOKEN
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($token)) {
+            $headers["Authorization"] = "Bearer $token"
+        }
+
+        $uri = "https://api.github.com/repos/$ownerRepo/pulls/$PrId"
+        $pr = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers -ErrorAction Stop
+
+        return -not [string]::IsNullOrWhiteSpace($pr.merged_at)
+    }
+    catch {
+        Write-Warning "Could not determine merge status for PR #$PrId in $ownerRepo. Assuming not merged. $($_.Exception.Message)"
+        return $false
+    }
+}
