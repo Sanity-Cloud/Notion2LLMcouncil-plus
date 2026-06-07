@@ -92,6 +92,53 @@ function Reset-PatchTargetPaths {
     }
 }
 
+
+function Test-PatchEquivalentPresent {
+    param(
+        [string]$Root,
+        [string]$PatchPath
+    )
+
+    if (-not $PatchPath) { return $false }
+
+    $leaf = Split-Path $PatchPath -Leaf
+    $customOpenAiPath = Join-Path $Root "backend\providers\custom_openai.py"
+    if (-not (Test-Path $customOpenAiPath)) { return $false }
+
+    $content = Get-Content -Raw -Path $customOpenAiPath
+
+    if ($leaf -eq "the-ai-counsel-custom-openai-runtime-retry.patch") {
+        $required = @(
+            "def _is_rate_limited",
+            "def _rate_limit_retry_config",
+            "debug_timeline",
+            "rate_limited",
+            "total_elapsed_seconds"
+        )
+        foreach ($symbol in $required) {
+            if ($content -notmatch [regex]::Escape($symbol)) { return $false }
+        }
+        return $true
+    }
+
+    if ($leaf -eq "the-ai-counsel-notion2api-upload-rate-limit.patch") {
+        $required = @(
+            "_ATTACHMENT_UPLOAD_SEMAPHORE",
+            "def _attachment_retry_config",
+            "def _rate_limit_retry_config",
+            "debug_timeline",
+            "rate_limited",
+            "total_elapsed_seconds"
+        )
+        foreach ($symbol in $required) {
+            if ($content -notmatch [regex]::Escape($symbol)) { return $false }
+        }
+        return $true
+    }
+
+    return $false
+}
+
 function Invoke-RepoPatchPostHooks {
     param(
         [string]$Root,
@@ -143,6 +190,11 @@ function Update-RepoPatch {
 
     if (-not (Test-Path $PatchPath)) { return }
 
+    if (Test-PatchEquivalentPresent -Root $Root -PatchPath $PatchPath) {
+        Write-Step "Skipping patch already integrated upstream: $Name"
+        return
+    }
+
     Push-Location $Root
     try {
         try {
@@ -151,14 +203,12 @@ function Update-RepoPatch {
                 Write-Step "Applying patch: $Name"
                 cmd.exe /c "git apply --ignore-whitespace `"$PatchPath`""
                 if ($LASTEXITCODE -ne 0) { throw "Failed to apply patch: $Name" }
-                Invoke-RepoPatchPostHooks -Root $Root -PatchPath $PatchPath -Name $Name
                 return
             }
 
             cmd.exe /c "git apply --reverse --check --ignore-whitespace `"$PatchPath`" 2>nul"
             if ($LASTEXITCODE -eq 0) {
                 Write-Step "Patch already applied: $Name"
-                Invoke-RepoPatchPostHooks -Root $Root -PatchPath $PatchPath -Name $Name
                 return
             }
 
@@ -172,7 +222,6 @@ function Update-RepoPatch {
                     Write-Step "Applying patch after reset: $Name"
                     cmd.exe /c "git apply --ignore-whitespace `"$PatchPath`""
                     if ($LASTEXITCODE -ne 0) { throw "Failed to apply patch after reset: $Name" }
-                    Invoke-RepoPatchPostHooks -Root $Root -PatchPath $PatchPath -Name $Name
                     return
                 }
             }
@@ -261,9 +310,8 @@ function Apply-SubmodulePatches {
         Pop-Location
     }
 
-    # Now apply the patches in strict order. The race patch post-hook applies
-    # the upload patch, and the upload patch post-hook applies the upload
-    # rate-limit guard.
+    # Now apply the patches in strict order. Hidden post-hook chaining is intentionally disabled.
+    # Stale/colliding PR-backed patches are skipped when equivalent code is already present.
     Update-RepoPatch `
         -Root $CouncilRoot `
         -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-model-icons.patch") `
@@ -301,4 +349,4 @@ function Apply-SubmodulePatches {
     Write-Step "Patches successfully applied and marker file written"
 }
 
-Export-ModuleMember -Function Initialize-Repo, Get-Python, Update-RepoPatch, Apply-SubmodulePatches
+Export-ModuleMember -Function Initialize-Repo, Get-Python, Update-RepoPatch, Apply-SubmodulePatches, Test-PatchEquivalentPresent
