@@ -241,43 +241,15 @@ function Apply-SubmodulePatches {
 
     # 2. Get hash of all patch files that exist
     $PatchHashes = ""
-    $LedgerEntries = @()
     foreach ($file in $PatchFiles) {
         if (Test-Path $file) {
             $hash = Get-Sha256Hash -Path $file
             $fileName = Split-Path $file -Leaf
             $PatchHashes += "$fileName=$hash`n"
-
-            # Identify PR number if mapped
-            $prId = $null
-            foreach ($p in $PatchFilesList) {
-                if (($p.Name -replace '\\', '/') -match ($fileName -replace '\\', '/')) {
-                    $prId = $p.PrId
-                    break
-                }
-            }
-
-            $LedgerEntries += @{
-                name = $fileName -replace "\.patch$", ""
-                file = "scripts/patches/$fileName"
-                status = "applied"
-                upstreamPr = $prId
-                supersededByMerge = $false
-            }
         }
     }
 
-    $LedgerObject = @{
-        base = "the-ai-counsel@$SubmoduleCommit"
-        patches = $LedgerEntries
-    }
-
     $ExpectedState = "SubmoduleCommit=$SubmoduleCommit`n$PatchHashes"
-
-    $LedgerFile = Join-Path $RepoRoot "patches.json"
-    $LedgerJson = $LedgerObject | ConvertTo-Json -Depth 5
-    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-    [System.IO.File]::WriteAllText($LedgerFile, $LedgerJson, $utf8NoBom)
 
     $MarkerFile = Join-Path $CouncilRoot ".patches-applied"
     $CurrentState = ""
@@ -300,38 +272,23 @@ function Apply-SubmodulePatches {
     }
 
     # Now apply the patches in strict order. The race patch post-hook applies
-    # the upload patch, and the upload patch post-hook applies the upload
-    # rate-limit guard.
-    Update-RepoPatch `
-        -Root $CouncilRoot `
-        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-model-icons.patch") `
-        -Name "LLM Council custom model brand icons" `
-        -Optional
-
-    Update-RepoPatch `
-        -Root $CouncilRoot `
-        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-provider-initial-setup.patch") `
-        -Name "LLM Council custom provider initial setup detection"
-
-    Update-RepoPatch `
-        -Root $CouncilRoot `
-        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-first-message-title.patch") `
-        -Name "LLM Council first message conversation titles"
-
-    Update-RepoPatch `
-        -Root $CouncilRoot `
-        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-new-chat-stream-race.patch") `
-        -Name "LLM Council new chat stream race guard"
-
-    Update-RepoPatch `
-        -Root $CouncilRoot `
-        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-preflight-rate-limit.patch") `
-        -Name "LLM Council preflight rate-limit retry and soft-fail"
-
-    Update-RepoPatch `
-        -Root $CouncilRoot `
-        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-openai-runtime-retry.patch") `
-        -Name "LLM Council custom OpenAI runtime 429 retry with backoff"
+    # Apply patches dynamically based on the authoritative PR-aware list
+    foreach ($p in $PatchFilesList) {
+        $patchPath = Join-Path $RepoRoot $p.Name
+        if ($PatchFiles -contains $patchPath) {
+            $isOptional = $p.Name -match "custom-model-icons.patch"
+            $cmdArgs = @{
+                Root = $CouncilRoot
+                PatchPath = $patchPath
+                Name = "LLM Council " + (Split-Path $patchPath -LeafBase).Replace("the-ai-counsel-", "").Replace("-", " ")
+            }
+            if ($isOptional) {
+                Update-RepoPatch @cmdArgs -Optional
+            } else {
+                Update-RepoPatch @cmdArgs
+            }
+        }
+    }
 
     # Write marker file if we got here successfully
     Set-Content -Path $MarkerFile -Value $ExpectedState -NoNewline
