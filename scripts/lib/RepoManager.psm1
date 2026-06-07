@@ -92,47 +92,6 @@ function Reset-PatchTargetPaths {
     }
 }
 
-function Invoke-RepoPatchPostHooks {
-    param(
-        [string]$Root,
-        [string]$PatchPath,
-        [string]$Name
-    )
-
-    $patchDir = Split-Path $PatchPath -Parent
-    $leaf = Split-Path $PatchPath -Leaf
-
-    if ($leaf -eq "the-ai-counsel-new-chat-stream-race.patch") {
-        $uploadPatch = Join-Path $patchDir "the-ai-counsel-notion2api-file-uploads.patch"
-        if (Test-Path $uploadPatch) {
-            Update-RepoPatch `
-                -Root $Root `
-                -PatchPath $uploadPatch `
-                -Name "LLM Council Notion2API file uploads"
-        }
-    }
-
-    if ($leaf -eq "the-ai-counsel-notion2api-file-uploads.patch") {
-        $rateLimitPatch = Join-Path $patchDir "the-ai-counsel-notion2api-upload-rate-limit.patch"
-        if (Test-Path $rateLimitPatch) {
-            Update-RepoPatch `
-                -Root $Root `
-                -PatchPath $rateLimitPatch `
-                -Name "LLM Council Notion2API upload rate-limit guard"
-        }
-    }
-
-    if ($leaf -eq "the-ai-counsel-notion2api-upload-rate-limit.patch") {
-        $saveExportPatch = Join-Path $patchDir "the-ai-counsel-notion2api-save-export.patch"
-        if (Test-Path $saveExportPatch) {
-            Update-RepoPatch `
-                -Root $Root `
-                -PatchPath $saveExportPatch `
-                -Name "LLM Council Notion2API save and export layer"
-        }
-    }
-}
-
 function Update-RepoPatch {
     param(
         [string]$Root,
@@ -151,15 +110,13 @@ function Update-RepoPatch {
                 Write-Step "Applying patch: $Name"
                 cmd.exe /c "git apply --ignore-whitespace `"$PatchPath`""
                 if ($LASTEXITCODE -ne 0) { throw "Failed to apply patch: $Name" }
-                Invoke-RepoPatchPostHooks -Root $Root -PatchPath $PatchPath -Name $Name
-                return
+                                return
             }
 
             cmd.exe /c "git apply --reverse --check --ignore-whitespace `"$PatchPath`" 2>nul"
             if ($LASTEXITCODE -eq 0) {
                 Write-Step "Patch already applied: $Name"
-                Invoke-RepoPatchPostHooks -Root $Root -PatchPath $PatchPath -Name $Name
-                return
+                                return
             }
 
             $targets = @(Get-PatchTargetPaths -PatchPath $PatchPath)
@@ -172,8 +129,7 @@ function Update-RepoPatch {
                     Write-Step "Applying patch after reset: $Name"
                     cmd.exe /c "git apply --ignore-whitespace `"$PatchPath`""
                     if ($LASTEXITCODE -ne 0) { throw "Failed to apply patch after reset: $Name" }
-                    Invoke-RepoPatchPostHooks -Root $Root -PatchPath $PatchPath -Name $Name
-                    return
+                                        return
                 }
             }
 
@@ -203,17 +159,33 @@ function Apply-SubmodulePatches {
 
 
 
-    $PatchFiles = @(
-        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-model-icons.patch"),
-        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-provider-initial-setup.patch"),
-        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-first-message-title.patch"),
-        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-new-chat-stream-race.patch"),
-        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-file-uploads.patch"),
-        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-upload-rate-limit.patch"),
-        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-save-export.patch"),
-        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-preflight-rate-limit.patch"),
-        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-openai-runtime-retry.patch")
+    $PatchFilesList = @(
+        @{ Name="scripts\patches\the-ai-counsel-custom-model-icons.patch"; PrId=$null }
+        @{ Name="scripts\patches\the-ai-counsel-custom-provider-initial-setup.patch"; PrId=$null }
+        @{ Name="scripts\patches\the-ai-counsel-first-message-title.patch"; PrId=$null }
+        @{ Name="scripts\patches\the-ai-counsel-new-chat-stream-race.patch"; PrId=$null }
+        @{ Name="scripts\patches\the-ai-counsel-notion2api-file-uploads.patch"; PrId=6 }
+        @{ Name="scripts\patches\the-ai-counsel-notion2api-upload-rate-limit.patch"; PrId=$null }
+        @{ Name="scripts\patches\the-ai-counsel-notion2api-save-export.patch"; PrId=$null }
+        @{ Name="scripts\patches\the-ai-counsel-preflight-rate-limit.patch"; PrId=$null }
+        @{ Name="scripts\patches\the-ai-counsel-custom-openai-runtime-retry.patch"; PrId=5 }
     )
+
+    $PatchFiles = foreach ($p in $PatchFilesList) {
+        $patchPath = Join-Path $RepoRoot $p.Name
+
+        if (-not (Test-Path $patchPath)) {
+            Write-Warning "Patch file not found: $patchPath"
+            continue
+        }
+
+        if ($p.PrId -and (Test-PrMerged -PrId $p.PrId -RepoUrl $RemoteUrl)) {
+            Write-Host "Skipping $($p.Name) because upstream PR #$($p.PrId) is merged."
+            continue
+        }
+
+        $patchPath
+    }
 
     # 1. Get submodule commit
     $SubmoduleCommit = ""
@@ -256,42 +228,115 @@ function Apply-SubmodulePatches {
     }
 
     # Now apply the patches in strict order. The race patch post-hook applies
-    # the upload patch, and the upload patch post-hook applies the upload
-    # rate-limit guard.
-    Update-RepoPatch `
-        -Root $CouncilRoot `
-        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-model-icons.patch") `
-        -Name "LLM Council custom model brand icons" `
-        -Optional
-
-    Update-RepoPatch `
-        -Root $CouncilRoot `
-        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-provider-initial-setup.patch") `
-        -Name "LLM Council custom provider initial setup detection"
-
-    Update-RepoPatch `
-        -Root $CouncilRoot `
-        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-first-message-title.patch") `
-        -Name "LLM Council first message conversation titles"
-
-    Update-RepoPatch `
-        -Root $CouncilRoot `
-        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-new-chat-stream-race.patch") `
-        -Name "LLM Council new chat stream race guard"
-
-    Update-RepoPatch `
-        -Root $CouncilRoot `
-        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-preflight-rate-limit.patch") `
-        -Name "LLM Council preflight rate-limit retry and soft-fail"
-
-    Update-RepoPatch `
-        -Root $CouncilRoot `
-        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-openai-runtime-retry.patch") `
-        -Name "LLM Council custom OpenAI runtime 429 retry with backoff"
+    # Apply patches dynamically based on the authoritative PR-aware list
+    foreach ($p in $PatchFilesList) {
+        $patchPath = Join-Path $RepoRoot $p.Name
+        if ($PatchFiles -contains $patchPath) {
+            $isOptional = $p.Name -match "custom-model-icons.patch"
+            $cmdArgs = @{
+                Root = $CouncilRoot
+                PatchPath = $patchPath
+                Name = "LLM Council " + (Split-Path $patchPath -LeafBase).Replace("the-ai-counsel-", "").Replace("-", " ")
+            }
+            if ($isOptional) {
+                Update-RepoPatch @cmdArgs -Optional
+            } else {
+                Update-RepoPatch @cmdArgs
+            }
+        }
+    }
 
     # Write marker file if we got here successfully
     Set-Content -Path $MarkerFile -Value $ExpectedState -NoNewline
     Write-Step "Patches successfully applied and marker file written"
 }
 
-Export-ModuleMember -Function Initialize-Repo, Get-Python, Update-RepoPatch, Apply-SubmodulePatches
+
+
+function Get-GitHubOwnerRepoFromRemoteUrl {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $RepoUrl
+    )
+
+    $url = $RepoUrl.Trim()
+
+    if ($url -match '^https://github\.com/(?<owner>[^/]+)/(?<repo>[^/]+?)(?:\.git)?/?$') {
+        return "$($Matches.owner)/$($Matches.repo)"
+    }
+
+    if ($url -match '^git@github\.com:(?<owner>[^/]+)/(?<repo>[^/]+?)(?:\.git)?$') {
+        return "$($Matches.owner)/$($Matches.repo)"
+    }
+
+    if ($url -match '^([^/\s]+)/([^/\s]+)$') {
+        return "$($Matches[1])/$($Matches[2])"
+    }
+
+    throw "Could not parse GitHub owner/repo from remote URL: $RepoUrl"
+}
+
+function Test-PrMerged {
+    param(
+        [Parameter(Mandatory = $true)]
+        [int] $PrId,
+
+        [Parameter(Mandatory = $true)]
+        [string] $RepoUrl
+    )
+
+    try {
+        $ownerRepo = Get-GitHubOwnerRepoFromRemoteUrl -RepoUrl $RepoUrl
+    }
+    catch {
+        Write-Warning "Could not determine GitHub repo for PR #$PrId. Assuming not merged. $($_.Exception.Message)"
+        return $false
+    }
+
+    $ghCommand = Get-Command gh -ErrorAction SilentlyContinue
+    if ($ghCommand) {
+        try {
+            $mergedText = & gh pr view $PrId `
+                --repo $ownerRepo `
+                --json merged `
+                --jq ".merged" 2>$null
+
+            if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($mergedText)) {
+                return ($mergedText.Trim().ToLowerInvariant() -eq "true")
+            }
+
+            Write-Warning "gh could not determine merge status for PR #$PrId in $ownerRepo. Falling back to GitHub API."
+        }
+        catch {
+            Write-Warning "gh failed while checking PR #$PrId in $ownerRepo. Falling back to GitHub API. $($_.Exception.Message)"
+        }
+    }
+
+    try {
+        $headers = @{
+            "Accept"               = "application/vnd.github+json"
+            "X-GitHub-Api-Version" = "2022-11-28"
+            "User-Agent"           = "Notion2Council-Launcher"
+        }
+
+        $token = $env:GH_TOKEN
+        if ([string]::IsNullOrWhiteSpace($token)) {
+            $token = $env:GITHUB_TOKEN
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($token)) {
+            $headers["Authorization"] = "Bearer $token"
+        }
+
+        $uri = "https://api.github.com/repos/$ownerRepo/pulls/$PrId"
+        $pr = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers -ErrorAction Stop
+
+        return -not [string]::IsNullOrWhiteSpace($pr.merged_at)
+    }
+    catch {
+        Write-Warning "Could not determine merge status for PR #$PrId in $ownerRepo. Assuming not merged. $($_.Exception.Message)"
+        return $false
+    }
+}
+
+Export-ModuleMember -Function Initialize-Repo, Get-Python, Update-RepoPatch, Apply-SubmodulePatches, Test-PrMerged
