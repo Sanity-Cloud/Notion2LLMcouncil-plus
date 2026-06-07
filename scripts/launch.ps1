@@ -760,10 +760,7 @@ Write-Host "`nDiagnostics:"
 Write-Host "  Custom endpoint URL: http://127.0.0.1:$NotionPort/v1"
 $hasKey = -not [string]::IsNullOrWhiteSpace($notionApiKey)
 Write-Host "  API key present: $hasKey"
-if ($hasKey) {
-    $keyPrefix = $notionApiKey.Substring(0, [math]::Min(5, $notionApiKey.Length)) + "..."
-    Write-Host "  API key prefix: $keyPrefix"
-}
+
 Write-Host "  Save to Notion: $NotionPersistThreads"
 Write-Host "  Ephemeral deletion: $NotionDeleteEphemeralThreads`n"
 

@@ -92,47 +92,6 @@ function Reset-PatchTargetPaths {
     }
 }
 
-function Invoke-RepoPatchPostHooks {
-    param(
-        [string]$Root,
-        [string]$PatchPath,
-        [string]$Name
-    )
-
-    $patchDir = Split-Path $PatchPath -Parent
-    $leaf = Split-Path $PatchPath -Leaf
-
-    if ($leaf -eq "the-ai-counsel-new-chat-stream-race.patch") {
-        $uploadPatch = Join-Path $patchDir "the-ai-counsel-notion2api-file-uploads.patch"
-        if (Test-Path $uploadPatch) {
-            Update-RepoPatch `
-                -Root $Root `
-                -PatchPath $uploadPatch `
-                -Name "LLM Council Notion2API file uploads"
-        }
-    }
-
-    if ($leaf -eq "the-ai-counsel-notion2api-file-uploads.patch") {
-        $rateLimitPatch = Join-Path $patchDir "the-ai-counsel-notion2api-upload-rate-limit.patch"
-        if (Test-Path $rateLimitPatch) {
-            Update-RepoPatch `
-                -Root $Root `
-                -PatchPath $rateLimitPatch `
-                -Name "LLM Council Notion2API upload rate-limit guard"
-        }
-    }
-
-    if ($leaf -eq "the-ai-counsel-notion2api-upload-rate-limit.patch") {
-        $saveExportPatch = Join-Path $patchDir "the-ai-counsel-notion2api-save-export.patch"
-        if (Test-Path $saveExportPatch) {
-            Update-RepoPatch `
-                -Root $Root `
-                -PatchPath $saveExportPatch `
-                -Name "LLM Council Notion2API save and export layer"
-        }
-    }
-}
-
 function Update-RepoPatch {
     param(
         [string]$Root,
@@ -151,15 +110,13 @@ function Update-RepoPatch {
                 Write-Step "Applying patch: $Name"
                 cmd.exe /c "git apply --ignore-whitespace `"$PatchPath`""
                 if ($LASTEXITCODE -ne 0) { throw "Failed to apply patch: $Name" }
-                Invoke-RepoPatchPostHooks -Root $Root -PatchPath $PatchPath -Name $Name
-                return
+                                return
             }
 
             cmd.exe /c "git apply --reverse --check --ignore-whitespace `"$PatchPath`" 2>nul"
             if ($LASTEXITCODE -eq 0) {
                 Write-Step "Patch already applied: $Name"
-                Invoke-RepoPatchPostHooks -Root $Root -PatchPath $PatchPath -Name $Name
-                return
+                                return
             }
 
             $targets = @(Get-PatchTargetPaths -PatchPath $PatchPath)
@@ -172,8 +129,7 @@ function Update-RepoPatch {
                     Write-Step "Applying patch after reset: $Name"
                     cmd.exe /c "git apply --ignore-whitespace `"$PatchPath`""
                     if ($LASTEXITCODE -ne 0) { throw "Failed to apply patch after reset: $Name" }
-                    Invoke-RepoPatchPostHooks -Root $Root -PatchPath $PatchPath -Name $Name
-                    return
+                                        return
                 }
             }
 
@@ -295,7 +251,6 @@ function Apply-SubmodulePatches {
     Write-Step "Patches successfully applied and marker file written"
 }
 
-Export-ModuleMember -Function Initialize-Repo, Get-Python, Update-RepoPatch, Apply-SubmodulePatches, Test-PrMerged
 
 
 function Get-GitHubOwnerRepoFromRemoteUrl {
@@ -383,3 +338,5 @@ function Test-PrMerged {
         return $false
     }
 }
+
+Export-ModuleMember -Function Initialize-Repo, Get-Python, Update-RepoPatch, Apply-SubmodulePatches, Test-PrMerged
