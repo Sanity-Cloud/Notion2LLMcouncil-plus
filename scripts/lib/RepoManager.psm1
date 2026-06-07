@@ -293,7 +293,8 @@ function Apply-SubmodulePatches {
     Update-RepoPatch `
         -Root $CouncilRoot `
         -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-openai-runtime-retry.patch") `
-        -Name "LLM Council custom OpenAI runtime 429 retry with backoff"
+        -Name "LLM Council custom OpenAI runtime 429 retry with backoff" `
+        -Optional
 
     # Write marker file if we got here successfully
     Set-Content -Path $MarkerFile -Value $ExpectedState -NoNewline
