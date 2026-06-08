@@ -121,6 +121,19 @@ function Test-PatchEquivalentPresent {
         return $true
     }
 
+    if ($leaf -eq "the-ai-counsel-notion-attachment-endpoint-guards.patch") {
+        $required = @(
+            "def _is_notion_attachment_endpoint",
+            "payload_attachments",
+            "notion_upload",
+            "use_notion_attachment_retry"
+        )
+        foreach ($symbol in $required) {
+            if ($content -notmatch [regex]::Escape($symbol)) { return $false }
+        }
+        return $true
+    }
+
     if ($leaf -eq "the-ai-counsel-notion2api-upload-rate-limit.patch") {
         $required = @(
             "_ATTACHMENT_UPLOAD_SEMAPHORE",
@@ -132,6 +145,12 @@ function Test-PatchEquivalentPresent {
         )
         foreach ($symbol in $required) {
             if ($content -notmatch [regex]::Escape($symbol)) { return $false }
+        }
+        $councilPath = Join-Path $Root "backend\council.py"
+        if (-not (Test-Path $councilPath)) { return $false }
+        $councilContent = Get-Content -Raw -Path $councilPath
+        if ($councilContent -notmatch 'attachments:\s*"List\[Dict\[str,\s*Any\]\]\s*\|\s*None"\s*=\s*None') {
+            return $false
         }
         return $true
     }
@@ -239,6 +258,59 @@ function Update-RepoPatch {
     }
 }
 
+function Test-CouncilPatchesPresent {
+    param(
+        [string]$CouncilRoot,
+        [string]$RepoRoot
+    )
+
+    # Probe the tail of the patch stack. Older probes (e.g. configurable-model-timeout
+    # on council.py) fail reverse-check once later patches touch the same file.
+    $probePatches = @(
+        "the-ai-counsel-notion-attachment-endpoint-guards.patch",
+        "the-ai-counsel-chat-input-layout.patch"
+    )
+
+    Push-Location $CouncilRoot
+    try {
+        foreach ($leaf in $probePatches) {
+            $probePatch = Join-Path $RepoRoot "scripts\patches\$leaf"
+            if (-not (Test-Path $probePatch)) { return $false }
+            cmd.exe /c "git apply --reverse --check --ignore-whitespace `"$probePatch`" 2>nul"
+            if ($LASTEXITCODE -ne 0) { return $false }
+        }
+        return $true
+    } finally {
+        Pop-Location
+    }
+}
+
+function Apply-Notion2ApiPatches {
+    param(
+        [string]$NotionRoot,
+        [string]$RepoRoot
+    )
+
+    $patchFiles = @(
+        (Join-Path $RepoRoot "scripts\patches\notion2api-search-metadata-web-only.patch"),
+        (Join-Path $RepoRoot "scripts\patches\notion2api-openai-compat-shim.patch")
+    )
+
+    foreach ($patchPath in $patchFiles) {
+        if (-not (Test-Path $patchPath)) { continue }
+        $leaf = Split-Path $patchPath -Leaf
+        $name = switch ($leaf) {
+            "notion2api-search-metadata-web-only.patch" { "Notion2API search_metadata web client only" }
+            "notion2api-openai-compat-shim.patch" { "Notion2API OpenAI-compat persona shim" }
+            default { $leaf }
+        }
+        Update-RepoPatch `
+            -Root $NotionRoot `
+            -PatchPath $patchPath `
+            -Name $name
+    }
+}
+
 function Apply-SubmodulePatches {
     param(
         [string]$CouncilRoot,
@@ -261,7 +333,16 @@ function Apply-SubmodulePatches {
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-upload-rate-limit.patch"),
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-preflight-rate-limit.patch"),
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-configurable-model-timeout.patch"),
-        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-openai-runtime-retry.patch")
+        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-openai-runtime-retry.patch"),
+        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-strip-reasoning-preamble.patch"),
+        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-model-timeout-query-default.patch"),
+        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-chairman-extended-timeout.patch"),
+        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-council-attachments-wireup.patch"),
+        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion-attachment-endpoint-guards.patch"),
+        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-debate-claim-extraction-timeout.patch"),
+        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-integration-fixes.patch"),
+        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-claim-verdict-render.patch"),
+        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-chat-input-layout.patch")
     )
 
     # 1. Get submodule commit
@@ -291,8 +372,13 @@ function Apply-SubmodulePatches {
     }
 
     if ($CurrentState -eq $ExpectedState) {
-        Write-Step "LLM Council patches already applied (matching marker file found)"
-        return
+        if (Test-CouncilPatchesPresent -CouncilRoot $CouncilRoot -RepoRoot $RepoRoot) {
+            Write-Step "LLM Council patches already applied (matching marker file found)"
+            return
+        }
+
+        Write-Warning "Patch marker matched but council checkout is missing patches; re-applying."
+        Remove-Item $MarkerFile -Force -ErrorAction SilentlyContinue
     }
 
     Write-Step "Submodule patches not applied or dirty; resetting and applying all patches"
@@ -361,9 +447,54 @@ function Apply-SubmodulePatches {
         -Name "LLM Council custom OpenAI runtime 429 retry with backoff" `
         -Optional
 
+    Update-RepoPatch `
+        -Root $CouncilRoot `
+        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-strip-reasoning-preamble.patch") `
+        -Name "LLM Council strip untagged reasoning preamble"
+
+    Update-RepoPatch `
+        -Root $CouncilRoot `
+        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-model-timeout-query-default.patch") `
+        -Name "LLM Council default query timeout from settings"
+
+    Update-RepoPatch `
+        -Root $CouncilRoot `
+        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-chairman-extended-timeout.patch") `
+        -Name "LLM Council chairman and stage 4 extended timeout"
+
+    Update-RepoPatch `
+        -Root $CouncilRoot `
+        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-council-attachments-wireup.patch") `
+        -Name "LLM Council stage1 attachments wireup"
+
+    Update-RepoPatch `
+        -Root $CouncilRoot `
+        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion-attachment-endpoint-guards.patch") `
+        -Name "LLM Council Notion2API attachment endpoint guards"
+
+    Update-RepoPatch `
+        -Root $CouncilRoot `
+        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-debate-claim-extraction-timeout.patch") `
+        -Name "LLM Council debate claim extraction extended timeout"
+
+    Update-RepoPatch `
+        -Root $CouncilRoot `
+        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-integration-fixes.patch") `
+        -Name "LLM Council Notion2API integration fixes"
+
+    Update-RepoPatch `
+        -Root $CouncilRoot `
+        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-claim-verdict-render.patch") `
+        -Name "LLM Council claim verdict structured render"
+
+    Update-RepoPatch `
+        -Root $CouncilRoot `
+        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-chat-input-layout.patch") `
+        -Name "LLM Council chat input layout clearance"
+
     # Write marker file if we got here successfully
     Set-Content -Path $MarkerFile -Value $ExpectedState -NoNewline
     Write-Step "Patches successfully applied and marker file written"
 }
 
-Export-ModuleMember -Function Initialize-Repo, Get-Python, Update-RepoPatch, Apply-SubmodulePatches, Test-PatchEquivalentPresent
+Export-ModuleMember -Function Initialize-Repo, Get-Python, Update-RepoPatch, Apply-Notion2ApiPatches, Apply-SubmodulePatches, Test-CouncilPatchesPresent, Test-PatchEquivalentPresent

@@ -50,27 +50,14 @@ if ($Build -or $Package) {
     npm run electron:build
 }
 
-Write-Host "==> Creating Start Menu shortcut"
-$RepoRootStr = $RepoRoot.ProviderPath
-$ShortcutPath = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Notion2Council.lnk"
-$TargetPath = Join-Path $RepoRootStr "release\win-unpacked\Notion2Council.exe"
-
-if (-not (Test-Path $TargetPath)) {
-    Write-Host "Unpacked executable not found. Running electron:pack to generate it..."
-    npm run electron:pack
+Write-Host "==> Creating Start Menu shortcut (dev launcher: Start-Notion2Council.ps1)"
+$shortcutScript = Join-Path $RepoRoot "scripts\install-start-menu-shortcut.ps1"
+if (-not (Test-Path $shortcutScript)) {
+    throw "Missing shortcut installer: $shortcutScript"
 }
-
-try {
-    $WshShell = New-Object -ComObject WScript.Shell
-    $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
-    $Shortcut.TargetPath = $TargetPath
-    $Shortcut.WorkingDirectory = $RepoRootStr
-    $Shortcut.Description = "Notion2Council Desktop App"
-    $Shortcut.IconLocation = "$TargetPath,0"
-    $Shortcut.Save()
-    Write-Host "Shortcut successfully created at: $ShortcutPath"
-} catch {
-    Write-Warning "Could not create Start Menu shortcut: $_"
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $shortcutScript
+if ($LASTEXITCODE -ne 0) {
+    throw "Start Menu shortcut install failed with exit code $LASTEXITCODE"
 }
 
 Write-Host ""
