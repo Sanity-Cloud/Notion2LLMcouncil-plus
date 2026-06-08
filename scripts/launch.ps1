@@ -476,6 +476,10 @@ function Set-CouncilSettings {
                 }
             }
             
+            if ($settings.PSObject.Properties["model_timeout_seconds"] -and [int]$settings.model_timeout_seconds -ne $ProviderRequestTimeoutSeconds) {
+                $modelsMatch = $false
+            }
+
             if ($modelsMatch) {
                 Write-Step "LLM Council settings are already up to date"
                 $needsUpdate = $false
@@ -544,6 +548,7 @@ function Set-CouncilSettings {
         $settings.custom_endpoint_name = $ProviderName
         $settings.custom_endpoint_url = $expectedUrl
         $settings.custom_endpoint_api_key = $NotionApiKey
+        $settings | Add-Member -MemberType NoteProperty -Name "model_timeout_seconds" -Value $ProviderRequestTimeoutSeconds -Force
         
         # Ensure enabled_providers exists and custom is set to true
         if (-not $settings.enabled_providers) {
@@ -706,6 +711,7 @@ if (-not ($BoundParameters -contains "CouncilFrontendPort")) { $CouncilFrontendP
 $ProviderName = Use-ConfigValue -Value (Get-ConfigProperty $Config @("provider", "name")) -Fallback "Notion2API"
 $ProviderUrlPath = Use-ConfigValue -Value (Get-ConfigProperty $Config @("provider", "urlPath")) -Fallback "/v1"
 $ProviderAutoRepair = [bool](Use-ConfigValue -Value (Get-ConfigProperty $Config @("provider", "autoRepair")) -Fallback $true)
+$ProviderRequestTimeoutSeconds = [int](Use-ConfigValue -Value (Get-ConfigProperty $Config @("provider", "requestTimeoutSeconds")) -Fallback 300)
 $NotionAppMode = Use-ConfigValue -Value (Get-ConfigProperty $Config @("notion", "appMode")) -Fallback "standard"
 $NotionAutoLogin = [bool](Use-ConfigValue -Value (Get-ConfigProperty $Config @("notion", "autoLogin")) -Fallback $true)
 $NotionLoginTimeoutSeconds = [int](Use-ConfigValue -Value (Get-ConfigProperty $Config @("notion", "loginTimeoutSeconds")) -Fallback 300)

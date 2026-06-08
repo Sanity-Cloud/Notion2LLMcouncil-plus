@@ -43,6 +43,7 @@
         "supportsStreaming": { "type": "boolean" },
         "autoRepair": { "type": "boolean" },
         "applyDefaultCouncil": { "type": "boolean" },
+        "requestTimeoutSeconds": { "type": "integer", "minimum": 30, "maximum": 1800 },
         "councilModels": { "type": "array", "items": { "type": "string" } },
         "chairmanModel": { "type": "string" },
         "councilMemberFilters": { "type": "object" },

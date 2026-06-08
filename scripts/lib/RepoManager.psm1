@@ -260,6 +260,7 @@ function Apply-SubmodulePatches {
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-file-uploads.patch"),
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-upload-rate-limit.patch"),
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-preflight-rate-limit.patch"),
+        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-configurable-model-timeout.patch"),
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-openai-runtime-retry.patch")
     )
 
@@ -335,8 +336,24 @@ function Apply-SubmodulePatches {
 
     Update-RepoPatch `
         -Root $CouncilRoot `
+        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-file-uploads.patch") `
+        -Name "LLM Council Notion2API file uploads"
+
+    Update-RepoPatch `
+        -Root $CouncilRoot `
+        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-upload-rate-limit.patch") `
+        -Name "LLM Council Notion2API upload rate-limit guard" `
+        -Optional
+
+    Update-RepoPatch `
+        -Root $CouncilRoot `
         -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-preflight-rate-limit.patch") `
         -Name "LLM Council preflight rate-limit retry and soft-fail"
+
+    Update-RepoPatch `
+        -Root $CouncilRoot `
+        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-configurable-model-timeout.patch") `
+        -Name "LLM Council configurable model timeout"
 
     Update-RepoPatch `
         -Root $CouncilRoot `

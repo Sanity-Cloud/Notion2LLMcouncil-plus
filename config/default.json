@@ -60,7 +60,8 @@
       "3": "remote"
     },
     "chairmanFilter": "remote",
-    "searchQueryFilter": "remote"
+    "searchQueryFilter": "remote",
+    "requestTimeoutSeconds": 300
   },
   "sigmap": {
     "scriptPath": ""

@@ -73,6 +73,7 @@ function getIntegrationConfig() {
   const providerApplyDefaultCouncil = getConfigValue(localConfig, defaultConfig, ['provider', 'applyDefaultCouncil'], false);
   const providerEnabledKey = getConfigValue(localConfig, defaultConfig, ['provider', 'enabledKey'], 'custom');
   const providerName = getConfigValue(localConfig, defaultConfig, ['provider', 'name'], 'Notion2API');
+  const providerRequestTimeoutSeconds = Number(getConfigValue(localConfig, defaultConfig, ['provider', 'requestTimeoutSeconds'], 300));
   const notionRoot = resolveRuntimePath(repoRoot, getConfigValue(localConfig, defaultConfig, ['notion', 'localRoot'], ''), 'vendor\\notion2api');
   const councilRoot = resolveRuntimePath(repoRoot, getConfigValue(localConfig, defaultConfig, ['council', 'localRoot'], ''), 'vendor\\the-ai-counsel');
   const settingsMode = getConfigValue(localConfig, defaultConfig, ['council', 'settingsMode'], 'auto');
@@ -107,6 +108,7 @@ function getIntegrationConfig() {
     providerUrl: `${notionBaseUrl}${providerUrlPath}`,
     providerName,
     providerEnabledKey,
+    providerRequestTimeoutSeconds,
     settingsMode,
     verifyProvider,
     askSmokeTest,
@@ -138,6 +140,7 @@ function getEditableLocalConfig() {
       notionSetUnreadState: current.notionSetUnreadState,
       notionDeleteEphemeralThreads: current.notionDeleteEphemeralThreads,
       providerApplyDefaultCouncil: current.providerApplyDefaultCouncil,
+      providerRequestTimeoutSeconds: current.providerRequestTimeoutSeconds,
       councilLocalRoot: current.councilRoot,
       councilBackendPort: current.councilBackendPort,
       councilFrontendPort: current.councilFrontendPort,
@@ -173,6 +176,7 @@ function saveLocalIntegrationConfig(values) {
       ...(existing.provider || {}),
       urlPath: values.providerUrlPath || '/v1',
       applyDefaultCouncil: Boolean(values.providerApplyDefaultCouncil),
+      requestTimeoutSeconds: Number(values.providerRequestTimeoutSeconds) || current.providerRequestTimeoutSeconds,
     },
   };
 

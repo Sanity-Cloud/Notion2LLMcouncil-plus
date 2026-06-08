@@ -1,0 +1,94 @@
+diff --git a/backend/council.py b/backend/council.py
+index d2ce519..d40d0a1 100644
+--- a/backend/council.py
++++ b/backend/council.py
+@@ -191,11 +191,12 @@ async def stage1_collect_responses(
+     yield len(models)
+ 
+     council_temp = settings.council_temperature
++    model_timeout = getattr(settings, "model_timeout_seconds", 300)
+ 
+     async def _query_safe(m: str):
+         try:
+             model_msgs = per_model_messages.get(m, messages) if per_model_messages else messages
+-            return m, await query_model(m, model_msgs, temperature=council_temp)
++            return m, await query_model(m, model_msgs, timeout=model_timeout, temperature=council_temp)
+         except Exception as e:
+             return m, {"error": True, "error_message": str(e)}
+ 
+@@ -342,10 +343,11 @@ async def stage2_collect_rankings(
+ 
+     # Use dedicated Stage 2 temperature (lower for consistent ranking output)
+     stage2_temp = settings.stage2_temperature
++    model_timeout = getattr(settings, "model_timeout_seconds", 300)
+ 
+     async def _query_safe(m: str):
+         try:
+-            return m, await query_model(m, messages, temperature=stage2_temp)
++            return m, await query_model(m, messages, timeout=model_timeout, temperature=stage2_temp)
+         except Exception as e:
+             return m, {"error": True, "error_message": str(e)}
+ 
+@@ -511,9 +513,10 @@ async def stage3_synthesize_final(
+     # Query the chairman model with error handling
+     chairman_model = chairman_override if chairman_override else get_chairman_model()
+     chairman_temp = settings.chairman_temperature
++    model_timeout = getattr(settings, "model_timeout_seconds", 300)
+ 
+     try:
+-        response = await query_model(chairman_model, messages, temperature=chairman_temp)
++        response = await query_model(chairman_model, messages, timeout=model_timeout, temperature=chairman_temp)
+ 
+         # Check for error in response
+         if response is None or response.get('error'):
+diff --git a/backend/main.py b/backend/main.py
+index 697fcfa..ed296aa 100644
+--- a/backend/main.py
++++ b/backend/main.py
+@@ -1417,6 +1417,9 @@ class UpdateSettingsRequest(BaseModel):
+     chairman_temperature: Optional[float] = None
+     stage2_temperature: Optional[float] = None
+ 
++    # Timeout Settings
++    model_timeout_seconds: Optional[int] = None
++
+     # Display Preferences
+     date_format: Optional[str] = None
+     response_language: Optional[str] = None
+@@ -1509,6 +1512,9 @@ async def get_app_settings():
+         "chairman_temperature": settings.chairman_temperature,
+         "stage2_temperature": settings.stage2_temperature,
+ 
++        # Timeout Settings
++        "model_timeout_seconds": settings.model_timeout_seconds,
++
+         # Prompts
+         "stage1_prompt": settings.stage1_prompt,
+         "stage2_prompt": settings.stage2_prompt,
+@@ -1739,6 +1745,12 @@ async def update_app_settings(request: UpdateSettingsRequest):
+     if request.stage2_temperature is not None:
+         updates["stage2_temperature"] = request.stage2_temperature
+ 
++    # Timeout Settings
++    if request.model_timeout_seconds is not None:
++        if request.model_timeout_seconds < 30 or request.model_timeout_seconds > 1800:
++            raise HTTPException(status_code=400, detail="model_timeout_seconds must be between 30 and 1800")
++        updates["model_timeout_seconds"] = request.model_timeout_seconds
++
+     if request.date_format is not None:
+         valid_formats = ("auto", "MM/DD/YYYY", "DD/MM/YYYY", "YYYY-MM-DD")
+         if request.date_format not in valid_formats:
+diff --git a/backend/settings.py b/backend/settings.py
+index 0b8637e..34378ed 100644
+--- a/backend/settings.py
++++ b/backend/settings.py
+@@ -153,6 +153,9 @@ class Settings(BaseModel):
+     council_temperature: float = 0.5
+     chairman_temperature: float = 0.4
+     stage2_temperature: float = 0.3  # Lower for consistent ranking output
++
++    # Timeout Settings
++    model_timeout_seconds: int = 300
+     
+     # Remote/Local filters
+     council_member_filters: Optional[Dict[int, str]] = None
