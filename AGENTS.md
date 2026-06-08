@@ -436,12 +436,10 @@ Do not change the distribution strategy without updating `README.md`, `DEVELOPME
 | To query by topic | `sigmap --query "<topic>"` |
 
 Always run `sigmap ask` or `sigmap --query` before searching for files relevant to a task.
-## changes (last 5 commits — 1 second ago)
+## changes (last 5 commits — 2 seconds ago)
 ```
-electron\lib\diagnostics.js                   ~getDiagnosticsStatus
-electron\main.js                              ~getActiveRuntimeUrls  ~waitForReadyRuntimeUrls  ~isRuntimeReady
-.github\copilot-instructions.md               +readJson  +readEnvValue  +tailFile  +requestText
-.github\gemini-context.md                     +readJson  +readEnvValue  +tailFile  +requestText
+.github\copilot-instructions.md               +syncNotionPersistenceControls  +readJson  +readEnvValue  +tailFile
+.github\gemini-context.md                     +syncNotionPersistenceControls  +readJson  +readEnvValue  +tailFile
 ```
 
 ## .github
@@ -451,57 +449,57 @@ electron\main.js                              ~getActiveRuntimeUrls  ~waitForRea
 h2 Auto-generated signatures
 h2 SigMap commands
 h1 Code signatures
-h2 changes (last 5 commits — 2 seconds ago)
 h2 .github
+h3 .github\workflows\release.yml
 h3 .github\copilot-instructions.md
 h3 .github\gemini-context.md
-h3 .github\workflows\release.yml
 h3 .github\workflows\validate.yml
 h2 electron
-h3 electron\lib\diagnostics.js
-h3 electron\lib\integration-config.js
-h3 electron\main.js
 h3 electron\diagnostics-renderer.js
 h3 electron\diagnostics.html
+h3 electron\lib\diagnostics.js
+h3 electron\lib\integration-config.js
 h3 electron\hotkeys-renderer.js
 h3 electron\hotkeys.html
 h3 electron\lib\config.js
 h3 electron\lib\launcher.js
 h3 electron\lib\logger.js
 h3 electron\lib\utils.js
+h3 electron\main.js
 h3 electron\windows\diagnostics.js
 h3 electron\windows\hotkeys.js
 h3 electron\windows\main.js
 h2 scratch
+h3 scratch\0001-fix-strip-reasoning-tail-only-at-the-end-of-response.patch
 ```
 
 ### .github\gemini-context.md
 ```
 h2 Auto-generated signatures
 h2 Code Signatures
-h2 changes (last 5 commits — 2 seconds ago)
 h2 .github
+h3 .github\workflows\release.yml
 h3 .github\copilot-instructions.md
 h3 .github\gemini-context.md
-h3 .github\workflows\release.yml
 h3 .github\workflows\validate.yml
 h2 electron
-h3 electron\lib\diagnostics.js
-h3 electron\lib\integration-config.js
-h3 electron\main.js
 h3 electron\diagnostics-renderer.js
 h3 electron\diagnostics.html
+h3 electron\lib\diagnostics.js
+h3 electron\lib\integration-config.js
 h3 electron\hotkeys-renderer.js
 h3 electron\hotkeys.html
 h3 electron\lib\config.js
 h3 electron\lib\launcher.js
 h3 electron\lib\logger.js
 h3 electron\lib\utils.js
+h3 electron\main.js
 h3 electron\windows\diagnostics.js
 h3 electron\windows\hotkeys.js
 h3 electron\windows\main.js
 h2 scratch
 h3 scratch\0001-fix-strip-reasoning-tail-only-at-the-end-of-response.patch
+h3 scratch\regenerate_patches.py
 ```
 
 ### .github\workflows\release.yml
@@ -518,58 +516,9 @@ job: validate
 
 ## electron
 
-### electron\lib\diagnostics.js
-```
-module.exports = { getDiagnosticsStatus }
-function readJson(filePath)
-function readEnvValue(filePath, name)
-function tailFile(filePath, maxChars = 4000)
-function requestText(url, options = {})
-function requestJsonPost(url, bodyObject, options = {})
-function titleContains(body, expectedTitle)
-async function testService(name, url, options = {})
-async function getDiagnosticsStatus()
-```
-
-### electron\lib\integration-config.js
-```
-module.exports = { getIntegrationConfig, getEditableLocalConfig, saveLocalIntegrationConfig }
-function readJsonFile(filePath)
-function getNested(source, parts)
-function getConfigValue(localConfig, defaultConfig, parts, fallback)
-function getDefaultConfigPath(repoRoot)
-function getLocalConfigPath(repoRoot)
-function resolveRuntimePath(repoRoot, value, fallbackRelative)
-function getIntegrationConfig()
-function getEditableLocalConfig()
-function saveLocalIntegrationConfig(values)
-```
-
-### electron\main.js
-```
-async function focusChatInput(text, submit = false)
-async function ensureChatInputReady()
-async function clearCouncilUiStorage()
-async function getActiveRuntimeUrls(timeoutMs = 90000)
-async function isRuntimeReady(urls, timeoutMs = 2500)
-async function waitForReadyRuntimeUrls()
-async function waitForReadyNotionUrls()
-async function openNotion2ApiBrowser()
-async function openNotion2ApiDocsBrowser()
-async function openChat()
-async function openChatWithClipboard()
-async function createNewChatInputReady()
-async function openNewChat()
-async function openNewChatWithClipboard()
-function showAboutDialog()
-function createTray()
-function refreshTrayMenu()
-function setApplicationMenu()
-function registerHotkeys()
-```
-
 ### electron\diagnostics-renderer.js
 ```
+function syncNotionPersistenceControls()
 function setStatus(text)
 function formatValue(value)
 function renderDefinitionList(el, entries)
@@ -609,6 +558,20 @@ input#providerApplyDefaultCouncil
 button#saveConfig
 ```
 
+### electron\lib\integration-config.js
+```
+module.exports = { getIntegrationConfig, getEditableLocalConfig, saveLocalIntegrationConfig }
+function readJsonFile(filePath)
+function getNested(source, parts)
+function getConfigValue(localConfig, defaultConfig, parts, fallback)
+function getDefaultConfigPath(repoRoot)
+function getLocalConfigPath(repoRoot)
+function resolveRuntimePath(repoRoot, value, fallbackRelative)
+function getIntegrationConfig()
+function getEditableLocalConfig()
+function saveLocalIntegrationConfig(values)
+```
+
 ### electron\hotkeys-renderer.js
 ```
 function setStatus(text, kind = '')
@@ -643,6 +606,20 @@ module.exports = { defaultHotkeys, getHotkeyConfigPath, readHotkeys, writeHotkey
 function getHotkeyConfigPath()
 function readHotkeys()
 function writeHotkeys(hotkeys)
+```
+
+### electron\lib\diagnostics.js
+```
+module.exports = { getDiagnosticsStatus }
+function readJson(filePath)
+function readEnvValue(filePath, name)
+function tailFile(filePath, maxChars = 4000)
+function requestText(url, options = {})
+function requestJsonPost(url, bodyObject, options = {})
+function getCouncilSmokePayload(config, options = {})
+function titleContains(body, expectedTitle)
+async function testService(name, url, options = {})
+async function getDiagnosticsStatus()
 ```
 
 ### electron\lib\launcher.js
@@ -682,6 +659,29 @@ function waitForUrl(url, timeoutMs = 90000, options = {})
 function waitForRuntimeState(statePath, timeoutMs = 90000)
 ```
 
+### electron\main.js
+```
+async function focusChatInput(text, submit = false)
+async function ensureChatInputReady()
+async function clearCouncilUiStorage()
+async function getActiveRuntimeUrls(timeoutMs = 90000)
+async function isRuntimeReady(urls, timeoutMs = 2500)
+async function waitForReadyRuntimeUrls()
+async function waitForReadyNotionUrls()
+async function openNotion2ApiBrowser()
+async function openNotion2ApiDocsBrowser()
+async function openChat()
+async function openChatWithClipboard()
+async function createNewChatInputReady()
+async function openNewChat()
+async function openNewChatWithClipboard()
+function showAboutDialog()
+function createTray()
+function refreshTrayMenu()
+function setApplicationMenu()
+function registerHotkeys()
+```
+
 ### electron\windows\diagnostics.js
 ```
 module.exports = { openDiagnostics }
@@ -708,4 +708,10 @@ function toggleMainWindow()
 ### scratch\0001-fix-strip-reasoning-tail-only-at-the-end-of-response.patch
 ```
 def test_strip_tool_call_json(self):
+```
+
+### scratch\regenerate_patches.py
+```
+def run_cmd(cmd, cwd, check)
+def main()
 ```

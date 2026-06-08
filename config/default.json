@@ -15,7 +15,7 @@
   },
   "council": {
     "localRoot": "vendor\\the-ai-counsel",
-    "repoUrl": "https://github.com/Sanity-Cloud/the-ai-counsel.git",
+    "repoUrl": "https://github.com/jacob-bd/the-ai-counsel.git",
     "branch": "main",
     "backendPort": 8001,
     "frontendPort": 5173,
