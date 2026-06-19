@@ -243,7 +243,31 @@ function stopStack() {
   return runPowerShell(getScriptPath('launch.ps1'), args);
 }
 
+function restartStack({ noBrowser = true } = {}) {
+  appendLog('[launcher] restartStack: stopping services before restart');
+  const stopProcess = stopStack();
+  let restarted = false;
+
+  const startAgain = () => {
+    if (restarted) return;
+    restarted = true;
+    appendLog('[launcher] restartStack: starting services');
+    setTimeout(() => startStack({ noBrowser }), 750);
+  };
+
+  if (!stopProcess || typeof stopProcess.once !== 'function') {
+    startAgain();
+    return stopProcess;
+  }
+
+  stopProcess.once('exit', startAgain);
+  stopProcess.once('error', startAgain);
+  setTimeout(startAgain, 15000);
+  return stopProcess;
+}
+
 module.exports = {
   startStack,
-  stopStack
+  stopStack,
+  restartStack
 };

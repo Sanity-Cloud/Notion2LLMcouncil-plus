@@ -6,7 +6,7 @@ const fs = require('fs');
 const { appendLog } = require('./lib/logger');
 const { readHotkeys, writeHotkeys, defaultHotkeys, getHotkeyConfigPath } = require('./lib/config');
 const { waitForUrl, waitForRuntimeState } = require('./lib/utils');
-const { startStack, stopStack } = require('./lib/launcher');
+const { startStack, stopStack, restartStack } = require('./lib/launcher');
 const { getIntegrationConfig, getEditableLocalConfig, saveLocalIntegrationConfig } = require('./lib/integration-config');
 const { getDiagnosticsStatus } = require('./lib/diagnostics');
 const { createMainWindow, getMainWindow, showMainWindow, toggleMainWindow } = require('./windows/main');
@@ -332,6 +332,14 @@ async function openNewChatWithClipboard() {
   }
 }
 
+function restartApplication() {
+  appendLog('Restarting Electron application without stopping background services');
+  isQuitting = true;
+  app.isQuitting = true;
+  app.relaunch();
+  app.exit(0);
+}
+
 
 function showAboutDialog() {
   const mainWindow = getMainWindow();
@@ -384,8 +392,10 @@ function refreshTrayMenu() {
     { label: 'Open Service Logs', click: () => { shell.openPath(getIntegrationConfig().logsDir); } },
     { type: 'separator' },
     { label: 'Start Stack', click: () => startStack({ noBrowser: true }) },
+    { label: 'Restart Stack', click: () => restartStack({ noBrowser: true }) },
     { label: 'Stop Stack', click: stopStack },
     { type: 'separator' },
+    { label: 'Restart Application', click: restartApplication },
     { label: 'Quit', click: () => app.quit() },
   ]));
 }
@@ -413,6 +423,11 @@ function setApplicationMenu() {
         }
       },
       { type: 'separator' },
+      { label: 'Start Stack', click: () => startStack({ noBrowser: true }) },
+      { label: 'Restart Stack', click: () => restartStack({ noBrowser: true }) },
+      { label: 'Stop Stack', click: stopStack },
+      { type: 'separator' },
+      { label: 'Restart Application', click: restartApplication },
       { label: 'Quit', click: () => app.quit() },
     ] },
     { label: 'View', submenu: [
