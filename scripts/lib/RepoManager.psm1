@@ -102,6 +102,29 @@ function Test-PatchEquivalentPresent {
     if (-not $PatchPath) { return $false }
 
     $leaf = Split-Path $PatchPath -Leaf
+
+    if ($leaf -eq "notion2api-search-metadata-web-only.patch") {
+        $chatPath = Join-Path $Root "app\api\chat.py"
+        if (-not (Test-Path $chatPath)) { return $false }
+        $chatContent = Get-Content -Raw -Path $chatPath
+        $required = @(
+            "def _emit_search_metadata_for_client",
+            "def _probe_match_candidates",
+            "last_user_content = _last_user_message_content"
+        )
+        foreach ($symbol in $required) {
+            if ($chatContent -notmatch [regex]::Escape($symbol)) { return $false }
+        }
+        return $true
+    }
+
+    if ($leaf -eq "notion2api-drop-current-user-request-label.patch") {
+        $conversationPath = Join-Path $Root "app\conversation.py"
+        if (-not (Test-Path $conversationPath)) { return $false }
+        $conversationContent = Get-Content -Raw -Path $conversationPath
+        return $conversationContent -notmatch '\[Current user request\]'
+    }
+
     $customOpenAiPath = Join-Path $Root "backend\providers\custom_openai.py"
     if (-not (Test-Path $customOpenAiPath)) { return $false }
 
@@ -132,6 +155,34 @@ function Test-PatchEquivalentPresent {
             if ($content -notmatch [regex]::Escape($symbol)) { return $false }
         }
         return $true
+    }
+
+    if ($leaf -eq "the-ai-counsel-stage1-attachments-wireup.patch") {
+        $councilPath = Join-Path $Root "backend\council.py"
+        if (-not (Test-Path $councilPath)) { return $false }
+        $councilContent = Get-Content -Raw -Path $councilPath
+        $required = @(
+            "attachments: List[Dict[str, Any]] | None = None",
+            "attachments=attachments"
+        )
+        foreach ($symbol in $required) {
+            if ($councilContent -notmatch [regex]::Escape($symbol)) { return $false }
+        }
+        return $true
+    }
+
+    if ($leaf -eq "the-ai-counsel-notion2api-stage1-stagger.patch") {
+        $councilPath = Join-Path $Root "backend\council.py"
+        if (-not (Test-Path $councilPath)) { return $false }
+        $councilContent = Get-Content -Raw -Path $councilPath
+        return $councilContent -match "_NOTION_STAGGER_SECONDS" -and $councilContent -match "_vary_notion_thread_title"
+    }
+
+    if ($leaf -eq "the-ai-counsel-notion2api-preflight-skip.patch") {
+        $preflightPath = Join-Path $Root "backend\model_preflight.py"
+        if (-not (Test-Path $preflightPath)) { return $false }
+        $preflightContent = Get-Content -Raw -Path $preflightPath
+        return $preflightContent -match "def _skip_notion2api_preflight"
     }
 
     if ($leaf -eq "the-ai-counsel-notion2api-upload-rate-limit.patch") {
@@ -293,7 +344,8 @@ function Apply-Notion2ApiPatches {
 
     $patchFiles = @(
         (Join-Path $RepoRoot "scripts\patches\notion2api-search-metadata-web-only.patch"),
-        (Join-Path $RepoRoot "scripts\patches\notion2api-openai-compat-shim.patch")
+        (Join-Path $RepoRoot "scripts\patches\notion2api-openai-compat-shim.patch"),
+        (Join-Path $RepoRoot "scripts\patches\notion2api-drop-current-user-request-label.patch")
     )
 
     foreach ($patchPath in $patchFiles) {
@@ -302,6 +354,7 @@ function Apply-Notion2ApiPatches {
         $name = switch ($leaf) {
             "notion2api-search-metadata-web-only.patch" { "Notion2API search_metadata web client only" }
             "notion2api-openai-compat-shim.patch" { "Notion2API OpenAI-compat persona shim" }
+            "notion2api-drop-current-user-request-label.patch" { "Notion2API drop Current user request label" }
             default { $leaf }
         }
         Update-RepoPatch `
@@ -332,12 +385,14 @@ function Apply-SubmodulePatches {
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-file-uploads.patch"),
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-upload-rate-limit.patch"),
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-preflight-rate-limit.patch"),
+        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-preflight-skip.patch"),
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-configurable-model-timeout.patch"),
+        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-stage1-attachments-wireup.patch"),
+        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-stage1-stagger.patch"),
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-custom-openai-runtime-retry.patch"),
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-strip-reasoning-preamble.patch"),
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-model-timeout-query-default.patch"),
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-chairman-extended-timeout.patch"),
-        (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-council-attachments-wireup.patch"),
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion-attachment-endpoint-guards.patch"),
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-debate-claim-extraction-timeout.patch"),
         (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-integration-fixes.patch"),
@@ -438,8 +493,23 @@ function Apply-SubmodulePatches {
 
     Update-RepoPatch `
         -Root $CouncilRoot `
+        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-preflight-skip.patch") `
+        -Name "LLM Council Notion2API preflight skip"
+
+    Update-RepoPatch `
+        -Root $CouncilRoot `
         -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-configurable-model-timeout.patch") `
         -Name "LLM Council configurable model timeout"
+
+    Update-RepoPatch `
+        -Root $CouncilRoot `
+        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-stage1-attachments-wireup.patch") `
+        -Name "LLM Council stage1 attachments wireup"
+
+    Update-RepoPatch `
+        -Root $CouncilRoot `
+        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-notion2api-stage1-stagger.patch") `
+        -Name "LLM Council Notion2API stage1 stagger"
 
     Update-RepoPatch `
         -Root $CouncilRoot `
@@ -461,11 +531,6 @@ function Apply-SubmodulePatches {
         -Root $CouncilRoot `
         -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-chairman-extended-timeout.patch") `
         -Name "LLM Council chairman and stage 4 extended timeout"
-
-    Update-RepoPatch `
-        -Root $CouncilRoot `
-        -PatchPath (Join-Path $RepoRoot "scripts\patches\the-ai-counsel-council-attachments-wireup.patch") `
-        -Name "LLM Council stage1 attachments wireup"
 
     Update-RepoPatch `
         -Root $CouncilRoot `

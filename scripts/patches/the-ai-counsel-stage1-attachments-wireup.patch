@@ -1,0 +1,91 @@
+diff --git a/backend/council.py b/backend/council.py
+index d2ce519..d1ca607 100644
+--- a/backend/council.py
++++ b/backend/council.py
+@@ -57,10 +57,21 @@ def get_provider_for_model(model_id: str) -> Any:
+     return PROVIDERS["openrouter"]
+ 
+ 
+-async def query_model(model: str, messages: List[Dict[str, str]], timeout: float = 120.0, temperature: float = 0.7) -> Dict[str, Any]:
++async def query_model(
++    model: str,
++    messages: List[Dict[str, str]],
++    timeout: float = 120.0,
++    temperature: float = 0.7,
++    attachments: List[Dict[str, Any]] | None = None,
++) -> Dict[str, Any]:
+     """Dispatch query to appropriate provider."""
+     provider = get_provider_for_model(model)
+-    response = await provider.query(model, messages, timeout, temperature)
++    try:
++        response = await provider.query(
++            model, messages, timeout, temperature, attachments=attachments
++        )
++    except TypeError:
++        response = await provider.query(model, messages, timeout, temperature)
+     if isinstance(response, dict):
+         return await attach_cost(model, response)
+     return response
+@@ -136,7 +147,8 @@ async def stage1_collect_responses(
+     models_override: "List[str] | None" = None,
+     history: "List[Dict[str, str]] | None" = None,
+     messages_override: "List[Dict[str, str]] | None" = None,
+-    per_model_messages: "Dict[str, List[Dict[str, str]]] | None" = None
++    per_model_messages: "Dict[str, List[Dict[str, str]]] | None" = None,
++    attachments: List[Dict[str, Any]] | None = None,
+ ) -> Any:
+     """
+     Stage 1: Collect individual responses from all council models.
+@@ -149,6 +161,7 @@ async def stage1_collect_responses(
+         history: Prior conversation turns as [{role, content}, ...] for multi-turn
+         messages_override: Optional messages override to bypass default prompt
+         per_model_messages: Optional messages per model
++        attachments: Optional file attachments for Notion2API uploads
+ 
+     Yields:
+         - First yield: total_models (int)
+@@ -191,11 +204,18 @@ async def stage1_collect_responses(
+     yield len(models)
+ 
+     council_temp = settings.council_temperature
++    model_timeout = getattr(settings, "model_timeout_seconds", 300)
+ 
+     async def _query_safe(m: str):
+         try:
+             model_msgs = per_model_messages.get(m, messages) if per_model_messages else messages
+-            return m, await query_model(m, model_msgs, temperature=council_temp)
++            return m, await query_model(
++                m,
++                model_msgs,
++                timeout=model_timeout,
++                temperature=council_temp,
++                attachments=attachments,
++            )
+         except Exception as e:
+             return m, {"error": True, "error_message": str(e)}
+ 
+@@ -342,10 +362,11 @@ async def stage2_collect_rankings(
+ 
+     # Use dedicated Stage 2 temperature (lower for consistent ranking output)
+     stage2_temp = settings.stage2_temperature
++    model_timeout = getattr(settings, "model_timeout_seconds", 300)
+ 
+     async def _query_safe(m: str):
+         try:
+-            return m, await query_model(m, messages, temperature=stage2_temp)
++            return m, await query_model(m, messages, timeout=model_timeout, temperature=stage2_temp)
+         except Exception as e:
+             return m, {"error": True, "error_message": str(e)}
+ 
+@@ -511,9 +532,10 @@ async def stage3_synthesize_final(
+     # Query the chairman model with error handling
+     chairman_model = chairman_override if chairman_override else get_chairman_model()
+     chairman_temp = settings.chairman_temperature
++    model_timeout = getattr(settings, "model_timeout_seconds", 300)
+ 
+     try:
+-        response = await query_model(chairman_model, messages, temperature=chairman_temp)
++        response = await query_model(chairman_model, messages, timeout=model_timeout, temperature=chairman_temp)
+ 
+         # Check for error in response
+         if response is None or response.get('error'):

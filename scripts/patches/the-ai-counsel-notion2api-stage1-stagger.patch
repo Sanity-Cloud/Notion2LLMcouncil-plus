@@ -1,0 +1,231 @@
+diff --git a/backend/council.py b/backend/council.py
+index d2ce519..fff3043 100644
+--- a/backend/council.py
++++ b/backend/council.py
+@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Tuple
+ import asyncio
+ import logging
+ import re
++import time
+ from . import openrouter
+ from . import ollama_client
+ from .config import get_council_models, get_chairman_model
+@@ -13,6 +14,127 @@ from .prompts import apply_response_language
+ 
+ logger = logging.getLogger(__name__)
+ 
++_NOTION_COUNCIL_LOCK: asyncio.Lock | None = None
++_NOTION_STAGGER_SECONDS = 3.0
++_NOTION_503_PAUSE_SECONDS = 30.0
++_NOTION_503_MAX_RETRIES = 2
++_last_notion_call_started_at = 0.0
++
++
++def _is_notion2api_custom_endpoint() -> bool:
++    settings = get_settings()
++    if not settings.enabled_providers.get("custom"):
++        return False
++    name = (settings.custom_endpoint_name or "").lower()
++    url = (settings.custom_endpoint_url or "").lower()
++    if "notion" in name or "notion2api" in name:
++        return True
++    return "notion" in url or "notion2api" in url
++
++
++def _notion_council_lock() -> asyncio.Lock | None:
++    global _NOTION_COUNCIL_LOCK
++    if not _is_notion2api_custom_endpoint():
++        return None
++    if _NOTION_COUNCIL_LOCK is None:
++        _NOTION_COUNCIL_LOCK = asyncio.Lock()
++    return _NOTION_COUNCIL_LOCK
++
++
++async def _wait_notion_stagger() -> None:
++    global _last_notion_call_started_at
++    now = time.monotonic()
++    if _last_notion_call_started_at > 0:
++        delay = _NOTION_STAGGER_SECONDS - (now - _last_notion_call_started_at)
++        if delay > 0:
++            await asyncio.sleep(delay)
++    _last_notion_call_started_at = time.monotonic()
++
++
++def _vary_notion_thread_title(model: str, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
++    """Put the model name on its own first line so Notion thread titles differ per member."""
++    if not _is_notion2api_custom_endpoint():
++        return messages
++    normalized = (model or "").strip().lower()
++    if not normalized.startswith("custom:"):
++        return messages
++
++    label = model.split(":", 1)[-1].strip() or model
++    varied: List[Dict[str, str]] = []
++    for msg in messages:
++        if msg.get("role") != "user":
++            varied.append(msg)
++            continue
++        content = msg.get("content")
++        if not isinstance(content, str) or not content.strip():
++            varied.append(msg)
++            continue
++        first_line = content.splitlines()[0].strip() if content else ""
++        if first_line == label:
++            varied.append(msg)
++        else:
++            varied.append({**msg, "content": f"{label}\n{content}"})
++    return varied
++
++
++def _is_notion_overload_result(result: Dict[str, Any] | None) -> bool:
++    if not result or not result.get("error"):
++        return False
++    if result.get("rate_limited"):
++        return True
++    message = (result.get("error_message") or "").lower()
++    if any(marker in message for marker in ("503", "service unavailable", "rate limit", "rate_limit")):
++        return True
++    timeline = result.get("debug_timeline") or []
++    if timeline:
++        try:
++            return int(timeline[-1].get("status") or 0) == 503
++        except (TypeError, ValueError):
++            return False
++    return False
++
++
++async def _query_model_gated(
++    model: str,
++    messages: List[Dict[str, str]],
++    *,
++    timeout: float,
++    temperature: float,
++    attachments: List[Dict[str, Any]] | None = None,
++) -> Dict[str, Any]:
++    """Serialize Notion2API custom calls with stagger and 503 backoff."""
++    lock = _notion_council_lock() if (model or "").strip().lower().startswith("custom:") else None
++    if lock is None:
++        return await query_model(
++            model, messages, timeout=timeout, temperature=temperature, attachments=attachments
++        )
++
++    messages = _vary_notion_thread_title(model, messages)
++
++    async with lock:
++        await _wait_notion_stagger()
++        result = await query_model(
++            model, messages, timeout=timeout, temperature=temperature, attachments=attachments
++        )
++
++        retries = 0
++        while _is_notion_overload_result(result) and retries < _NOTION_503_MAX_RETRIES:
++            retries += 1
++            logger.warning(
++                "Notion2API overload for %s; pausing %.0fs before retry %d/%d",
++                model,
++                _NOTION_503_PAUSE_SECONDS,
++                retries,
++                _NOTION_503_MAX_RETRIES,
++            )
++            await asyncio.sleep(_NOTION_503_PAUSE_SECONDS)
++            _last_notion_call_started_at = time.monotonic()
++            result = await query_model(
++                model, messages, timeout=timeout, temperature=temperature, attachments=attachments
++            )
++
++        return result
++
+ 
+ THINK_BLOCK_RE = re.compile(r"<think\b[^>]*>[\s\S]*?</think>", re.IGNORECASE)
+ UNCLOSED_THINK_RE = re.compile(r"<think\b[^>]*>[\s\S]*$", re.IGNORECASE)
+@@ -57,10 +179,21 @@ def get_provider_for_model(model_id: str) -> Any:
+     return PROVIDERS["openrouter"]
+ 
+ 
+-async def query_model(model: str, messages: List[Dict[str, str]], timeout: float = 120.0, temperature: float = 0.7) -> Dict[str, Any]:
++async def query_model(
++    model: str,
++    messages: List[Dict[str, str]],
++    timeout: float = 120.0,
++    temperature: float = 0.7,
++    attachments: List[Dict[str, Any]] | None = None,
++) -> Dict[str, Any]:
+     """Dispatch query to appropriate provider."""
+     provider = get_provider_for_model(model)
+-    response = await provider.query(model, messages, timeout, temperature)
++    try:
++        response = await provider.query(
++            model, messages, timeout, temperature, attachments=attachments
++        )
++    except TypeError:
++        response = await provider.query(model, messages, timeout, temperature)
+     if isinstance(response, dict):
+         return await attach_cost(model, response)
+     return response
+@@ -136,7 +269,8 @@ async def stage1_collect_responses(
+     models_override: "List[str] | None" = None,
+     history: "List[Dict[str, str]] | None" = None,
+     messages_override: "List[Dict[str, str]] | None" = None,
+-    per_model_messages: "Dict[str, List[Dict[str, str]]] | None" = None
++    per_model_messages: "Dict[str, List[Dict[str, str]]] | None" = None,
++    attachments: List[Dict[str, Any]] | None = None,
+ ) -> Any:
+     """
+     Stage 1: Collect individual responses from all council models.
+@@ -149,6 +283,7 @@ async def stage1_collect_responses(
+         history: Prior conversation turns as [{role, content}, ...] for multi-turn
+         messages_override: Optional messages override to bypass default prompt
+         per_model_messages: Optional messages per model
++        attachments: Optional file attachments for Notion2API uploads
+ 
+     Yields:
+         - First yield: total_models (int)
+@@ -191,11 +326,18 @@ async def stage1_collect_responses(
+     yield len(models)
+ 
+     council_temp = settings.council_temperature
++    model_timeout = getattr(settings, "model_timeout_seconds", 300)
+ 
+     async def _query_safe(m: str):
+         try:
+             model_msgs = per_model_messages.get(m, messages) if per_model_messages else messages
+-            return m, await query_model(m, model_msgs, temperature=council_temp)
++            return m, await _query_model_gated(
++                m,
++                model_msgs,
++                timeout=model_timeout,
++                temperature=council_temp,
++                attachments=attachments,
++            )
+         except Exception as e:
+             return m, {"error": True, "error_message": str(e)}
+ 
+@@ -342,10 +484,13 @@ async def stage2_collect_rankings(
+ 
+     # Use dedicated Stage 2 temperature (lower for consistent ranking output)
+     stage2_temp = settings.stage2_temperature
++    model_timeout = getattr(settings, "model_timeout_seconds", 300)
+ 
+     async def _query_safe(m: str):
+         try:
+-            return m, await query_model(m, messages, temperature=stage2_temp)
++            return m, await _query_model_gated(
++                m, messages, timeout=model_timeout, temperature=stage2_temp
++            )
+         except Exception as e:
+             return m, {"error": True, "error_message": str(e)}
+ 
+@@ -511,9 +656,12 @@ async def stage3_synthesize_final(
+     # Query the chairman model with error handling
+     chairman_model = chairman_override if chairman_override else get_chairman_model()
+     chairman_temp = settings.chairman_temperature
++    model_timeout = getattr(settings, "model_timeout_seconds", 300)
+ 
+     try:
+-        response = await query_model(chairman_model, messages, temperature=chairman_temp)
++        response = await _query_model_gated(
++            chairman_model, messages, timeout=model_timeout, temperature=chairman_temp
++        )
+ 
+         # Check for error in response
+         if response is None or response.get('error'):

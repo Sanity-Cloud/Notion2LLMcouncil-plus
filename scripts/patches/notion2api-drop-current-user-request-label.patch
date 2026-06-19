@@ -1,0 +1,12 @@
+diff --git a/app/conversation.py b/app/conversation.py
+index cae3d92..7b02490 100644
+--- a/app/conversation.py
++++ b/app/conversation.py
+@@ -2106,7 +2106,6 @@ def build_standard_transcript(
+                 prompt_parts.append("[Previous conversation context]")
+                 prompt_parts.append("\n\n".join(history_lines))
+ 
+-        prompt_parts.append("[Current user request]")
+         prompt_parts.append(latest_user_content)
+ 
+         transcript.append({

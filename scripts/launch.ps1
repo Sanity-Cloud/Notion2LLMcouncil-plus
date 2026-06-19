@@ -12,6 +12,7 @@ param(
     [switch]$UseVendor,
     [switch]$RefreshLogin,
     [switch]$NoBrowser,
+    [switch]$NoPause,
     [switch]$SetupOnly,
     [switch]$Stop
 )
@@ -604,34 +605,27 @@ function Set-CouncilSettings {
         Write-Warning "Skipping provider key-sync verification because provider auto-repair is disabled and drift was left unchanged."
     }
 
-    # API Smoke Test using the newly verified custom endpoint
-    Write-Step "Performing backend end-to-end API smoke test"
-    $askUrl = "http://127.0.0.1:$CouncilBackendPort/api/ask"
-    $testModel = if ($ConfiguredCouncilModels -and $ConfiguredCouncilModels.Count -gt 0) { $ConfiguredCouncilModels[0] } else { "custom:gpt-5.5" }
-
-    $askBody = [ordered]@{
-        content = "Ping! Respond with exactly 'pong' to verify connection."
-        models = @($testModel)
-        execution_mode = "chat_only"
+    # Connectivity smoke test: validate custom endpoint via /models only.
+    # Do not send chat "pong" probes through /api/ask — that creates Notion threads
+    # when persistThreads is enabled.
+    Write-Step "Performing custom provider connectivity smoke test"
+    $testUrl = "http://127.0.0.1:$CouncilBackendPort/api/settings/test-custom-endpoint"
+    $testBody = [ordered]@{
+        name    = $ProviderName
+        url     = $expectedUrl
+        api_key = $NotionApiKey
     } | ConvertTo-Json
 
     try {
-        Write-Step "Sending smoke test query with model '$testModel'..."
-        $response = Invoke-RestMethod -Method Post -Uri $askUrl -ContentType "application/json" -Body $askBody -TimeoutSec 30
-        if ($response.responses) {
-            $firstResp = $response.responses[0]
-            if ($firstResp.error) {
-                Write-Warning "Smoke test model returned error: $($firstResp.error)"
-            } else {
-                Write-Step "Smoke test successful! Response: $($firstResp.response)"
-            }
-        } elseif ($response.response) {
-            Write-Step "Smoke test successful! Response: $($response.response)"
+        Write-Step "Validating custom endpoint at $expectedUrl ..."
+        $response = Invoke-RestMethod -Method Post -Uri $testUrl -ContentType "application/json" -Body $testBody -TimeoutSec 30
+        if ($response.error) {
+            Write-Warning "Custom endpoint smoke test warning: $($response.error)"
         } else {
-            Write-Warning "Smoke test returned empty or unexpected response format: $(ConvertTo-Json $response)"
+            Write-Step "Custom endpoint smoke test successful."
         }
     } catch {
-        Write-Warning "API smoke test warning: $($_.Exception.Message). (Continuing stack startup as services are running)"
+        Write-Warning "Custom endpoint smoke test warning: $($_.Exception.Message). (Continuing stack startup as services are running)"
     }
 }
 
@@ -744,7 +738,12 @@ if ($UseVendor) {
 $NotionRoot = (Resolve-Path $NotionRoot).Path
 $CouncilRoot = (Resolve-Path $CouncilRoot).Path
 
-Apply-SubmodulePatches -CouncilRoot $CouncilRoot -RepoRoot $RepoRoot
+if ($UseVendor) {
+    Apply-Notion2ApiPatches -NotionRoot $NotionRoot -RepoRoot $RepoRoot
+    Apply-SubmodulePatches -CouncilRoot $CouncilRoot -RepoRoot $RepoRoot
+} else {
+    Write-Step "Bypassing patch application for external canonical checkouts"
+}
 
 Write-Step "Preparing Services"
 Initialize-PythonRequirements -Root $NotionRoot -Label "Notion2API" -RequiredModules @("cloudscraper", "fastapi", "uvicorn", "dotenv", "slowapi", "websocket")
@@ -770,6 +769,6 @@ Write-Host "  Logs:              $LogDir`n"
 
 if (-not $NoBrowser) { Start-Process "http://127.0.0.1:$CouncilFrontendPort/" }
 
-if (-not $env:GITHUB_ACTIONS) {
+if (-not $env:GITHUB_ACTIONS -and -not $NoPause) {
     Pause
 }

@@ -13,6 +13,13 @@ config/local.json
 **/settings.live-drift-test-backup-*.json
 **/conversations/
 
+# Submodule runtime and scratch artifacts
+**/.notion2council-requirements.sha256
+**/.patches-applied
+**/.notion2api_mcp_chat_jobs.json
+**/.notion2api_mcp_sessions.json
+**/app/mcp_server.py.bak-*
+
 # Build and dependencies
 node_modules/
 release/

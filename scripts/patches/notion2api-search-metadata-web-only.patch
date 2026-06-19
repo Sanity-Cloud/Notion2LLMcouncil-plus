@@ -1,0 +1,193 @@
+diff --git a/app/api/chat.py b/app/api/chat.py
+index 1711fd9..2d9b5fd 100644
+--- a/app/api/chat.py
++++ b/app/api/chat.py
+@@ -145,25 +145,122 @@ def _resolve_request_model(model: str | None) -> str:
+     return normalized_model
+ 
+ 
+-def _local_probe_response_text(content: Any) -> str:
+-    """Return a local response for health/preflight prompts that must not persist."""
+-    if not isinstance(content, str):
++def _client_type_from_request(request: Request) -> str:
++    return request.headers.get("X-Client-Type", "").strip().lower()
++
++
++def _emit_search_metadata_for_client(client_type: str) -> bool:
++    return client_type == "web"
++
++
++def _message_content_to_text(content: Any) -> str:
++    """Flatten OpenAI string or multipart message content to plain text."""
++    if content is None:
+         return ""
++    if isinstance(content, str):
++        return content
++    if isinstance(content, list):
++        parts: list[str] = []
++        for item in content:
++            if isinstance(item, str):
++                if item:
++                    parts.append(item)
++                continue
++            if not isinstance(item, dict):
++                continue
++            item_type = str(item.get("type") or "").lower()
++            if item_type in {"input_text", "output_text", "text"} or "text" in item:
++                text = str(item.get("text") or "")
++                if text:
++                    parts.append(text)
++        return "\n".join(parts)
++    return str(content)
++
++
++def _last_user_message_content(messages: Iterable[Any]) -> Any:
++    """Return the content field from the last user message, if any."""
++    for message in reversed(list(messages)):
++        role = getattr(message, "role", None)
++        if role is None and isinstance(message, dict):
++            role = message.get("role")
++        if role != "user":
++            continue
++        content = getattr(message, "content", None)
++        if content is None and isinstance(message, dict):
++            content = message.get("content")
++        return content
++    return ""
++
++
++_LOCAL_PROBE_OK = frozenset({
++    "reply with ok.",
++    "reply with ok",
++    "respond with ok.",
++    "respond with ok",
++})
++
++_LOCAL_PROBE_PONG = frozenset({
++    "ping! respond with exactly 'pong' to verify connection.",
++    "reply with exactly: pong",
++    "reply with exactly pong",
++})
++
++
++def _normalize_probe_text(content: Any) -> str:
++    text = _message_content_to_text(content)
++    if not text:
++        return ""
++    return " ".join(text.strip().split()).lower()
++
+ 
+-    normalized = " ".join(content.strip().split()).lower()
+-    if normalized in {
+-        "reply with ok.",
+-        "reply with ok",
+-        "respond with ok.",
+-        "respond with ok",
+-    }:
+-        return "OK"
+-    if normalized in {
+-        "ping! respond with exactly 'pong' to verify connection.",
+-        "reply with exactly: pong",
+-        "reply with exactly pong",
+-    }:
+-        return "pong"
++def _strip_probe_markdown_prefix(text: str) -> str:
++    stripped = text.strip()
++    while stripped.startswith("#"):
++        stripped = stripped.lstrip("#").strip()
++    return stripped
++
++
++def _probe_match_candidates(content: Any) -> list[str]:
++    """Collect normalized strings that may be bare or wrapped probe prompts."""
++    text = _message_content_to_text(content)
++    if not text:
++        return []
++
++    candidates: list[str] = []
++
++    def _add(candidate: str) -> None:
++        normalized = " ".join(candidate.strip().split()).lower()
++        if not normalized:
++            return
++        if normalized not in candidates:
++            candidates.append(normalized)
++        markdown_stripped = _strip_probe_markdown_prefix(normalized)
++        if markdown_stripped and markdown_stripped not in candidates:
++            candidates.append(markdown_stripped)
++
++    _add(text)
++
++    for match in re.finditer(r"(?im)^\s*question:\s*(.+?)\s*$", text):
++        _add(match.group(1))
++
++    for match in re.finditer(r"(?i)\[current user request\]\s*(.+)$", text, flags=re.DOTALL):
++        tail = match.group(1).strip()
++        if not tail:
++            continue
++        _add(tail)
++        for question_match in re.finditer(r"(?im)^\s*question:\s*(.+?)\s*$", tail):
++            _add(question_match.group(1))
++
++    return candidates
++
++
++def _local_probe_response_text(content: Any) -> str:
++    """Return a local response for health/preflight prompts that must not persist."""
++    for normalized in _probe_match_candidates(content):
++        if normalized in _LOCAL_PROBE_OK:
++            return "OK"
++        if normalized in _LOCAL_PROBE_PONG:
++            return "pong"
+     return ""
+ 
+ 
+@@ -669,6 +766,8 @@ def _create_standard_stream_generator(
+     model_name: str,
+     first_item: Any,
+     stream_gen: Iterable[Any],
++    *,
++    client_type: str = "",
+ ) -> Generator[str, None, None]:
+     """
+     Standard 模式流式生成器：使用前端定义的 SSE 事件类型
+@@ -819,8 +918,10 @@ def _create_standard_stream_generator(
+                     )
+                 streamed_content_accumulator = final_reply
+ 
+-        # 输出搜索结果（使用前端定义的 search_metadata 类型）
+-        if collected_search_sources or collected_search_queries:
++        # 输出搜索结果（使用前端定义的 search_metadata 类型；仅 web UI 客户端）
++        if _emit_search_metadata_for_client(client_type) and (
++            collected_search_sources or collected_search_queries
++        ):
+             search_metadata = {
+                 "type": "search_metadata",
+                 "searches": {
+@@ -1166,6 +1267,7 @@ def _handle_standard_request(
+ 
+     response_id = f"chatcmpl-{uuid.uuid4().hex}"
+     max_retries = max(3, len(pool.clients))
++    client_type = _client_type_from_request(request)
+ 
+     for attempt in range(1, max_retries + 1):
+         client = None
+@@ -1235,6 +1337,7 @@ def _handle_standard_request(
+                         req_body.model,
+                         first_item,
+                         stream_gen,
++                        client_type=client_type,
+                     ),
+                     media_type="text/event-stream",
+                     headers=stream_headers,
+@@ -1431,8 +1534,8 @@ async def create_chat_completion(
+ 
+     # Check for local smoke/preflight messages to avoid creating new chats in Notion.
+     if req_body.messages:
+-        last_content = req_body.messages[-1].content or ""
+-        probe_response = _local_probe_response_text(last_content)
++        last_user_content = _last_user_message_content(req_body.messages)
++        probe_response = _local_probe_response_text(last_user_content)
+         if probe_response:
+             response_id = f"chatcmpl-{uuid.uuid4().hex}"
+             if req_body.stream:

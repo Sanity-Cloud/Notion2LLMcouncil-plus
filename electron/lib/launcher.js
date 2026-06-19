@@ -217,7 +217,11 @@ function startStack({ noBrowser = true } = {}) {
   }
 
   const args = getBaseLaunchArgs();
-  if (noBrowser) args.push('-NoBrowser');
+  args.push('-UseVendor');
+  if (noBrowser) {
+    args.push('-NoBrowser');
+    args.push('-NoPause');
+  }
   launcherProcess = runPowerShell(getScriptPath('launch.ps1'), args);
   return launcherProcess;
 }

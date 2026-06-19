@@ -113,20 +113,6 @@ function requestJsonPost(url, bodyObject, options = {}) {
   });
 }
 
-function getCouncilSmokePayload(config, options = {}) {
-  const testModel = (Array.isArray(config.councilModels) && config.councilModels.length > 0)
-    ? config.councilModels[0]
-    : 'custom:gpt-5.5';
-  return {
-    content: options.content || 'Reply with exactly: pong',
-    models: [testModel],
-    chairman_model: config.chairmanModel || 'custom:claude-opus4.7',
-    web_search: false,
-    execution_mode: 'chat_only',
-  };
-}
-
-
 function titleContains(body, expectedTitle) {
   if (!expectedTitle) return true;
   const match = /<title>(.*?)<\/title>/is.exec(body || '');
@@ -221,29 +207,28 @@ async function getDiagnosticsStatus() {
       let smokeDetail = '';
       if (enabled && urlMatches && config.askSmokeTest !== false) {
         try {
-          const smokePayload = getCouncilSmokePayload(config, {
-            content: 'Reply with exactly: pong'
-          });
-          const smokeRes = await requestJsonPost(`${runtimeCouncilBackendUrl}/api/ask`, smokePayload, { timeoutMs: 30000 });
+          const smokeRes = await requestJsonPost(
+            `${runtimeCouncilBackendUrl}/api/settings/test-custom-endpoint`,
+            {
+              name: settings.custom_endpoint_name || config.providerName || 'Notion2API',
+              url: runtimeProviderUrl,
+              api_key: apiKey || settings.custom_endpoint_api_key || '',
+            },
+            { timeoutMs: 30000 }
+          );
           if (smokeRes.ok) {
             const smokeJson = JSON.parse(smokeRes.body);
-            if (smokeJson.responses && smokeJson.responses[0]) {
-              const firstResp = smokeJson.responses[0];
-              if (firstResp.error) {
-                smokeTestOk = false;
-                smokeDetail = `Smoke test model returned error: ${firstResp.error}`;
-              }
-            } else if (smokeJson.error) {
+            if (smokeJson.error) {
               smokeTestOk = false;
-              smokeDetail = `Smoke test returned error: ${smokeJson.error}`;
+              smokeDetail = `Custom endpoint smoke test error: ${smokeJson.error}`;
             }
           } else {
             smokeTestOk = false;
-            smokeDetail = `Smoke test HTTP failed: ${smokeRes.statusCode || smokeRes.error || 'unknown error'}`;
+            smokeDetail = `Custom endpoint smoke test HTTP failed: ${smokeRes.statusCode || smokeRes.error || 'unknown error'}`;
           }
         } catch (smokeError) {
           smokeTestOk = false;
-          smokeDetail = `Smoke test failed: ${smokeError.message}`;
+          smokeDetail = `Custom endpoint smoke test failed: ${smokeError.message}`;
         }
       }
 
