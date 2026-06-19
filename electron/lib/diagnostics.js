@@ -166,17 +166,25 @@ async function getDiagnosticsStatus() {
       : Promise.resolve({ name: 'Notion2API models', url: notionModelsUrl, ok: false, detail: 'API_KEY is missing from Notion2API .env' }),
   ]);
 
-  const [settingsExportRes, askRes, healthRes] = await Promise.all([
+  const [settingsExportRes, openapiRes, healthRes] = await Promise.all([
     requestText(`${runtimeCouncilBackendUrl}/api/settings/export`),
-    requestText(`${runtimeCouncilBackendUrl}/api/ask`),
+    requestText(`${runtimeCouncilBackendUrl}/openapi.json`),
     requestText(`${runtimeCouncilBackendUrl}/api/health`),
   ]);
+
+  let askCapable = false;
+  if (openapiRes.ok) {
+    try {
+      const spec = JSON.parse(openapiRes.body);
+      askCapable = !!(spec.paths && spec.paths['/api/ask']);
+    } catch (e) {}
+  }
 
   const capabilities = {
     settings: services.find(s => s.name === 'LLM Council backend')?.ok || false,
     settingsExport: settingsExportRes.ok,
     settingsImport: settingsExportRes.ok,
-    ask: askRes.statusCode !== 404,
+    ask: askCapable,
     health: healthRes.ok,
   };
 

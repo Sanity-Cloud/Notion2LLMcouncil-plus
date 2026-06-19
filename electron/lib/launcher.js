@@ -196,6 +196,12 @@ function getBaseLaunchArgs() {
   ];
 }
 
+function usesBundledVendorRoots(integration) {
+  const normalize = value => path.resolve(value).toLowerCase();
+  return normalize(integration.notionRoot) === normalize(path.join(getAppRoot(), 'vendor', 'notion2api'))
+    && normalize(integration.councilRoot) === normalize(path.join(getAppRoot(), 'vendor', 'the-ai-counsel'));
+}
+
 function startStack({ noBrowser = true } = {}) {
   if (launcherProcess && !launcherProcess.killed) return launcherProcess;
 
@@ -217,7 +223,11 @@ function startStack({ noBrowser = true } = {}) {
   }
 
   const args = getBaseLaunchArgs();
-  args.push('-UseVendor');
+  if (usesBundledVendorRoots(integration)) {
+    args.push('-UseVendor');
+  } else {
+    appendLog(`Using external canonical roots: notion=${integration.notionRoot}; council=${integration.councilRoot}`);
+  }
   if (noBrowser) {
     args.push('-NoBrowser');
     args.push('-NoPause');
