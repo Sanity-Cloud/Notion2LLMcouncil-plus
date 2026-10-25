@@ -765,7 +765,14 @@ Write-Host "`nReady:"
 Write-Host "  Notion2API:        http://127.0.0.1:$NotionPort"
 Write-Host "  LLM Council API:   http://127.0.0.1:$CouncilBackendPort"
 Write-Host "  LLM Council UI:    http://127.0.0.1:$CouncilFrontendPort"
-Write-Host "  Logs:              $LogDir`n"
+Write-Host "  Logs:              $LogDir"
+
+# Read-only diagnostics; never reveal the configured API key.
+Write-Host "`nProvider diagnostics:"
+Write-Host "  Endpoint:          http://127.0.0.1:$NotionPort$ProviderUrlPath"
+Write-Host "  API key configured: $(-not [string]::IsNullOrWhiteSpace($notionApiKey))"
+Write-Host "  Persist threads:   $NotionPersistThreads"
+Write-Host "  Delete ephemeral:  $NotionDeleteEphemeralThreads`n"
 
 if (-not $NoBrowser) { Start-Process "http://127.0.0.1:$CouncilFrontendPort/" }
 
